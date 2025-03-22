@@ -8,6 +8,24 @@ const FieldDetail: React.FC = () => {
   const router = useRouter();
   const { name, price, location, image, description } = useLocalSearchParams();
 
+  const fields = [
+    {
+      id: 1,
+      image: "https://via.placeholder.com/150",
+      prev: "Ảnh 1",
+    },
+    {
+      id: 2,
+      image: "https://via.placeholder.com/150",
+      prev: "Ảnh 2",
+    },
+    {
+      id: 3,
+      image: "https://via.placeholder.com/150",
+      prev: "Ảnh 3",
+    },
+  ];
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -48,12 +66,45 @@ const FieldDetail: React.FC = () => {
         {/* Mô tả */}
         <Text style={styles.descriptionTitle}>Mô tả</Text>
         <Text style={styles.description}>{description}</Text>
+
+        <Text style={styles.preview}>Một số hình ảnh của sân</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+          {fields.map((field) => (
+            <TouchableOpacity
+              key={field.id}
+              onPress={() =>
+                router.push({
+                  pathname: "/field_detail",
+                  params: field,
+                 })
+              }
+            >
+              <View style={styles.styleprev}>
+                <Image source={{ uri: field.image }} style={styles.previmg} />
+                <Text>{field.prev}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </ScrollView>
 
       {/* Nút đặt sân */}
       <View style={styles.bookingContainer}>
-        <TouchableOpacity style={styles.bookingButton}>
-          <Text style={styles.bookingText}>Đặt ngay</Text>
+        <TouchableOpacity 
+          style={styles.bookingButton} 
+          onPress={() => 
+            router.push({
+              pathname: "/payment", // Đường dẫn tới màn hình chọn giờ & thanh toán
+              params: {
+                name, 
+                price, 
+                location, 
+                image,
+              }
+            })
+          }
+        >
+        <Text style={styles.bookingText}>Đặt ngay</Text>
         </TouchableOpacity>
       </View>
 
@@ -125,6 +176,25 @@ const styles = StyleSheet.create({
   },
   description: {
     color: "#6B7280",
+  },
+  preview: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginTop: 8,
+  },
+  horizontalScroll: {
+    marginBottom: 16,
+  },
+  styleprev: {
+    backgroundColor: "white",
+    padding: 8,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  previmg: {
+    width: 150,
+    height: 100,
+    borderRadius: 8,
   },
   bookingContainer: {
     position: "absolute",
