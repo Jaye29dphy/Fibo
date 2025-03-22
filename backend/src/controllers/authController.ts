@@ -81,10 +81,10 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET || "secret");
 
     const [users]: any = await pool.execute(
-      "SELECT user_id, full_name, email FROM users WHERE user_id = ?",
+      "SELECT user_id, full_name, email, phone, role, status, created_at FROM users WHERE user_id = ?",
       [decoded.id] // Lấy user_id từ token
     );
-    
+
 
     if (!Array.isArray(users) || users.length === 0) {
       res.status(404).json({ error: "User not found" });
