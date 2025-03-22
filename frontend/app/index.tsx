@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { View, Text, TextInput, Button, StyleSheet, Alert } from "react-native";
+import React, { useState } from "react";
+import { View, Text, TextInput, Button, StyleSheet, Alert, ImageBackground } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -16,10 +16,10 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [user, setUser] = useState<User | null>(null);
-  const [error, setError] = useState<string | null>(null); // ✅ Lưu lỗi đăng nhập
+  const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async () => {
-    setError(null); // Xóa lỗi cũ trước khi gửi request
+    setError(null);
 
     try {
       const response = await fetch("http://localhost:5000/api/auth/login", {
@@ -51,39 +51,51 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Đăng Nhập</Text>
+    <ImageBackground
+      source={require("../assets/images/anhbia.jpg")}
+      style={styles.backgroundImage}
+    >
+      <View style={styles.overlay}>
+        <Text style={styles.title}>Đăng Nhập</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Mật khẩu"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Mật khẩu"
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+        />
 
-      {error && <Text style={styles.error}>{error}</Text>} {/* ✅ Hiển thị lỗi */}
+        {error && <Text style={styles.error}>{error}</Text>}
 
-      <Button title="Đăng Nhập" onPress={handleLogin} />
+        <Button title="Đăng Nhập" onPress={handleLogin} />
 
-      <Text onPress={() => router.push("/register")} style={styles.link}>
-        Chưa có tài khoản? Đăng ký
-      </Text>
-    </View>
+        <Text onPress={() => router.push("/register")} style={styles.link}>
+          Chưa có tài khoản? Đăng ký
+        </Text>
+      </View>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  backgroundImage: {
     flex: 1,
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover", // Ảnh sẽ tự động phóng to để lấp kín màn hình
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)", // Tạo lớp phủ mờ
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
@@ -91,11 +103,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "bold",
+    color: "white", // Đổi chữ thành màu trắng để nổi bật trên nền tối
     marginBottom: 20,
   },
   input: {
     width: "100%",
     padding: 10,
+    backgroundColor: "white",
     borderWidth: 1,
     borderColor: "gray",
     borderRadius: 5,
@@ -107,7 +121,7 @@ const styles = StyleSheet.create({
   },
   link: {
     marginTop: 10,
-    color: "blue",
+    color: "lightblue",
     textDecorationLine: "underline",
   },
 });

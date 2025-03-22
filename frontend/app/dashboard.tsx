@@ -1,80 +1,90 @@
-import { useEffect, useState } from "react";
-import { View, Text, Button, StyleSheet, ActivityIndicator } from "react-native";
-import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import BottomTabs from "./BottomTabs"; // Import thanh điều hướng
 
-type User = {
-  id: number;
-  name: string;
-  email: string;
-  role: string;
+type OptionButtonProps = {
+  label: string;
+  color: string;
+  icon: keyof typeof Ionicons.glyphMap;
 };
 
 export default function Dashboard() {
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true); // Thêm state loading
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      setLoading(true); // Bắt đầu loading
-      const token = await AsyncStorage.getItem("token");
-      if (!token) {
-        router.replace("/"); // Nếu chưa đăng nhập, quay về Login
-        return;
-      }
-
-      try {
-        const response = await fetch("http://localhost:5000/api/auth/me", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error("Unauthorized");
-
-        setUser(data);
-      } catch (error) {
-        await AsyncStorage.removeItem("token"); // Xóa token nếu lỗi
-        router.replace("/");
-      } finally {
-        setLoading(false); // Kết thúc loading
-      }
-    };
-
-    checkAuth();
-  }, []);
-
-  const handleLogout = async () => {
-    await AsyncStorage.removeItem("token");
-    router.replace("/");
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#0000ff" />
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Chào mừng {user?.name || "User"}!</Text>
-      <Text>Email: {user?.email}</Text>
-      <Button title="Đăng xuất" onPress={handleLogout} />
+      {/* Logo */}
+      <View style={styles.logoContainer}>
+        <Image source={require("../assets/images/react-logo.png")} style={styles.logo} />
+      </View>
+
+      {/* Header Text */}
+      <Text style={styles.headerText}>Kết nối đam mê, đặt sân mọi lúc!</Text>
+
+      {/* Option Buttons */}
+      <View style={styles.optionsContainer}>
+        <OptionButton label="Bóng đá" color="#4CAF50" icon="football-outline" />
+        <OptionButton label="Bóng rổ" color="#F44336" icon="basketball-outline" />
+        <OptionButton label="Cầu lông" color="#3F51B5" icon="tennisball-outline" />
+        <OptionButton label="Pickle ball" color="#9C27B0" icon="ellipse-outline" />
+        <OptionButton label="Tennis" color="#CDDC39" icon="tennisball-outline" />
+      </View>
+
+      {/* Thanh điều hướng */}
+      <BottomTabs />
     </View>
+  );
+}
+
+function OptionButton({ label, color, icon }: OptionButtonProps) {
+  return (
+    <TouchableOpacity style={[styles.optionButton, { backgroundColor: color }]}>
+      <Ionicons name={icon} size={40} color="white" style={styles.icon} />
+      <Text style={styles.optionText}>{label}</Text>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
+    backgroundColor: "#fff",
   },
-  title: {
-    fontSize: 24,
+  logoContainer: {
+    alignItems: "center",
+    marginTop: 30,
+  },
+  logo: {
+    width: 70,
+    height: 70,
+    resizeMode: "contain",
+  },
+  headerText: {
+    fontSize: 20,
     fontWeight: "bold",
+    color: "#3F51B5",
+    textAlign: "center",
+    marginTop: 10,
     marginBottom: 20,
+  },
+  optionsContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "space-evenly",
+  },
+  optionButton: {
+    width: "80%",
+    aspectRatio: 4.5,
+    borderRadius: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 15,
+    elevation: 2,
+  },
+  icon: {
+    marginRight: 15,
+  },
+  optionText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
   },
 });
