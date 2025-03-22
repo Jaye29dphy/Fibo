@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AntDesign } from "@expo/vector-icons";
 
 type User = {
   id: number;
@@ -41,10 +42,10 @@ export default function ProfileScreen() {
     checkAuth();
   }, []);
   const handleLogout = () => {
-     router.replace('/');
+    router.replace('/');
   };
-  
-  
+
+
 
   if (loading) {
     return (
@@ -57,7 +58,13 @@ export default function ProfileScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerText}>Hồ sơ</Text>
+        <AntDesign
+          name="arrowleft"
+          size={24}
+          color="white"
+          onPress={() => router.back()} // Điều hướng quay lại
+        />
+        <Text style={styles.title}>Hồ Sơ</Text>
       </View>
       <Image
         source={{ uri: 'https://randomuser.me/api/portraits/women/79.jpg' }} // Ảnh đại diện mẫu
@@ -80,15 +87,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   header: {
-    backgroundColor: '#42ba96',
-    height: 70,
-    justifyContent: 'center',
+    backgroundColor: "#42BA96",
+    paddingVertical: 15,
     paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
   },
-  headerText: {
-    color: '#fff',
+  title: {
+    color: "white",
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
+    marginLeft: 10,
   },
   avatar: {
     width: 120,

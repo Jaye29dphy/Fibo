@@ -1,14 +1,18 @@
 import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router"; // Dùng expo-router thay vì react-navigation
 import BottomTabs from "./BottomTabs"; // Import thanh điều hướng
 
 type OptionButtonProps = {
   label: string;
   color: string;
   icon: keyof typeof Ionicons.glyphMap;
+  onPress?: () => void;
 };
 
 export default function Dashboard() {
+  const router = useRouter(); // Dùng router để điều hướng
+
   return (
     <View style={styles.container}>
       {/* Logo */}
@@ -21,7 +25,12 @@ export default function Dashboard() {
 
       {/* Option Buttons */}
       <View style={styles.optionsContainer}>
-        <OptionButton label="Bóng đá" color="#4CAF50" icon="football-outline" />
+        <OptionButton 
+          label="Bóng đá" 
+          color="#4CAF50" 
+          icon="football-outline" 
+          onPress={() => router.push("/pickfield")} // Điều hướng với expo-router
+        />
         <OptionButton label="Bóng rổ" color="#F44336" icon="basketball-outline" />
         <OptionButton label="Cầu lông" color="#3F51B5" icon="tennisball-outline" />
         <OptionButton label="Pickle ball" color="#9C27B0" icon="ellipse-outline" />
@@ -34,9 +43,9 @@ export default function Dashboard() {
   );
 }
 
-function OptionButton({ label, color, icon }: OptionButtonProps) {
+function OptionButton({ label, color, icon, onPress }: OptionButtonProps) {
   return (
-    <TouchableOpacity style={[styles.optionButton, { backgroundColor: color }]}>
+    <TouchableOpacity style={[styles.optionButton, { backgroundColor: color }]} onPress={onPress}>
       <Ionicons name={icon} size={40} color="white" style={styles.icon} />
       <Text style={styles.optionText}>{label}</Text>
     </TouchableOpacity>
