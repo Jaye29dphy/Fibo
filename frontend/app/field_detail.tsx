@@ -6,7 +6,7 @@ import BottomTabs from "./BottomTabs";
 
 const FieldDetail: React.FC = () => {
   const router = useRouter();
-  const { name, price, location, image, description } = useLocalSearchParams(); // Nhận params từ expo-router
+  const { name, price, location, image, description } = useLocalSearchParams();
 
   return (
     <View style={styles.container}>
@@ -18,7 +18,8 @@ const FieldDetail: React.FC = () => {
         <Text style={styles.title}>Chi tiết sân bóng</Text>
       </View>
 
-      <ScrollView style={styles.content}>
+      {/* Nội dung chính */}
+      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 120 }}>
         {/* Ảnh sân */}
         <Image source={{ uri: image as string }} style={styles.image} />
 
@@ -47,17 +48,16 @@ const FieldDetail: React.FC = () => {
         {/* Mô tả */}
         <Text style={styles.descriptionTitle}>Mô tả</Text>
         <Text style={styles.description}>{description}</Text>
+      </ScrollView>
 
-        {/* Nút đặt sân */}
+      {/* Nút đặt sân */}
+      <View style={styles.bookingContainer}>
         <TouchableOpacity style={styles.bookingButton}>
           <Text style={styles.bookingText}>Đặt ngay</Text>
         </TouchableOpacity>
-      </ScrollView>
-
-      {/* Thanh điều hướng dưới cùng */}
-      <View style={styles.bottomTabs}>
-        <BottomTabs />
       </View>
+
+      <BottomTabs />
     </View>
   );
 };
@@ -126,25 +126,24 @@ const styles = StyleSheet.create({
   description: {
     color: "#6B7280",
   },
+  bookingContainer: {
+    position: "absolute",
+    bottom: 100, 
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    alignItems: "center",
+  },
   bookingButton: {
     backgroundColor: "#16A34A",
-    padding: 12,
+    padding: 14,
     borderRadius: 8,
-    marginTop: 16,
+    width: "100%",
     alignItems: "center",
   },
   bookingText: {
     color: "white",
     fontSize: 16,
     fontWeight: "bold",
-  },
-  bottomTabs: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "white",
-    borderTopWidth: 1,
-    borderTopColor: "#ddd",
   },
 });

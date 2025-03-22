@@ -1,7 +1,8 @@
 import React from "react";
-import { View, Text, TextInput, Image, TouchableOpacity, ScrollView } from "react-native";
+import { View, Text, TextInput, Image, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
 import { FontAwesome, Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import BottomTabs from "./BottomTabs";
 
 const PickField: React.FC = () => {
@@ -38,85 +39,164 @@ const PickField: React.FC = () => {
   ];
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#F3F4F6", padding: 16 }}>
+    <View style={styles.container}>
       {/* Header */}
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <View style={{ backgroundColor: "#16A34A", paddingHorizontal: 12, paddingVertical: 4, borderRadius: 50 }}>
-            <Text style={{ color: "white", fontWeight: "bold" }}>FiBO</Text>
-          </View>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="black" />
+        </TouchableOpacity>
+        <View style={styles.logoContainer}>
+          <Text style={styles.logoText}>FiBO</Text>
         </View>
-        <Feather name="settings" size={24} color="#374151" />
       </View>
 
       {/* Search Bar */}
-      <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "white", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 16 }}>
+      <View style={styles.searchBar}>
         <FontAwesome name="search" size={20} color="#9CA3AF" />
-        <TextInput placeholder="Nhập tên sân..." style={{ marginLeft: 8, flex: 1 }} />
+        <TextInput placeholder="Nhập tên sân..." style={styles.searchInput} />
       </View>
 
-      <ScrollView>
+      {/* Nội dung chính */}
+      <ScrollView style={styles.content}>
         {/* Sân gần bạn */}
-        <Text style={{ fontSize: 16, fontWeight: "bold", marginBottom: 8 }}>Sân bóng đá gần chỗ bạn</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+        <Text style={styles.sectionTitle}>Sân bóng đá gần chỗ bạn</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
           {fields.map((field) => (
             <TouchableOpacity
               key={field.id}
               onPress={() =>
                 router.push({
                   pathname: "/field_detail",
-                  params: {
-                    name: field.name,
-                    image: field.image,
-                    location: field.location,
-                    price: field.price,
-                    description: field.description,
-                  },
+                  params: field,
                 })
               }
             >
-              <View style={{ backgroundColor: "white", padding: 8, borderRadius: 8, marginRight: 8 }}>
-                <Image source={{ uri: field.image }} style={{ width: 150, height: 100, borderRadius: 8 }} />
-                <Text style={{ fontWeight: "bold" }}>{field.name}</Text>
-                <Text style={{ color: "#6B7280" }}>{field.location}</Text>
-                <Text style={{ color: "#16A34A", fontWeight: "bold" }}>{field.price}</Text>
+              <View style={styles.fieldCard}>
+                <Image source={{ uri: field.image }} style={styles.fieldImage} />
+                <Text style={styles.fieldName}>{field.name}</Text>
+                <Text style={styles.fieldLocation}>{field.location}</Text>
+                <Text style={styles.fieldPrice}>{field.price}</Text>
               </View>
             </TouchableOpacity>
           ))}
         </ScrollView>
 
         {/* Sân nổi tiếng */}
-        <Text style={{ fontSize: 16, fontWeight: "bold", marginBottom: 8 }}>Sân nổi tiếng</Text>
+        <Text style={styles.sectionTitle}>Sân nổi tiếng</Text>
         {famousFields.map((field) => (
           <TouchableOpacity
             key={field.id}
             onPress={() =>
               router.push({
                 pathname: "/field_detail",
-                params: {
-                  name: field.name,
-                  image: field.image,
-                  location: field.location,
-                  price: field.price,
-                  description: field.description,
-                },
+                params: field,
               })
             }
           >
-            <View style={{ backgroundColor: "white", padding: 8, borderRadius: 8, marginBottom: 16 }}>
-              <Image source={{ uri: field.image }} style={{ width: "100%", height: 120, borderRadius: 8 }} />
-              <Text style={{ fontWeight: "bold" }}>{field.name}</Text>
-              <Text style={{ color: "#6B7280" }}>{field.location}</Text>
-              <Text style={{ color: "#16A34A", fontWeight: "bold" }}>{field.price}</Text>
+            <View style={styles.famousFieldCard}>
+              <Image source={{ uri: field.image }} style={styles.famousFieldImage} />
+              <Text style={styles.fieldName}>{field.name}</Text>
+              <Text style={styles.fieldLocation}>{field.location}</Text>
+              <Text style={styles.fieldPrice}>{field.price}</Text>
             </View>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      {/* Thanh điều hướng */}
-      <BottomTabs />
+      <View style={styles.bottomTabs}>
+              <BottomTabs />
+      </View>
     </View>
   );
 };
 
 export default PickField;
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#F3F4F6",
+    padding: 16,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  logoContainer: {
+    backgroundColor: "#16A34A",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 50,
+  },
+  logoText: {
+    color: "white",
+    fontWeight: "bold",
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 16,
+  },
+  searchInput: {
+    marginLeft: 8,
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+  horizontalScroll: {
+    marginBottom: 16,
+  },
+  fieldCard: {
+    backgroundColor: "white",
+    padding: 8,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  fieldImage: {
+    width: 150,
+    height: 100,
+    borderRadius: 8,
+  },
+  fieldName: {
+    fontWeight: "bold",
+  },
+  fieldLocation: {
+    color: "#6B7280",
+  },
+  fieldPrice: {
+    color: "#16A34A",
+    fontWeight: "bold",
+  },
+  famousFieldCard: {
+    backgroundColor: "white",
+    padding: 8,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  famousFieldImage: {
+    width: "100%",
+    height: 120,
+    borderRadius: 8,
+  },
+  bottomTabs: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "white",
+    borderTopWidth: 1,
+    borderTopColor: "#ddd",
+  },
+});

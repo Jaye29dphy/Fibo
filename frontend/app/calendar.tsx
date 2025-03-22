@@ -17,7 +17,7 @@ export default function MyCalendar() {
           name="arrowleft"
           size={24}
           color="white"
-          onPress={() => router.back()} // Điều hướng quay lại
+          onPress={() => router.back()}
         />
         <Text style={styles.title}>Lịch của tôi</Text>
       </View>

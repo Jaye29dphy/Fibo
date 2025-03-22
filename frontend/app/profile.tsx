@@ -58,14 +58,14 @@ export default function ProfileScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <AntDesign
-          name="arrowleft"
-          size={24}
-          color="white"
-          onPress={() => router.back()} // Điều hướng quay lại
-        />
-        <Text style={styles.title}>Hồ Sơ</Text>
-      </View>
+              <AntDesign
+                name="arrowleft"
+                size={24}
+                color="white"
+                onPress={() => router.back()}
+              />
+              <Text style={styles.title}>Hồ sơ</Text>
+            </View>
       <Image
         source={{ uri: 'https://randomuser.me/api/portraits/women/79.jpg' }} // Ảnh đại diện mẫu
         style={styles.avatar}
@@ -84,10 +84,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    paddingHorizontal: 20,
   },
   header: {
-    backgroundColor: "#42BA96",
+    backgroundColor: "#4CAF50",
     paddingVertical: 15,
     paddingHorizontal: 10,
     flexDirection: "row",
