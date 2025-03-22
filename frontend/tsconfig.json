@@ -2,6 +2,8 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    "jsx": "react-jsx",  // Thêm dòng này để xử lý JSX
+    "esModuleInterop": true, // Thêm để sửa lỗi import mặc định
     "paths": {
       "@/*": [
         "./*"
