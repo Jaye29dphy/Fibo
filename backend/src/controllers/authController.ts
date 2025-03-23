@@ -5,20 +5,37 @@ import jwt from "jsonwebtoken";
 
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, email, password, role } = req.body;
+    const { full_name, email, password, role, phone } = req.body;
+
+    // Kiểm tra nếu thiếu trường
+    if (!full_name || !email || !password || !role || !phone) {
+      res.status(400).json({ error: "All fields are required" });
+      return;
+    }
+
+    // Kiểm tra email trùng lặp
+    const [rows] = await pool.execute("SELECT * FROM users WHERE email = ?", [email]);
+    if (Array.isArray(rows) && rows.length > 0) {
+      res.status(409).json({ error: "Email already exists" });
+      return;
+    }
+
+    // Hash mật khẩu
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Thêm người dùng vào cơ sở dữ liệu với status mặc định là 'active'
     await pool.execute(
-      "INSERT INTO users (full_name, email, password, role) VALUES (?, ?, ?, ?)",
-      [name, email, hashedPassword, role]
+      "INSERT INTO users (full_name, email, password, phone, role, status) VALUES (?, ?, ?, ?, ?, ?)",
+      [full_name, email, hashedPassword, phone, role, 'active']
     );
 
     res.status(201).json({ message: "User registered successfully" });
   } catch (error) {
-    console.error(error);
+    console.error("Error during registration:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
