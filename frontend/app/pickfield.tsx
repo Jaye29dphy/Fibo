@@ -1,42 +1,26 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, TextInput, Image, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
-import { FontAwesome, Feather } from "@expo/vector-icons";
+import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import BottomTabs from "./BottomTabs";
+import { getFields } from "../hooks/useGetFields"; 
+
 
 const PickField: React.FC = () => {
   const router = useRouter();
+  const [fields, setFields] = useState<any[]>([]); // Khởi tạo state cho dữ liệu sân bóng
 
-  const fields = [
-    {
-      id: 1,
-      name: "Sân bóng đá Hà Đông 1",
-      image: "https://via.placeholder.com/150",
-      location: "Đâu đó ở Hà Đông",
-      price: "400.000VND/h",
-      description: "Sân Hà Đông 1 là 1 sân ở Hà Đông, nơi đây các cầu thủ được đá trên mặt cỏ nhân tạo...",
-    },
-    {
-      id: 2,
-      name: "Sân bóng đá Hà Đông 2",
-      image: "https://via.placeholder.com/150",
-      location: "Hà Đông, Hà Nội",
-      price: "450.000VND/h",
-      description: "Sân Hà Đông 2 có không gian rộng rãi, mặt cỏ chất lượng cao, thích hợp cho các trận đấu lớn...",
-    },
-  ];
-
-  const famousFields = [
-    {
-      id: 3,
-      name: "Sân Spotify Camp Nou",
-      image: "https://via.placeholder.com/150",
-      location: "Barcelona",
-      price: "$100000/day",
-      description: "Sân nhà của FC Barcelona, một trong những sân vận động nổi tiếng nhất thế giới.",
-    },
-  ];
+  useEffect(() => {
+    const fetchFields = async () => {
+      try {
+        const fieldsData = await getFields();
+        setFields(fieldsData); // Cập nhật dữ liệu vào state
+      } catch (error) {
+        console.error("Error fetching fields:", error);
+      }
+    };
+    fetchFields();
+  }, []); // Chạy khi component được render
 
   return (
     <View style={styles.container}>
@@ -59,11 +43,12 @@ const PickField: React.FC = () => {
       {/* Nội dung chính */}
       <ScrollView style={styles.content}>
         {/* Sân gần bạn */}
-        <Text style={styles.sectionTitle}>Sân bóng đá gần chỗ bạn</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+        <Text style={styles.sectionTitle}>Tất cả các sân</Text>
+        {/* Sử dụng ScrollView bình thường để hiển thị các sân theo chiều dọc */}
+        <View style={styles.fieldsList}>
           {fields.map((field) => (
             <TouchableOpacity
-              key={field.id}
+              key={field.field_id} // Sử dụng field_id làm key
               onPress={() =>
                 router.push({
                   pathname: "/field_detail",
@@ -72,39 +57,19 @@ const PickField: React.FC = () => {
               }
             >
               <View style={styles.fieldCard}>
-                <Image source={{ uri: field.image }} style={styles.fieldImage} />
+                {/* Hiển thị hình ảnh sân */}
+                <Image source={{ uri: field.image || 'default_image_url' }} style={styles.fieldImage} />
                 <Text style={styles.fieldName}>{field.name}</Text>
-                <Text style={styles.fieldLocation}>{field.location}</Text>
-                <Text style={styles.fieldPrice}>{field.price}</Text>
+                <Text style={styles.fieldLocation}>{`Loại sân: ${field.sport_type}`}</Text>
+                <Text style={styles.fieldPrice}>{`Giá: ${field.price_per_hour} VND/giờ`}</Text>
               </View>
             </TouchableOpacity>
           ))}
-        </ScrollView>
-
-        {/* Sân nổi tiếng */}
-        <Text style={styles.sectionTitle}>Sân nổi tiếng</Text>
-        {famousFields.map((field) => (
-          <TouchableOpacity
-            key={field.id}
-            onPress={() =>
-              router.push({
-                pathname: "/field_detail",
-                params: field,
-              })
-            }
-          >
-            <View style={styles.famousFieldCard}>
-              <Image source={{ uri: field.image }} style={styles.famousFieldImage} />
-              <Text style={styles.fieldName}>{field.name}</Text>
-              <Text style={styles.fieldLocation}>{field.location}</Text>
-              <Text style={styles.fieldPrice}>{field.price}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
+        </View>
       </ScrollView>
 
       <View style={styles.bottomTabs}>
-              <BottomTabs />
+        <BottomTabs />
       </View>
     </View>
   );
@@ -155,22 +120,24 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 8,
   },
-  horizontalScroll: {
-    marginBottom: 16,
+  fieldsList: {
+    // Không cần ScrollView ngang, chỉ cần View cho danh sách các sân
+    paddingBottom: 16,
   },
   fieldCard: {
     backgroundColor: "white",
-    padding: 8,
+    padding: 16,
     borderRadius: 8,
-    marginRight: 8,
+    marginBottom: 16, // Đảm bảo có khoảng cách giữa các sân
   },
   fieldImage: {
-    width: 150,
-    height: 100,
+    width: "100%", // Đảm bảo hình ảnh chiếm đầy chiều rộng
+    height: 150,
     borderRadius: 8,
   },
   fieldName: {
     fontWeight: "bold",
+    marginTop: 8,
   },
   fieldLocation: {
     color: "#6B7280",
@@ -178,17 +145,7 @@ const styles = StyleSheet.create({
   fieldPrice: {
     color: "#16A34A",
     fontWeight: "bold",
-  },
-  famousFieldCard: {
-    backgroundColor: "white",
-    padding: 8,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  famousFieldImage: {
-    width: "100%",
-    height: 120,
-    borderRadius: 8,
+    marginTop: 4,
   },
   bottomTabs: {
     position: "absolute",

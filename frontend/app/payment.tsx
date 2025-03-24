@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from "react-native"; // Thêm Alert từ react-native
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import moment from "moment";
@@ -56,6 +56,29 @@ const BookingScreen = () => {
     );
   };
 
+  // Kiểm tra nếu chưa chọn đủ các mục
+  const handlePayment = () => {
+    if (!selectedFieldType || !selectedDate || !selectedSlot) {
+      Alert.alert("Thông báo", "Vui lòng chọn đầy đủ loại sân, ngày và khung giờ trước khi thanh toán.");
+      return;
+    }
+    router.push({
+      pathname: "/confirmpay",
+      params: {
+        orderId: "123456789XYZ",
+        date: selectedDate,
+        timeSlot: selectedSlot,
+        price: timeSlots.find(slot => slot.time === selectedSlot)?.price.replace("K", "000") || "0",
+        extraService: selectedServices.join(", "),
+        extraPrice: selectedServices.reduce((total, service) => {
+          const foundService = extraServices.find(s => s.name === service);
+          return total + (foundService ? parseInt(foundService.price.replace("K", "000")) : 0);
+        }, 0).toString(),
+        fieldType: selectedFieldType,
+      },
+    });
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -63,25 +86,25 @@ const BookingScreen = () => {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
-        <Text style={styles.title}>Lựa chọn thanh toán</Text>
+        <Text style={styles.title}>Lựa chọn dịch vụ</Text>
       </View>
 
-        {/* Chọn loại sân */}
-        <Text style={styles.sectionTitle}>Chọn loại sân</Text>
-        <View style={styles.gridContainer}>
-          {typefield.map((field, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.optionItem,
-                selectedFieldType === field.typef && styles.selectedOption,
-              ]}
-              onPress={() => setSelectedFieldType(field.typef)}
-            >
-              <Text style={styles.optionText}>{field.typef}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+      {/* Chọn loại sân */}
+      <Text style={styles.sectionTitle}>Chọn loại sân</Text>
+      <View style={styles.gridContainer}>
+        {typefield.map((field, index) => (
+          <TouchableOpacity
+            key={index}
+            style={[
+              styles.optionItem,
+              selectedFieldType === field.typef && styles.selectedOption,
+            ]}
+            onPress={() => setSelectedFieldType(field.typef)}
+          >
+            <Text style={styles.optionText}>{field.typef}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 120 }}>
         {/* Chọn ngày */}
@@ -143,9 +166,13 @@ const BookingScreen = () => {
       </ScrollView>
 
       {/* Nút thanh toán */}
-      <TouchableOpacity style={styles.payButton}>
+      <TouchableOpacity
+        style={styles.payButton}
+        onPress={handlePayment}
+      >
         <Text style={styles.payText}>Thanh toán</Text>
       </TouchableOpacity>
+
     </View>
   );
 };
