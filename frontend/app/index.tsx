@@ -22,7 +22,7 @@ export default function LoginScreen() {
     setError(null);
 
     try {
-      const response = await fetch("http://localhost:5000/api/auth/login", {
+      const response = await fetch("http://192.168.47.204:5000/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -52,7 +52,7 @@ export default function LoginScreen() {
 
   return (
     <ImageBackground
-      source={require("../assets/images/anhbia.jpg")}
+      source={require("../assets/images/anhbiakhach.jpg")}
       style={styles.backgroundImage}
     >
       <View style={styles.overlay}>
