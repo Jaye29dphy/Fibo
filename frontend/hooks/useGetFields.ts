@@ -1,5 +1,5 @@
 // useGetFields.ts
-import { API_ENDPOINTS } from "../constants/api";
+import { API_ENDPOINTS } from "../constants/apiConfig";
 
 // Hàm lấy dữ liệu sân bóng
 export const getFields = async () => {

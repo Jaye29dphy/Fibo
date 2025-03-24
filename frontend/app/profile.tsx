@@ -3,6 +3,7 @@ import { View, Text, Image, StyleSheet, TouchableOpacity, TouchableWithoutFeedba
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AntDesign } from "@expo/vector-icons";
+import { getUserInfo } from "../constants/apiService";  // Thêm đúng đường dẫn nếu cần
 
 type User = {
   id: number;
@@ -22,21 +23,21 @@ export default function ProfileScreen() {
   const [modalContent, setModalContent] = useState('');
   const [version, setVersion] = useState("Đang tải...");
 
+  
   useEffect(() => {
     const checkAuth = async () => {
-      const token = await AsyncStorage.getItem('token');
-      if (!token) {
-        router.replace('/');
-        return;
-      }
-
       try {
-        const response = await fetch('http://192.168.1.2:5000/api/auth/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error('Unauthorized');
-
+        const token = await AsyncStorage.getItem("token");
+        if (!token) {
+          console.log("No token found. Redirecting to login...");
+          router.replace("/");
+          return;
+        }
+  
+        console.log("Fetching user info with token:", token);
+        const data = await getUserInfo(); // Trực tiếp lấy data từ fetchAPI
+        console.log("User info fetched successfully:", data);
+  
         setUser({
           id: data.id,
           full_name: data.full_name,
@@ -47,31 +48,17 @@ export default function ProfileScreen() {
           created_at: data.created_at,
         });
       } catch (error) {
-        await AsyncStorage.removeItem('token');
-        router.replace('/');
+        console.error("Error fetching user info:", error);
+        await AsyncStorage.removeItem("token");
+        router.replace("/");
       } finally {
         setLoading(false);
       }
     };
-
+  
     checkAuth();
   }, []);
-
-  useEffect(() => {
-    const fetchVersion = async () => {
-      try {
-        const response = await fetch(
-          "https://api.github.com/repos/Jaye29dphy/Fibo/releases/latest"
-        );
-        const data = await response.json();
-        setVersion(data.tag_name || "Không có thông tin");
-      } catch (error) {
-        setVersion("Lỗi tải phiên bản");
-      }
-    };
-
-    fetchVersion();
-  }, []);
+  
 
   const handleLogout = async () => {
     await AsyncStorage.removeItem('token');

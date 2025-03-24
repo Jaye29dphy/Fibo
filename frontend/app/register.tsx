@@ -2,26 +2,20 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, Button, Alert, StyleSheet, TouchableOpacity } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useRouter } from 'expo-router';
+import { registerUser } from '../constants/apiService'; // Import hàm đăng ký từ apiService
 
 export default function Register() {
   const router = useRouter();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState(''); // Thêm số điện thoại
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState('customer');
   const [loading, setLoading] = useState(false);
 
-  const isValidEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  const isValidPhone = (phone: string) => {
-    const phoneRegex = /^[0-9]{10}$/; // Định dạng cơ bản (10 chữ số)
-    return phoneRegex.test(phone);
-  };
+  const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const isValidPhone = (phone: string) => /^[0-9]{10}$/.test(phone);
 
   const handleRegister = async () => {
     if (!fullName || !email || !phone || !password || !confirmPassword || !role) {
@@ -45,27 +39,17 @@ export default function Register() {
     }
 
     setLoading(true);
-
     try {
-      const response = await fetch('http://192.168.2.3:5000/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ full_name: fullName, email, phone, password, role }), // Gửi phone
-      });
+      // Gọi API thông qua hàm `registerUser`
+      const data = await registerUser(fullName, email, phone, password, role);
 
-      const data = await response.json();
-      setLoading(false);
-
-      if (response.ok) {
-        Alert.alert('Success', data.message);
-        router.push('/');
-      } else {
-        Alert.alert('Error', data.error || 'Failed to register');
-      }
-    } catch (error) {
-      setLoading(false);
+      Alert.alert('Success', data.message);
+      router.push('/');
+    } catch (error: any) {
       console.error(error);
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      Alert.alert('Error', error.message || 'Failed to register.');
+    } finally {
+      setLoading(false);
     }
   };
 

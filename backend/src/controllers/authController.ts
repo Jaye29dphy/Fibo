@@ -2,6 +2,85 @@ import { Request, Response } from "express";
 import pool from "../config/database";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
+import { sendEmail } from "../utils/sendEmail";
+
+
+export const sendOtp = async (req: Request, res: Response): Promise<void> => {
+  const { email } = req.body;
+
+  try {
+    const [users]: [any[], any] = await pool.execute("SELECT * FROM users WHERE email = ?", [email]);
+    if (!users.length) {
+      res.status(404).json({ message: "Email không tồn tại!" });
+      return;
+    }
+
+    const user = users[0];
+    const currentTime = new Date();
+
+    // Nếu OTP cũ đã hết hạn, xóa OTP cũ
+    if (user.otp_expiry && new Date(user.otp_expiry) < currentTime) {
+      await pool.execute("UPDATE users SET otp = NULL, otp_expiry = NULL WHERE email = ?", [email]);
+    }
+
+    // Tạo OTP mới
+    const otp = crypto.randomInt(100000, 999999).toString();
+    const hashedOtp = await bcrypt.hash(otp, 10);
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 phút
+
+    // Lưu OTP mới vào cơ sở dữ liệu
+    await pool.execute("UPDATE users SET otp = ?, otp_expiry = ? WHERE email = ?", [hashedOtp, expiresAt, email]);
+    
+    // Gửi OTP mới cho người dùng qua email
+    await sendEmail(email, `Mã OTP của bạn là ${otp}. Hết hạn sau 5 phút.`);
+
+    res.status(200).json({ message: "OTP đã được gửi!" });
+  } catch (error) {
+    console.error("Lỗi khi gửi OTP:", error);
+    res.status(500).json({ message: "Lỗi máy chủ!" });
+  }
+};
+
+
+export const changePassword = async (req: Request, res: Response): Promise<void> => {
+  const { email, newPassword, otp } = req.body;
+
+  try {
+    // Kiểm tra xem email có tồn tại trong cơ sở dữ liệu không
+    const [users]: [any[], any] = await pool.execute("SELECT * FROM users WHERE email = ?", [email]);
+    if (!users.length) {
+      res.status(404).json({ message: "Email không tồn tại!" });
+      return;
+    }
+
+    const user = users[0];
+    const currentTime = new Date();
+
+    // Kiểm tra xem OTP có đúng và chưa hết hạn không
+    if (user.otp === null || new Date(user.otp_expiry) < currentTime) {
+      res.status(400).json({ message: "OTP không hợp lệ hoặc đã hết hạn!" });
+      return;
+    }
+
+    // So sánh OTP nhập vào với OTP đã lưu trong cơ sở dữ liệu (bằng bcrypt)
+    const isOtpValid = await bcrypt.compare(otp, user.otp);
+    if (!isOtpValid) {
+      res.status(400).json({ message: "OTP không hợp lệ!" });
+      return;
+    }
+
+    // Cập nhật mật khẩu mới
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await pool.execute("UPDATE users SET password = ?, otp = NULL, otp_expiry = NULL WHERE email = ?", [hashedPassword, email]);
+
+    res.status(200).json({ message: "Mật khẩu đã được thay đổi thành công!" });
+  } catch (error) {
+    console.error("Lỗi khi thay đổi mật khẩu:", error);
+    res.status(500).json({ message: "Lỗi máy chủ!" });
+  }
+};
+
 
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {

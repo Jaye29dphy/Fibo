@@ -1,52 +1,43 @@
+// LoginScreen.tsx
 import React, { useState } from "react";
-import { View, Text, TextInput, Button, StyleSheet, Alert, ImageBackground } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  Button,
+  StyleSheet,
+  Alert,
+  ImageBackground,
+  TouchableOpacity,
+} from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-type User = {
-  id: number;
-  full_name: string;
-  email: string;
-  role: string;
-  phone: string;
-};
+import { loginUser } from "../constants/apiService";
 
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const handleLogin = async () => {
     setError(null);
 
     try {
-      const response = await fetch("http://192.168.47.204:5000/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
+      const data = await loginUser(email, password);
       console.log("📥 Response từ server:", data);
 
-      if (response.ok) {
-        if (data.token) {
-          await AsyncStorage.setItem("token", data.token);
-          setUser(data.user);
-          Alert.alert("✅ Thành công", "Đăng nhập thành công!");
-          router.push("/dashboard");
-        } else {
-          setError("Không nhận được token từ server.");
-        }
+      if (data.token) {
+        await AsyncStorage.setItem("token", data.token);
+        Alert.alert("✅ Thành công", "Đăng nhập thành công!");
+        router.push("/dashboard");
       } else {
-        console.log("❌ Lỗi đăng nhập:", data.error);
-        setError(data.error || "Email hoặc mật khẩu không đúng!");
+        setError("Không nhận được token từ server.");
       }
-    } catch (error) {
-      console.error("🔥 Lỗi đăng nhập:", error);
-      setError("Không thể kết nối đến server!");
+    } catch (error: any) {
+      console.error("🔥 Lỗi đăng nhập:", error.message);
+      setError(error.message || "Không thể kết nối đến server!");
     }
   };
 
@@ -56,8 +47,15 @@ export default function LoginScreen() {
       style={styles.backgroundImage}
     >
       <View style={styles.overlay}>
-        <Text style={styles.title}>Đăng Nhập</Text>
+        <View style={styles.header}>
+          <ImageBackground
+            source={require("../assets/images/doituyencc.png")} // Logo MU
+            style={styles.logo}
+          />
+          <Text style={styles.title}>FIBO</Text>
+        </View>
 
+        <Text style={styles.inputLabel}>Tài khoản*</Text>
         <TextInput
           style={styles.input}
           placeholder="Email"
@@ -66,6 +64,8 @@ export default function LoginScreen() {
           keyboardType="email-address"
           autoCapitalize="none"
         />
+
+        <Text style={styles.inputLabel}>Mật khẩu*</Text>
         <TextInput
           style={styles.input}
           placeholder="Mật khẩu"
@@ -74,37 +74,73 @@ export default function LoginScreen() {
           onChangeText={setPassword}
         />
 
+        <View style={styles.rememberMeContainer}>
+          <TouchableOpacity onPress={() => setRememberMe(!rememberMe)}>
+            <Text style={styles.rememberMeText}>
+              {rememberMe ? "☑" : "☐"} Remember me
+            </Text>
+          </TouchableOpacity>
+
+          {/* Thêm "Quên mật khẩu?" bên phải */}
+          <TouchableOpacity onPress={() => router.push("/forgot-password")}>
+            <Text style={styles.forgotPasswordText}>Quên mật khẩu?</Text>
+          </TouchableOpacity>
+        </View>
+
         {error && <Text style={styles.error}>{error}</Text>}
 
-        <Button title="Đăng Nhập" onPress={handleLogin} />
+        <View style={styles.buttonsContainer}>
+          <Button title="Đăng Nhập" onPress={handleLogin} color="#ff6200" />
+        </View>
 
-        <Text onPress={() => router.push("/register")} style={styles.link}>
-          Chưa có tài khoản? Đăng ký
-        </Text>
+        <View style={styles.orContainer}>
+          <View style={styles.line}></View>
+          <Text style={styles.orText}>OR</Text>
+          <View style={styles.line}></View>
+        </View>
+
+        <TouchableOpacity onPress={() => router.push("/register")} style={styles.registerButton}>
+          <Text style={styles.registerText}>Đăng ký</Text>
+        </TouchableOpacity>
       </View>
     </ImageBackground>
   );
 }
 
+// Phần styles đã cải tiến
 const styles = StyleSheet.create({
   backgroundImage: {
     flex: 1,
     width: "100%",
     height: "100%",
-    resizeMode: "cover", // Ảnh sẽ tự động phóng to để lấp kín màn hình
+    resizeMode: "cover",
   },
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)", // Tạo lớp phủ mờ
-    justifyContent: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "space-between", // Thay đổi để căn chỉnh phần tử xuống dưới
     alignItems: "center",
     padding: 20,
+    paddingBottom: 40, // Cung cấp không gian cho các nút ở dưới cùng
+  },
+  header: {
+    alignItems: "center",
+    marginBottom: 30,
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    marginBottom: 10,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: "bold",
-    color: "white", // Đổi chữ thành màu trắng để nổi bật trên nền tối
-    marginBottom: 20,
+    color: "white",
+  },
+  inputLabel: {
+    alignSelf: "flex-start",
+    color: "white",
+    fontSize: 14,
   },
   input: {
     width: "100%",
@@ -112,16 +148,59 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderWidth: 1,
     borderColor: "gray",
-    borderRadius: 5,
+    
+  },
+  rememberMeContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between", // Căn lề để hai phần nhớ tôi và quên mật khẩu nằm cạnh nhau
+    alignItems: "center",
+    width: "100%",
     marginBottom: 10,
+  },
+  rememberMeText: {
+    color: "white",
+    fontSize: 16,
+  },
+  forgotPasswordText: {
+    color: "lightblue",
+    fontSize: 16,
+    textDecorationLine: "underline",
   },
   error: {
     color: "red",
     marginBottom: 10,
   },
-  link: {
-    marginTop: 10,
-    color: "lightblue",
-    textDecorationLine: "underline",
+  buttonsContainer: {
+    width: "100%",
+    marginBottom: 10, // Thêm khoảng cách dưới nút đăng nhập
+  },
+  orContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 20,
+    width: "100%",
+  },
+  line: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "white",
+  },
+  orText: {
+    color: "white",
+    fontSize: 16,
+    paddingHorizontal: 10,
+  },
+  registerButton: {
+    width: "100%",
+    paddingVertical: 15,
+    backgroundColor: "#ff0040",
+    borderRadius: 5,
+    marginTop: 20,
+    alignItems: "center",
+  },
+  registerText: {
+    fontSize: 18,
+    color: "white",
+    fontWeight: "bold",
   },
 });
