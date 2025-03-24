@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, ActivityIndicator, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AntDesign } from "@expo/vector-icons";
@@ -18,6 +18,9 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalContent, setModalContent] = useState('');
+  const [version, setVersion] = useState("Đang tải...");
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -28,7 +31,7 @@ export default function ProfileScreen() {
       }
 
       try {
-        const response = await fetch('http://192.168.47.204:5000/api/auth/me', {
+        const response = await fetch('http://192.168.1.2:5000/api/auth/me', {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await response.json();
@@ -54,6 +57,22 @@ export default function ProfileScreen() {
     checkAuth();
   }, []);
 
+  useEffect(() => {
+    const fetchVersion = async () => {
+      try {
+        const response = await fetch(
+          "https://api.github.com/repos/Jaye29dphy/Fibo/releases/latest"
+        );
+        const data = await response.json();
+        setVersion(data.tag_name || "Không có thông tin");
+      } catch (error) {
+        setVersion("Lỗi tải phiên bản");
+      }
+    };
+
+    fetchVersion();
+  }, []);
+
   const handleLogout = async () => {
     await AsyncStorage.removeItem('token');
     router.replace('/');
@@ -66,6 +85,11 @@ export default function ProfileScreen() {
       case "banned": return "red";
       default: return "black";
     }
+  };
+
+  const openModal = (content: string) => {
+    setModalContent(content);
+    setModalVisible(true);
   };
 
   if (loading) {
@@ -88,7 +112,7 @@ export default function ProfileScreen() {
         <Text style={styles.title}>Hồ Sơ</Text>
       </View>
 
-      <Image source={{ uri: 'https://randomuser.me/api/portraits/women/79.jpg' }} style={styles.avatar} />
+      <Image source={{ uri: 'https://randomuser.me/api/portraits/men/69.jpg' }} style={styles.avatar} />
 
       {/* Thông tin cá nhân */}
       <View style={styles.infoBox}>
@@ -128,7 +152,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-
         <View style={styles.infoRow}>
           <AntDesign name="calendar" size={20} color="#333" />
           <Text style={styles.label}>Thời gian tạo tài khoản:</Text>
@@ -136,109 +159,199 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* Nút đăng xuất */}
+      {/* Chính sách bảo mật & Điều khoản sử dụng */}
+      <View style={styles.infoBox}>
+        <TouchableOpacity onPress={() => openModal("Hoang Hoang")}>
+          <Text style={styles.infoTitle}>📜 Chính sách bảo mật</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.infoBox}>
+        <TouchableOpacity onPress={() => openModal("Quynh Anh Trinh")}>
+          <Text style={styles.infoTitle}>📑 Điều khoản sử dụng</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Phiên bản ứng dụng */}
+      <View style={styles.infoBox}>
+        <Text style={styles.infoTitle}>🔖 Phiên bản</Text>
+        <Text style={styles.infoValue}>{version}</Text>
+      </View>
+
+      {/* Nút Xóa tài khoản */}
       <TouchableOpacity
-        style={styles.button}
-        onPress={handleLogout}
-        activeOpacity={0.7}
+        style={styles.deleteButton}
+        onPress={() => router.push('/confirmdelete')}
+        activeOpacity={0.7}  // Thêm hiệu ứng nhấn
       >
-        <Text style={styles.buttonText}>Đăng xuất</Text>
+        <Text style={styles.deleteButtonText}>Xóa tài khoản</Text>
       </TouchableOpacity>
+
+      {/* Nút đăng xuất (xuống cuối màn hình) */}
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleLogout}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.buttonText}>Đăng xuất</Text>
+        </TouchableOpacity>
+      </View>
+
+
+      {/* Modal Overlay */}
+      <Modal visible={modalVisible} transparent animationType="fade">
+        <TouchableOpacity
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={() => setModalVisible(false)}
+        >
+          <View style={styles.modalBox}>
+            <Text style={styles.modalText}>{modalContent}</Text>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
 
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#f4f4f4",
     paddingHorizontal: 20,
   },
   header: {
-    backgroundColor: "#42BA96",
+    backgroundColor: "#42ba96",
     paddingVertical: 15,
-    paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "center",
+    paddingHorizontal: 15,
   },
   title: {
-    color: "white",
     fontSize: 20,
+    color: "white",
     fontWeight: "bold",
     marginLeft: 10,
   },
   avatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    alignSelf: 'center',
-    marginVertical: 20,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignSelf: "center",
+    marginVertical: 15,
   },
   infoBox: {
-    backgroundColor: "white",
+    backgroundColor: "#fff",
     padding: 15,
     borderRadius: 10,
-    elevation: 3,
+    marginBottom: 10,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
+    elevation: 3,
   },
   infoTitle: {
     fontSize: 16,
     fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 5,
+    color: "#333",
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#333",
   },
   divider: {
-    height: 2,
-    backgroundColor: "#ccc",
-    marginBottom: 10,
+    height: 1,
+    backgroundColor: "#ddd",
+    marginVertical: 10,
   },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 8,
   },
   label: {
-    flex: 1,
+    marginLeft: 8,
     fontSize: 14,
     color: "#555",
-    marginLeft: 10,
   },
   value: {
+    marginLeft: "auto",
     fontSize: 14,
     fontWeight: "bold",
     color: "#333",
-    textAlign: "right",
-    flex: 1.5,
   },
   statusDotContainer: {
-    marginLeft: 8, // Tạo khoảng cách giữa status và chấm tròn
-    justifyContent: 'center', // Căn giữa theo chiều dọc
-    alignItems: 'center',
+    marginLeft: 5,
   },
   statusDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
   },
+  footer: {
+    marginTop: "auto", // Đẩy xuống cuối màn hình
+    width: "100%",
+  },
   button: {
-    backgroundColor: '#cb0909',
+    backgroundColor: "#ff4d4d",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 20,
+  },
+  logoutButton: {
+    backgroundColor: "#cb0909",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 20,
+  },
+  buttonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  deleteButton: {
+    borderWidth: 1,
+    borderColor: "#cb0909",
+    backgroundColor: "white",
     paddingVertical: 12,
     borderRadius: 20,
-    marginTop: 20,
-    width: '100%',
-    alignSelf: 'center',
+    alignItems: "center",
+    marginBottom: 10,
   },
-
-  buttonText: {
-    textAlign: 'center',
-    color: '#fff',
+  deleteButtonText: {
+    color: "#cb0909",
     fontSize: 16,
+    fontWeight: "bold",
   },
-
-  buttonPress: {
-    backgroundColor: '#a10707',
+  // 💡 Thêm các style cho modal (Overlay)
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBox: {
+    width: "80%",
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  modalText: {
+    fontSize: 16,
+    color: "#333",
+    textAlign: "center",
+    marginBottom: 15,
   },
 });
