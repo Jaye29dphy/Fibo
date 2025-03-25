@@ -9,7 +9,7 @@ export default function BottomTabs() {
   return (
     <View style={styles.container}>
       <TabButton icon="football-outline" label="Đặt sân" onPress={() => router.push("/dashboard")} />
-      <TabButton icon="calendar-outline" label="Lịch của tôi" onPress={() => router.push("/calendar")} />
+      <TabButton icon="calendar-outline" label="Lịch của tôi" onPress={() => router.push("/calendar1")} />
       <TabButton icon="notifications-outline" label="Thông báo" onPress={() => router.push("/notifications")} />
       <TabButton icon="person-outline" label="Hồ sơ" onPress={() => router.push("/profile")} />
     </View>
