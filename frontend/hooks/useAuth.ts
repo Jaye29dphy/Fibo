@@ -1,5 +1,4 @@
 import { API_ENDPOINTS } from "../constants/api";
-
 export const login = async (email: string, password: string) => {
   try {
     const response = await fetch(API_ENDPOINTS.LOGIN, {

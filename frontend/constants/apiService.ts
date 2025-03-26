@@ -60,3 +60,31 @@ export const changePassword = async (email: string, newPassword: string, otp: st
   ) => {
     return fetchAPI(API_ENDPOINTS.REGISTER, "POST", { full_name: fullName, email, phone, password, role });
   };
+  // lịch của tôi
+  export const getCalendarData = async () => {
+    try {
+      console.log("Fetching calendar data..."); // Log trước khi fetch
+      const response = await fetch(API_ENDPOINTS.GET_CALENDAR);
+      console.log("Response status:", response.status); // Kiểm tra status
+  
+      if (!response.ok) {
+        throw new Error(`Lỗi API: ${response.status} - ${response.statusText}`);
+      }
+  
+      const data = await response.json();
+      console.log("Dữ liệu từ API:", data); // Kiểm tra dữ liệu nhận được
+  
+      return data.map((booking: any) => ({
+        id: booking.booking_id,
+        customerId: booking.customer_id,
+        fieldId: booking.field_id,
+        startTime: booking.start_time,
+        endTime: booking.end_time,
+        status: booking.status,
+      }));
+    } catch (error) {
+      console.error("Lỗi lấy dữ liệu từ API:", error);
+      return [];
+    }
+  };
+  
