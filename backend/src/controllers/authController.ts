@@ -6,11 +6,51 @@ import crypto from "crypto";
 import { sendEmail } from "../utils/sendEmail";
 
 
+// export const sendOtp = async (req: Request, res: Response): Promise<void> => {
+//   const { email } = req.body;
+
+//   try {
+//     const [users]: [any[], any] = await pool.execute("SELECT * FROM users WHERE email = ?", [email]);
+//     if (!users.length) {
+//       res.status(404).json({ message: "Email không tồn tại!" });
+//       return;
+//     }
+
+//     const user = users[0];
+//     const currentTime = new Date();
+
+//     // Nếu OTP cũ đã hết hạn, xóa OTP cũ
+//     if (user.otp_expiry && new Date(user.otp_expiry) < currentTime) {
+//       await pool.execute("UPDATE users SET otp = NULL, otp_expiry = NULL WHERE email = ?", [email]);
+//     }
+
+//     // Tạo OTP mới
+//     const otp = crypto.randomInt(100000, 999999).toString();
+//     const hashedOtp = await bcrypt.hash(otp, 10);
+//     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 phút
+
+//     // Lưu OTP mới vào cơ sở dữ liệu
+//     await pool.execute("UPDATE users SET otp = ?, otp_expiry = ? WHERE email = ?", [hashedOtp, expiresAt, email]);
+    
+//     // Gửi OTP mới cho người dùng qua email
+//     await sendEmail(email, `Mã OTP của bạn là ${otp}. Hết hạn sau 5 phút.`);
+
+//     res.status(200).json({ message: "OTP đã được gửi!" });
+//   } catch (error) {
+//     console.error("Lỗi khi gửi OTP:", error);
+//     res.status(500).json({ message: "Lỗi máy chủ!" });
+//   }
+// };
+
 export const sendOtp = async (req: Request, res: Response): Promise<void> => {
   const { email } = req.body;
 
   try {
-    const [users]: [any[], any] = await pool.execute("SELECT * FROM users WHERE email = ?", [email]);
+    const [users]: [any[], any] = await pool.execute(
+      "SELECT otp_attempts, last_otp_request FROM users WHERE email = ?",
+      [email]
+    );
+
     if (!users.length) {
       res.status(404).json({ message: "Email không tồn tại!" });
       return;
@@ -18,10 +58,18 @@ export const sendOtp = async (req: Request, res: Response): Promise<void> => {
 
     const user = users[0];
     const currentTime = new Date();
+    const lastRequest = user.last_otp_request ? new Date(user.last_otp_request) : null;
 
-    // Nếu OTP cũ đã hết hạn, xóa OTP cũ
-    if (user.otp_expiry && new Date(user.otp_expiry) < currentTime) {
-      await pool.execute("UPDATE users SET otp = NULL, otp_expiry = NULL WHERE email = ?", [email]);
+    // Kiểm tra nếu yêu cầu quá nhanh (chỉ cho phép gửi OTP sau 1 phút)
+    if (lastRequest && (currentTime.getTime() - lastRequest.getTime()) < 60 * 1000) {
+      res.status(429).json({ message: "Bạn đã yêu cầu OTP quá nhanh. Hãy thử lại sau!" });
+      return;
+    }
+
+    // Kiểm tra nếu đã gửi quá nhiều OTP trong 10 phút
+    if (user.otp_attempts >= 5 && lastRequest && (currentTime.getTime() - lastRequest.getTime()) < 10 * 60 * 1000) {
+      res.status(429).json({ message: "Bạn đã yêu cầu quá nhiều OTP. Hãy thử lại sau 10 phút!" });
+      return;
     }
 
     // Tạo OTP mới
@@ -29,10 +77,19 @@ export const sendOtp = async (req: Request, res: Response): Promise<void> => {
     const hashedOtp = await bcrypt.hash(otp, 10);
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 phút
 
-    // Lưu OTP mới vào cơ sở dữ liệu
-    await pool.execute("UPDATE users SET otp = ?, otp_expiry = ? WHERE email = ?", [hashedOtp, expiresAt, email]);
-    
-    // Gửi OTP mới cho người dùng qua email
+    // Cập nhật OTP, số lần thử, và thời gian yêu cầu cuối
+    await pool.execute(
+      "UPDATE users SET otp = ?, otp_expiry = ?, otp_attempts = ?, last_otp_request = ? WHERE email = ?",
+      [
+        hashedOtp,
+        expiresAt,
+        (lastRequest && (currentTime.getTime() - lastRequest.getTime()) > 10 * 60 * 1000) ? 1 : user.otp_attempts + 1,
+        currentTime,
+        email
+      ]
+    );
+
+    // Gửi OTP qua email
     await sendEmail(email, `Mã OTP của bạn là ${otp}. Hết hạn sau 5 phút.`);
 
     res.status(200).json({ message: "OTP đã được gửi!" });
@@ -41,6 +98,7 @@ export const sendOtp = async (req: Request, res: Response): Promise<void> => {
     res.status(500).json({ message: "Lỗi máy chủ!" });
   }
 };
+
 
 
 export const changePassword = async (req: Request, res: Response): Promise<void> => {
