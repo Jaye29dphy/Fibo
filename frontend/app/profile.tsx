@@ -15,8 +15,9 @@ import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { AntDesign, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
-import { getUserInfo, uploadAvatar } from "../constants/apiService";
+import { getUserInfo, uploadAvatar, fetchLatestRelease } from "../constants/apiService";
 
+// Interface cho dữ liệu user
 type User = {
   id: number;
   full_name: string;
@@ -28,6 +29,14 @@ type User = {
   avatar: string;
 };
 
+// Interface cho dữ liệu release từ GitHub
+interface GitHubRelease {
+  tag_name: string;
+  published_at: string;
+  name?: string;
+  body?: string;
+}
+
 export default function ProfileScreen() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -35,6 +44,9 @@ export default function ProfileScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editedUser, setEditedUser] = useState<User | null>(null);
+  // State để lưu thông tin release
+  const [release, setRelease] = useState<GitHubRelease | null>(null);
+  const [releaseLoading, setReleaseLoading] = useState(true);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -55,7 +67,16 @@ export default function ProfileScreen() {
         setLoading(false);
       }
     };
+
+    const getRelease = async () => {
+      setReleaseLoading(true);
+      const latestRelease = await fetchLatestRelease();
+      setRelease(latestRelease);
+      setReleaseLoading(false);
+    };
+
     checkAuth();
+    getRelease();
   }, []);
 
   const pickImage = useCallback(async (useCamera: boolean) => {
@@ -202,21 +223,21 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.infoRow}>
-  <AntDesign name="calendar" size={20} color="#333" />
-  <Text style={styles.label}>Ngày tạo:</Text>
-  <Text style={styles.value}>
-    {user?.created_at
-      ? new Date(user.created_at).toLocaleString("vi-VN", {
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        })
-      : "N/A"}
-  </Text>
-</View>
+          <AntDesign name="calendar" size={20} color="#333" />
+          <Text style={styles.label}>Ngày tạo:</Text>
+          <Text style={styles.value}>
+            {user?.created_at
+              ? new Date(user.created_at).toLocaleString("vi-VN", {
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })
+              : "N/A"}
+          </Text>
+        </View>
 
         <View style={styles.infoRow}>
           <AntDesign name="checkcircle" size={20} color="#333" />
@@ -224,6 +245,37 @@ export default function ProfileScreen() {
           <Text style={styles.value}>{user?.status || "N/A"}</Text>
         </View>
       </View>
+
+      {/* Phần thông tin phiên bản (thêm vào đây) */}
+      <View style={styles.infoBox}>
+        <View style={styles.infoHeader}>
+          <Text style={styles.infoTitle}>THÔNG TIN PHIÊN BẢN</Text>
+        </View>
+        <View style={styles.divider} />
+
+        {releaseLoading ? (
+          <Text style={styles.value}>Đang tải...</Text>
+        ) : release ? (
+          <>
+            <View style={styles.infoRow}>
+              <AntDesign name="tag" size={20} color="#333" />
+              <Text style={styles.label}>Phiên bản:</Text>
+              <Text style={styles.value}>{release.tag_name}</Text>
+            </View>
+          </>
+        ) : (
+          <Text style={styles.value}>Không có thông tin phiên bản.</Text>
+        )}
+      </View>
+
+      {/* Nút Xóa tài khoản */}
+      <TouchableOpacity
+        style={styles.deleteButton}
+        onPress={() => router.push("/confirmdelete")}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.deleteButtonText}>Xóa tài khoản</Text>
+      </TouchableOpacity>
 
       {/* Nút đăng xuất */}
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -266,9 +318,9 @@ export default function ProfileScreen() {
       <Modal visible={editModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Chỉnh sửa thông tin</Text>
+            <Text style={[styles.modalTitle, { alignSelf: "center" }]}>Chỉnh sửa thông tin</Text>
 
-            <Text style={styles.label}>Tên đầy đủ:</Text>
+            <Text style={styles.modalLabel}>Tên đầy đủ:</Text>
             <TextInput
               style={styles.input}
               value={editedUser?.full_name}
@@ -279,7 +331,7 @@ export default function ProfileScreen() {
               }
             />
 
-            <Text style={styles.label}>Email:</Text>
+            <Text style={styles.modalLabel}>Email:</Text>
             <TextInput
               style={styles.input}
               value={editedUser?.email}
@@ -290,7 +342,7 @@ export default function ProfileScreen() {
               }
             />
 
-            <Text style={styles.label}>Số điện thoại:</Text>
+            <Text style={styles.modalLabel}>Số điện thoại:</Text>
             <TextInput
               style={styles.input}
               value={editedUser?.phone}
@@ -302,14 +354,14 @@ export default function ProfileScreen() {
             />
 
             <TouchableOpacity
-              style={styles.saveButton}
+              style={[styles.saveButton, { alignSelf: "center" }]}
               onPress={handleEditUser}
             >
               <Text style={styles.saveButtonText}>Lưu</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.modalClose}
+              style={[styles.modalClose, { alignSelf: "center" }]}
               onPress={() => setEditModalVisible(false)}
             >
               <Text style={styles.modalCloseText}>Hủy</Text>
@@ -402,6 +454,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
   },
+  deleteButton: {
+    borderWidth: 1,
+    borderColor: "#cb0909",
+    backgroundColor: "white",
+    paddingVertical: 12,
+    borderRadius: 20,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  deleteButtonText: {
+    color: "#cb0909",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
   logoutText: { fontSize: 16, color: "#fff", fontWeight: "bold" },
   modalOverlay: {
     flex: 1,
@@ -409,12 +475,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  modalLabel: {
+    fontSize: 14,
+    color: "#555",
+    marginBottom: 5,
+  },
   modalContent: {
     backgroundColor: "#fff",
     padding: 20,
     borderRadius: 10,
     width: "80%",
-    alignItems: "center",
+    alignItems: "flex-start",
     elevation: 5,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -442,6 +513,7 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 10,
     fontSize: 14,
+    alignSelf: "stretch",
   },
   saveButton: {
     backgroundColor: "#42ba96",

@@ -22,7 +22,7 @@ const fetchAPI = async (endpoint: string, method = "GET", body?: any) => {
 
     if (!response.ok) {
       console.error("API Error:", data);
-      
+
       if (response.status === 429) {
         throw new Error("Bạn đã thử OTP quá nhiều lần. Vui lòng thử lại sau!");
       }
@@ -50,47 +50,75 @@ export const getUserInfo = async () => {
 };
 // gửi otp
 export const sendOtp = async (email: string) => {
-    return fetchAPI(API_ENDPOINTS.SEND_OTP, "POST", { email });
-  };
+  return fetchAPI(API_ENDPOINTS.SEND_OTP, "POST", { email });
+};
 //thay đổi mk
 export const changePassword = async (email: string, newPassword: string, otp: string) => {
-    return fetchAPI(API_ENDPOINTS.CHANGE_PASSWORD, "POST", { email, newPassword, otp });
-  };
+  return fetchAPI(API_ENDPOINTS.CHANGE_PASSWORD, "POST", { email, newPassword, otp });
+};
 // đăng ký tài khoản
-  export const registerUser = async (
-    fullName: string,
-    email: string,
-    phone: string,
-    password: string,
-    role: string
-  ) => {
-    return fetchAPI(API_ENDPOINTS.REGISTER, "POST", { full_name: fullName, email, phone, password, role });
-  };
-  // lịch của tôi
-  export const getCalendarData = async () => {
-    try {
-      console.log("Fetching calendar data..."); // Log trước khi fetch
-      const response = await fetch(API_ENDPOINTS.GET_CALENDAR);
-      console.log("Response status:", response.status); // Kiểm tra status
-  
-      if (!response.ok) {
-        throw new Error(`Lỗi API: ${response.status} - ${response.statusText}`);
-      }
-  
-      const data = await response.json();
-      console.log("Dữ liệu từ API:", data); // Kiểm tra dữ liệu nhận được
-  
-      return data.map((booking: any) => ({
-        id: booking.booking_id,
-        customerId: booking.customer_id,
-        fieldId: booking.field_id,
-        startTime: booking.start_time,
-        endTime: booking.end_time,
-        status: booking.status,
-      }));
-    } catch (error) {
-      console.error("Lỗi lấy dữ liệu từ API:", error);
-      return [];
+export const registerUser = async (
+  fullName: string,
+  email: string,
+  phone: string,
+  password: string,
+  role: string
+) => {
+  return fetchAPI(API_ENDPOINTS.REGISTER, "POST", { full_name: fullName, email, phone, password, role });
+};
+// lịch của tôi
+export const getCalendarData = async () => {
+  try {
+    console.log("Fetching calendar data..."); // Log trước khi fetch
+    const response = await fetch(API_ENDPOINTS.GET_CALENDAR);
+    console.log("Response status:", response.status); // Kiểm tra status
+
+    if (!response.ok) {
+      throw new Error(`Lỗi API: ${response.status} - ${response.statusText}`);
     }
-  };
-  
+
+    const data = await response.json();
+    console.log("Dữ liệu từ API:", data); // Kiểm tra dữ liệu nhận được
+
+    return data.map((booking: any) => ({
+      id: booking.booking_id,
+      customerId: booking.customer_id,
+      fieldId: booking.field_id,
+      startTime: booking.start_time,
+      endTime: booking.end_time,
+      status: booking.status,
+    }));
+  } catch (error) {
+    console.error("Lỗi lấy dữ liệu từ API:", error);
+    return [];
+  }
+};
+
+// Interface để định nghĩa cấu trúc dữ liệu của release từ GitHub
+interface GitHubRelease {
+  tag_name: string;
+  published_at: string;
+  name?: string;
+  body?: string;
+}
+
+// Hàm lấy release mới nhất từ GitHub
+export const fetchLatestRelease = async (): Promise<GitHubRelease | null> => {
+  try {
+    const response = await fetch(API_ENDPOINTS.GET_VERSION, {
+      headers: {
+        Accept: 'application/vnd.github.v3+json', // Yêu cầu của GitHub API
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch GitHub release: ${response.statusText}`);
+    }
+
+    const release: GitHubRelease = await response.json();
+    return release;
+  } catch (error) {
+    console.error('Error fetching GitHub release:', error);
+    return null;
+  }
+};

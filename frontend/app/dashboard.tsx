@@ -1,64 +1,59 @@
 import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router"; // Dùng expo-router thay vì react-navigation
-import BottomTabs from "./BottomTabs"; // Import thanh điều hướng
+import { Icon } from "@iconify/react";
+import { useRouter } from "expo-router";
+import BottomTabs from "./BottomTabs";
 
 type OptionButtonProps = {
   label: string;
   color: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: string;
   onPress?: () => void;
 };
 
 export default function Dashboard() {
-  const router = useRouter(); // Dùng router để điều hướng
+  const router = useRouter();
 
   return (
     <View style={styles.container}>
-      {/* Logo */}
       <View style={styles.logoContainer}>
         <Image source={require("../assets/images/react-logo.png")} style={styles.logo} />
       </View>
 
-      {/* Header Text */}
       <Text style={styles.headerText}>Kết nối đam mê, đặt sân mọi lúc!</Text>
 
-      {/* Option Buttons */}
       <View style={styles.optionsContainer}>
-      <OptionButton 
-        label="Bóng đá" 
-        color="#4CAF50" 
-        icon="football-outline" 
-        onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "football" } })}
-      />
-      <OptionButton 
-        label="Bóng rổ" 
-        color="#F44336" 
-        icon="basketball-outline" 
-        onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "basketball" } })}
-      />
-      <OptionButton 
-        label="Cầu lông" 
-        color="#3F51B5" 
-        icon="tennisball-outline" 
-        onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "badminton" } })}
-      />
-      <OptionButton 
-        label="Pickle ball" 
-        color="#9C27B0" 
-        icon="ellipse-outline" 
-        onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "pickleball" } })}
-      />
-      <OptionButton 
-        label="Tennis" 
-        color="#CDDC39" 
-        icon="tennisball-outline" 
-        onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "tennis" } })}
-      />
-
+        <OptionButton
+          label="Bóng đá"
+          color="#4CAF50"
+          icon="mdi:soccer"
+          onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "football" } })}
+        />
+        <OptionButton
+          label="Bóng rổ"
+          color="#F44336"
+          icon="mdi:basketball"
+          onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "basketball" } })}
+        />
+        <OptionButton
+          label="Cầu lông"
+          color="#3F51B5"
+          icon="mdi:badminton"
+          onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "badminton" } })}
+        />
+        <OptionButton
+          label="Pickle ball"
+          color="#9C27B0"
+          icon="mdi:volleyball"
+          onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "pickleball" } })}
+        />
+        <OptionButton
+          label="Tennis"
+          color="#CDDC39"
+          icon="mdi:tennis"
+          onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "tennis" } })}
+        />
       </View>
 
-      {/* Thanh điều hướng */}
       <BottomTabs />
     </View>
   );
@@ -67,7 +62,7 @@ export default function Dashboard() {
 function OptionButton({ label, color, icon, onPress }: OptionButtonProps) {
   return (
     <TouchableOpacity style={[styles.optionButton, { backgroundColor: color }]} onPress={onPress}>
-      <Ionicons name={icon} size={40} color="white" style={styles.icon} />
+      <Icon icon={icon} width={40} height={40} color="white" style={styles.icon} />
       <Text style={styles.optionText}>{label}</Text>
     </TouchableOpacity>
   );
