@@ -34,18 +34,29 @@ export const createCourt = async (req: AuthRequest, res: Response): Promise<void
 
 export const getFields = async (req: Request, res: Response): Promise<void> => {
   try {
-    const [rows] = await pool.execute("SELECT * FROM fields"); // Trả về rows từ kết quả truy vấn
+    const { sport_type } = req.query;
 
-    if (Array.isArray(rows) && rows.length === 0) { // Kiểm tra nếu rows là mảng
+    let query = "SELECT * FROM fields";
+    let params: any[] = [];
+
+    if (sport_type) {
+      query += " WHERE sport_type = ?";
+      params.push(sport_type);
+    }
+
+    const [rows] = await pool.execute(query, params);
+
+    if (Array.isArray(rows) && rows.length === 0) {
       res.status(404).json({ error: "No fields found" });
       return;
     }
 
-    res.json(rows); // Trả về danh sách các sân
+    res.json(rows);
   } catch (error) {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
 
 export const getFieldDetail = async (req: Request, res: Response): Promise<void> => {
   try {

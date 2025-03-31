@@ -4,23 +4,26 @@ import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import BottomTabs from "./BottomTabs";
 import { getFields } from "../hooks/useGetFields"; 
+import { useLocalSearchParams } from "expo-router"; 
 
 
 const PickField: React.FC = () => {
   const router = useRouter();
-  const [fields, setFields] = useState<any[]>([]); // Khởi tạo state cho dữ liệu sân bóng
+  const { sport_type } = useLocalSearchParams(); // Lấy sport_type từ params
+  const [fields, setFields] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchFields = async () => {
       try {
-        const fieldsData = await getFields();
-        setFields(fieldsData); // Cập nhật dữ liệu vào state
+        const fieldsData = await getFields(sport_type as string); // Gửi sport_type lên API
+        setFields(fieldsData);
       } catch (error) {
         console.error("Error fetching fields:", error);
       }
     };
-    fetchFields();
-  }, []); // Chạy khi component được render
+    if (sport_type) fetchFields();
+  }, [sport_type]);
+  
 
   return (
     <View style={styles.container}>

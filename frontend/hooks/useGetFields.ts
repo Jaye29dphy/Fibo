@@ -1,14 +1,13 @@
-// useGetFields.ts
 import { API_ENDPOINTS } from "../constants/apiConfig";
 
-// Hàm lấy dữ liệu sân bóng
-export const getFields = async () => {
+export const getFields = async (sportType: string) => {
   try {
-    const response = await fetch(API_ENDPOINTS.GET_FIELDS); // Gọi API để lấy dữ liệu sân
+    const url = `${API_ENDPOINTS.GET_FIELDS}?sport_type=${encodeURIComponent(sportType)}`;
+    const response = await fetch(url);
     const data = await response.json();
-    return data; // Trả về dữ liệu sân
+    return data;
   } catch (error) {
     console.error("Error fetching fields:", error);
-    throw error; // Ném lỗi nếu có
+    throw error;
   }
 };

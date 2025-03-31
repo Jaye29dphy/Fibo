@@ -25,16 +25,37 @@ export default function Dashboard() {
 
       {/* Option Buttons */}
       <View style={styles.optionsContainer}>
-        <OptionButton 
-          label="Bóng đá" 
-          color="#4CAF50" 
-          icon="football-outline" 
-          onPress={() => router.push("/pickfield")} // Điều hướng với expo-router
-        />
-        <OptionButton label="Bóng rổ" color="#F44336" icon="basketball-outline" />
-        <OptionButton label="Cầu lông" color="#3F51B5" icon="tennisball-outline" />
-        <OptionButton label="Pickle ball" color="#9C27B0" icon="ellipse-outline" />
-        <OptionButton label="Tennis" color="#CDDC39" icon="tennisball-outline" />
+      <OptionButton 
+        label="Bóng đá" 
+        color="#4CAF50" 
+        icon="football-outline" 
+        onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "football" } })}
+      />
+      <OptionButton 
+        label="Bóng rổ" 
+        color="#F44336" 
+        icon="basketball-outline" 
+        onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "basketball" } })}
+      />
+      <OptionButton 
+        label="Cầu lông" 
+        color="#3F51B5" 
+        icon="tennisball-outline" 
+        onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "badminton" } })}
+      />
+      <OptionButton 
+        label="Pickle ball" 
+        color="#9C27B0" 
+        icon="ellipse-outline" 
+        onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "pickleball" } })}
+      />
+      <OptionButton 
+        label="Tennis" 
+        color="#CDDC39" 
+        icon="tennisball-outline" 
+        onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "tennis" } })}
+      />
+
       </View>
 
       {/* Thanh điều hướng */}
