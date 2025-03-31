@@ -235,17 +235,23 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET || "secret");
 
     const [users]: any = await pool.execute(
-      "SELECT user_id, full_name, email, phone, role, status, created_at FROM users WHERE user_id = ?",
+      "SELECT user_id, full_name, email, phone, role, status, created_at, avatar FROM users WHERE user_id = ?",
       [decoded.id] // Lấy user_id từ token
     );
-
 
     if (!Array.isArray(users) || users.length === 0) {
       res.status(404).json({ error: "User not found" });
       return;
     }
 
-    res.json(users[0]);
+    const user = users[0];
+
+    // 🔹 Tạo đường dẫn ảnh đầy đủ
+    user.avatar = user.avatar
+      ? `http://localhost:5000${user.avatar}` // Nếu có ảnh, trả về URL đầy đủ
+      : "http://localhost:5000/avatars/default.png"; // Ảnh mặc định nếu user chưa upload avatar
+
+    res.json(user);
   } catch (error) {
     console.error("JWT Error:", error); // In lỗi chi tiết
     res.status(500).json({ error: "Invalid token" });

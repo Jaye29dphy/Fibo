@@ -1,4 +1,4 @@
-export const API_URL = "http://192.168.1.105:5000"; // Đổi IP của máy chủ
+export const API_URL = "http://192.168.1.6:5000"; // Đổi IP của máy chủ
 
 export const API_ENDPOINTS = {
   LOGIN: `${API_URL}/api/auth/login`,

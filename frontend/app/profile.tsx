@@ -1,9 +1,21 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, ActivityIndicator, Modal } from 'react-native';
-import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AntDesign } from "@expo/vector-icons";
-import { getUserInfo } from "../constants/apiService";  // Thêm đúng đường dẫn nếu cần
+import React, { useEffect, useState, useCallback } from "react";
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  TouchableOpacity,
+  Modal,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  TextInput,
+} from "react-native";
+import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as ImagePicker from "expo-image-picker";
+import { AntDesign, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
+import { getUserInfo, uploadAvatar } from "../constants/apiService";
 
 type User = {
   id: number;
@@ -13,6 +25,7 @@ type User = {
   role: string;
   status: string;
   created_at: string;
+  avatar: string;
 };
 
 export default function ProfileScreen() {
@@ -20,33 +33,20 @@ export default function ProfileScreen() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalContent, setModalContent] = useState('');
-  const [version, setVersion] = useState("Đang tải...");
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editedUser, setEditedUser] = useState<User | null>(null);
 
-  
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const token = await AsyncStorage.getItem("token");
         if (!token) {
-          console.log("No token found. Redirecting to login...");
           router.replace("/");
           return;
         }
-  
-        console.log("Fetching user info with token:", token);
-        const data = await getUserInfo(); // Trực tiếp lấy data từ fetchAPI
-        console.log("User info fetched successfully:", data);
-  
-        setUser({
-          id: data.id,
-          full_name: data.full_name,
-          email: data.email,
-          phone: data.phone,
-          role: data.role,
-          status: data.status,
-          created_at: data.created_at,
-        });
+        const data = await getUserInfo();
+        setUser(data);
+        setEditedUser(data);
       } catch (error) {
         console.error("Error fetching user info:", error);
         await AsyncStorage.removeItem("token");
@@ -55,28 +55,74 @@ export default function ProfileScreen() {
         setLoading(false);
       }
     };
-  
     checkAuth();
   }, []);
-  
+
+  const pickImage = useCallback(async (useCamera: boolean) => {
+    setModalVisible(false);
+    let result;
+
+    if (useCamera) {
+      result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 1,
+      });
+    } else {
+      result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 1,
+      });
+    }
+
+    if (!result.canceled) {
+      uploadAvatarToServer(result.assets[0].uri);
+    }
+  }, []);
+
+  const uploadAvatarToServer = useCallback(async (imageUri: string) => {
+    if (!user) return;
+
+    const formData = new FormData();
+    formData.append("avatar", {
+      uri: imageUri,
+      name: `${user.id}_avatar.jpg`,
+      type: "image/jpeg",
+    } as any);
+
+    formData.append("userId", user.id.toString());
+
+    try {
+      const response = await uploadAvatar(formData);
+      if (response.avatar) {
+        setUser((prevUser) =>
+          prevUser ? { ...prevUser, avatar: response.avatar } : null
+        );
+        Alert.alert("Thành công", "Ảnh đại diện đã được cập nhật!");
+      }
+    } catch (error) {
+      console.error("Lỗi khi upload ảnh:", error);
+      Alert.alert("Lỗi", "Không thể cập nhật ảnh đại diện. Vui lòng thử lại.");
+    }
+  }, [user]);
 
   const handleLogout = async () => {
-    await AsyncStorage.removeItem('token');
-    router.replace('/');
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active": return "green";
-      case "inactive": return "gray";
-      case "banned": return "red";
-      default: return "black";
+    try {
+      await AsyncStorage.removeItem("token");
+      router.replace("/");
+      Alert.alert("Thành công", "Bạn đã đăng xuất thành công!");
+    } catch (error) {
+      console.error("Lỗi khi đăng xuất:", error);
+      Alert.alert("Lỗi", "Không thể đăng xuất. Vui lòng thử lại.");
     }
   };
 
-  const openModal = (content: string) => {
-    setModalContent(content);
-    setModalVisible(true);
+  const handleEditUser = () => {
+    // Giả lập API để cập nhật thông tin người dùng
+    setUser(editedUser);
+    setEditModalVisible(false);
+    Alert.alert("Thành công", "Thông tin cá nhân đã được cập nhật!");
   };
 
   if (loading) {
@@ -88,7 +134,8 @@ export default function ProfileScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
         <AntDesign
           name="arrowleft"
@@ -99,246 +146,310 @@ export default function ProfileScreen() {
         <Text style={styles.title}>Hồ Sơ</Text>
       </View>
 
-      <Image source={{ uri: 'https://randomuser.me/api/portraits/men/69.jpg' }} style={styles.avatar} />
+      {/* Ảnh đại diện */}
+      <View style={styles.avatarSection}>
+        <TouchableOpacity
+          style={styles.avatarContainer}
+          onPress={() => setModalVisible(true)}
+        >
+          <Image
+            source={{
+              uri:
+                user?.avatar ||
+                "https://via.placeholder.com/100.png?text=User",
+            }}
+            style={styles.avatar}
+          />
+          <View style={styles.editIcon}>
+            <FontAwesome5 name="edit" size={16} color="#fff" />
+          </View>
+        </TouchableOpacity>
+        <Text style={styles.userName}>{user?.full_name || "N/A"}</Text>
+      </View>
 
       {/* Thông tin cá nhân */}
       <View style={styles.infoBox}>
-        <Text style={styles.infoTitle}>THÔNG TIN CÁ NHÂN</Text>
+        <View style={styles.infoHeader}>
+          <Text style={styles.infoTitle}>THÔNG TIN CÁ NHÂN</Text>
+          <TouchableOpacity onPress={() => setEditModalVisible(true)}>
+            <MaterialIcons name="edit" size={20} color="#42ba96" />
+          </TouchableOpacity>
+        </View>
         <View style={styles.divider} />
 
         <View style={styles.infoRow}>
           <AntDesign name="user" size={20} color="#333" />
           <Text style={styles.label}>Tên đầy đủ:</Text>
-          <Text style={styles.value}>{user?.full_name || 'N/A'}</Text>
+          <Text style={styles.value}>{user?.full_name || "N/A"}</Text>
         </View>
 
         <View style={styles.infoRow}>
           <AntDesign name="mail" size={20} color="#333" />
           <Text style={styles.label}>Email:</Text>
-          <Text style={styles.value}>{user?.email || 'N/A'}</Text>
+          <Text style={styles.value}>{user?.email || "N/A"}</Text>
         </View>
 
         <View style={styles.infoRow}>
           <AntDesign name="phone" size={20} color="#333" />
           <Text style={styles.label}>Số điện thoại:</Text>
-          <Text style={styles.value}>{user?.phone || 'N/A'}</Text>
+          <Text style={styles.value}>{user?.phone || "N/A"}</Text>
         </View>
 
         <View style={styles.infoRow}>
           <AntDesign name="idcard" size={20} color="#333" />
           <Text style={styles.label}>Vai trò:</Text>
-          <Text style={styles.value}>{user?.role || 'N/A'}</Text>
+          <Text style={styles.value}>{user?.role || "N/A"}</Text>
         </View>
 
         <View style={styles.infoRow}>
-          <AntDesign name="infocirlceo" size={20} color="#333" />
+  <AntDesign name="calendar" size={20} color="#333" />
+  <Text style={styles.label}>Ngày tạo:</Text>
+  <Text style={styles.value}>
+    {user?.created_at
+      ? new Date(user.created_at).toLocaleString("vi-VN", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        })
+      : "N/A"}
+  </Text>
+</View>
+
+        <View style={styles.infoRow}>
+          <AntDesign name="checkcircle" size={20} color="#333" />
           <Text style={styles.label}>Trạng thái:</Text>
-          <Text style={styles.value}>{user?.status || 'N/A'}</Text>
-          <View style={styles.statusDotContainer}>
-            <View style={[styles.statusDot, { backgroundColor: getStatusColor(user?.status || '') }]} />
-          </View>
-        </View>
-
-        <View style={styles.infoRow}>
-          <AntDesign name="calendar" size={20} color="#333" />
-          <Text style={styles.label}>Thời gian tạo tài khoản:</Text>
-          <Text style={styles.value}>{user?.created_at ? new Date(user.created_at).toLocaleString("vi-VN") : 'N/A'}</Text>
+          <Text style={styles.value}>{user?.status || "N/A"}</Text>
         </View>
       </View>
 
-      {/* Chính sách bảo mật & Điều khoản sử dụng */}
-      <View style={styles.infoBox}>
-        <TouchableOpacity onPress={() => openModal("Hoang Hoang")}>
-          <Text style={styles.infoTitle}>📜 Chính sách bảo mật</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.infoBox}>
-        <TouchableOpacity onPress={() => openModal("Quynh Anh Trinh")}>
-          <Text style={styles.infoTitle}>📑 Điều khoản sử dụng</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Phiên bản ứng dụng */}
-      <View style={styles.infoBox}>
-        <Text style={styles.infoTitle}>🔖 Phiên bản</Text>
-        <Text style={styles.infoValue}>{version}</Text>
-      </View>
-
-      {/* Nút Xóa tài khoản */}
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={() => router.push('/confirmdelete')}
-        activeOpacity={0.7}  // Thêm hiệu ứng nhấn
-      >
-        <Text style={styles.deleteButtonText}>Xóa tài khoản</Text>
+      {/* Nút đăng xuất */}
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <Text style={styles.logoutText}>Đăng Xuất</Text>
       </TouchableOpacity>
 
-      {/* Nút đăng xuất (xuống cuối màn hình) */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={handleLogout}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.buttonText}>Đăng xuất</Text>
-        </TouchableOpacity>
-      </View>
-
-
-      {/* Modal Overlay */}
+      {/* Modal chọn ảnh */}
       <Modal visible={modalVisible} transparent animationType="fade">
-        <TouchableOpacity
-          style={styles.overlay}
-          activeOpacity={1}
-          onPress={() => setModalVisible(false)}
-        >
-          <View style={styles.modalBox}>
-            <Text style={styles.modalText}>{modalContent}</Text>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Cập nhật ảnh đại diện</Text>
+
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => pickImage(true)}
+            >
+              <FontAwesome5 name="camera" size={20} color="#42ba96" />
+              <Text style={styles.modalButtonText}>Chụp ảnh</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => pickImage(false)}
+            >
+              <FontAwesome5 name="images" size={20} color="#42ba96" />
+              <Text style={styles.modalButtonText}>Chọn từ thư viện</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalClose}
+              onPress={() => setModalVisible(false)}
+            >
+              <Text style={styles.modalCloseText}>Hủy</Text>
+            </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
-    </View>
+
+      {/* Modal chỉnh sửa thông tin */}
+      <Modal visible={editModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Chỉnh sửa thông tin</Text>
+
+            <Text style={styles.label}>Tên đầy đủ:</Text>
+            <TextInput
+              style={styles.input}
+              value={editedUser?.full_name}
+              onChangeText={(text) =>
+                setEditedUser((prev) =>
+                  prev ? { ...prev, full_name: text } : null
+                )
+              }
+            />
+
+            <Text style={styles.label}>Email:</Text>
+            <TextInput
+              style={styles.input}
+              value={editedUser?.email}
+              onChangeText={(text) =>
+                setEditedUser((prev) =>
+                  prev ? { ...prev, email: text } : null
+                )
+              }
+            />
+
+            <Text style={styles.label}>Số điện thoại:</Text>
+            <TextInput
+              style={styles.input}
+              value={editedUser?.phone}
+              onChangeText={(text) =>
+                setEditedUser((prev) =>
+                  prev ? { ...prev, phone: text } : null
+                )
+              }
+            />
+
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={handleEditUser}
+            >
+              <Text style={styles.saveButtonText}>Lưu</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalClose}
+              onPress={() => setEditModalVisible(false)}
+            >
+              <Text style={styles.modalCloseText}>Hủy</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </ScrollView>
   );
 }
 
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f4f4f4",
-    paddingHorizontal: 20,
-  },
+  container: { flex: 1, backgroundColor: "#f4f4f4", paddingHorizontal: 20 },
   header: {
     backgroundColor: "#42ba96",
     paddingVertical: 15,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 15,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
   },
-  title: {
-    fontSize: 20,
-    color: "white",
-    fontWeight: "bold",
-    marginLeft: 10,
+  title: { fontSize: 20, color: "white", fontWeight: "bold", marginLeft: 10 },
+  avatarSection: { alignItems: "center", marginVertical: 20 },
+  avatarContainer: {
+    position: "relative",
+    padding: 10,
+    borderRadius: 60,
+    backgroundColor: "#fff",
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
   },
   avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    alignSelf: "center",
-    marginVertical: 15,
+    borderWidth: 2,
+    borderColor: "#42ba96",
+  },
+  editIcon: {
+    position: "absolute",
+    bottom: 10,
+    right: 10,
+    backgroundColor: "#42ba96",
+    borderRadius: 15,
+    padding: 5,
+  },
+  userName: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    marginTop: 10,
   },
   infoBox: {
     backgroundColor: "#fff",
     padding: 15,
     borderRadius: 10,
-    marginBottom: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
+    marginBottom: 20,
     elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
-  infoTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  infoValue: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "#ddd",
-    marginVertical: 10,
-  },
-  infoRow: {
+  infoHeader: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
   },
-  label: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: "#555",
-  },
-  value: {
-    marginLeft: "auto",
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  statusDotContainer: {
-    marginLeft: 5,
-  },
-  statusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  footer: {
-    marginTop: "auto", // Đẩy xuống cuối màn hình
-    width: "100%",
-  },
-  button: {
+  infoTitle: { fontSize: 16, fontWeight: "bold", color: "#333" },
+  divider: { height: 1, backgroundColor: "#ddd", marginVertical: 10 },
+  infoRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+  label: { marginLeft: 8, fontSize: 14, color: "#555" },
+  value: { marginLeft: "auto", fontSize: 14, fontWeight: "bold", color: "#333" },
+  logoutButton: {
     backgroundColor: "#ff4d4d",
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: "center",
-    marginTop: 20,
+    marginBottom: 20,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
-  logoutButton: {
-    backgroundColor: "#cb0909",
-    padding: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 20,
-  },
-  buttonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  deleteButton: {
-    borderWidth: 1,
-    borderColor: "#cb0909",
-    backgroundColor: "white",
-    paddingVertical: 12,
-    borderRadius: 20,
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  deleteButtonText: {
-    color: "#cb0909",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  // 💡 Thêm các style cho modal (Overlay)
-  overlay: {
+  logoutText: { fontSize: 16, color: "#fff", fontWeight: "bold" },
+  modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
-  modalBox: {
-    width: "80%",
+  modalContent: {
     backgroundColor: "#fff",
     padding: 20,
     borderRadius: 10,
+    width: "80%",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 5,
     elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
   },
-  modalText: {
-    fontSize: 16,
-    color: "#333",
-    textAlign: "center",
-    marginBottom: 15,
+  modalTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 15, color: "#333" },
+  modalButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    width: "100%",
+    justifyContent: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
   },
+  modalButtonText: { marginLeft: 10, fontSize: 16, color: "#42ba96" },
+  modalClose: { marginTop: 10 },
+  modalCloseText: { fontSize: 16, color: "#ff4d4d", fontWeight: "bold" },
+  input: {
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 10,
+    fontSize: 14,
+  },
+  saveButton: {
+    backgroundColor: "#42ba96",
+    paddingVertical: 10,
+    borderRadius: 5,
+    width: "100%",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  saveButtonText: { fontSize: 16, color: "#fff", fontWeight: "bold" },
 });
