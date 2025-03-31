@@ -1,12 +1,12 @@
 import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
-import { Icon } from "@iconify/react";
+import { MaterialCommunityIcons } from "@expo/vector-icons"; // Hoặc từ react-native-vector-icons
 import { useRouter } from "expo-router";
 import BottomTabs from "./BottomTabs";
 
 type OptionButtonProps = {
   label: string;
   color: string;
-  icon: string;
+  icon: "soccer" | "basketball" | "badminton" | "volleyball" | "tennis";
   onPress?: () => void;
 };
 
@@ -25,31 +25,31 @@ export default function Dashboard() {
         <OptionButton
           label="Bóng đá"
           color="#4CAF50"
-          icon="mdi:soccer"
+          icon="soccer"
           onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "football" } })}
         />
         <OptionButton
           label="Bóng rổ"
           color="#F44336"
-          icon="mdi:basketball"
+          icon="basketball"
           onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "basketball" } })}
         />
         <OptionButton
           label="Cầu lông"
           color="#3F51B5"
-          icon="mdi:badminton"
+          icon="badminton"
           onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "badminton" } })}
         />
         <OptionButton
           label="Pickle ball"
           color="#9C27B0"
-          icon="mdi:volleyball"
-          onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "pickleball" } })}
+          icon="volleyball"
+          onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "volleyball" } })}
         />
         <OptionButton
           label="Tennis"
           color="#CDDC39"
-          icon="mdi:tennis"
+          icon="tennis"
           onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "tennis" } })}
         />
       </View>
@@ -62,7 +62,7 @@ export default function Dashboard() {
 function OptionButton({ label, color, icon, onPress }: OptionButtonProps) {
   return (
     <TouchableOpacity style={[styles.optionButton, { backgroundColor: color }]} onPress={onPress}>
-      <Icon icon={icon} width={40} height={40} color="white" style={styles.icon} />
+      <MaterialCommunityIcons name={icon} size={40} color="white" style={styles.icon} />
       <Text style={styles.optionText}>{label}</Text>
     </TouchableOpacity>
   );
