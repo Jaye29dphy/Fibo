@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
-import { View, TextInput, Button, Text, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
-import { changePassword } from '../constants/apiService'; // Import hàm từ apiService
+import { View, TextInput, Button, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { changePassword } from '../constants/apiService';
+import { Ionicons } from '@expo/vector-icons';
 
 const ChangePassword = () => {
-  const [email, setEmail] = useState('');
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const emailFromParams = params.email as string;
+  const [email, setEmail] = useState(emailFromParams || '');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');  // Thêm biến lưu trữ xác nhận mật khẩu
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const router = useRouter();
 
   const handleChangePassword = async () => {
     if (!email || !otp || !newPassword || !confirmPassword) {
@@ -27,9 +30,8 @@ const ChangePassword = () => {
       const response = await changePassword(email, newPassword, otp);
       setMessage(response.message || 'Mật khẩu đã được thay đổi thành công!');
       setError('');
-      // Sau khi đổi mật khẩu thành công, chuyển hướng về màn hình đăng nhập
       setTimeout(() => {
-        router.push('/'); // Chuyển sang màn hình đăng nhập
+        router.push('/');
       }, 2000);
     } catch (err: any) {
       setMessage('');
@@ -39,15 +41,19 @@ const ChangePassword = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Nhập email của bạn</Text>
+      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <Ionicons name="arrow-back" size={24} color="black" />
+      </TouchableOpacity>
+      <Text style={styles.header}>Thay đổi mật khẩu</Text>
+      <Text style={styles.label}>Email của bạn</Text>
       <TextInput
         placeholder="Email"
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
-        style={styles.input}
+        style={[styles.input, styles.disabledInput]}
+        editable={false}
       />
-
       <Text style={styles.label}>Nhập mã OTP</Text>
       <TextInput
         placeholder="Mã OTP"
@@ -56,7 +62,6 @@ const ChangePassword = () => {
         keyboardType="numeric"
         style={styles.input}
       />
-
       <Text style={styles.label}>Nhập mật khẩu mới</Text>
       <TextInput
         placeholder="Mật khẩu mới"
@@ -65,8 +70,7 @@ const ChangePassword = () => {
         secureTextEntry
         style={styles.input}
       />
-
-      <Text style={styles.label}>Xác nhận mật khẩu mới</Text>  {/* Trường xác nhận mật khẩu */}
+      <Text style={styles.label}>Xác nhận mật khẩu mới</Text>
       <TextInput
         placeholder="Xác nhận mật khẩu"
         value={confirmPassword}
@@ -74,10 +78,8 @@ const ChangePassword = () => {
         secureTextEntry
         style={styles.input}
       />
-
-      {error && <Text style={styles.error}>{error}</Text>}
-      {message && <Text style={styles.success}>{message}</Text>}
-
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {message ? <Text style={styles.success}>{message}</Text> : null}
       <Button title="Thay đổi mật khẩu" onPress={handleChangePassword} />
     </View>
   );
@@ -88,6 +90,18 @@ const styles = StyleSheet.create({
     padding: 20,
     flex: 1,
     justifyContent: 'center',
+  },
+  backButton: {
+    position: 'absolute',
+    top: 40,
+    left: 20,
+    zIndex: 1, // Đảm bảo nút back hiển thị trên cùng
+  },
+  header: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
   },
   label: {
     fontSize: 16,
@@ -101,6 +115,10 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginBottom: 10,
     paddingLeft: 8,
+  },
+  disabledInput: {
+    backgroundColor: '#f0f0f0',
+    color: '#666',
   },
   error: {
     color: 'red',

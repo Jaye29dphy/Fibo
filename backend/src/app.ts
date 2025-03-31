@@ -5,7 +5,7 @@ import morgan from "morgan";
 import dotenv from "dotenv";
 import authRoutes from "./routes/authRoutes";
 import courtRoutes from "./routes/courtRoutes";
-import calendarRoutes from "./routes/calendarRoutes"; // Ensure this path is correct
+import calendarRoutes from "./routes/calendarRoutes"; 
 import os from "os";
 
 dotenv.config();

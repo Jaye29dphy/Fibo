@@ -22,6 +22,11 @@ const fetchAPI = async (endpoint: string, method = "GET", body?: any) => {
 
     if (!response.ok) {
       console.error("API Error:", data);
+      
+      if (response.status === 429) {
+        throw new Error("Bạn đã thử OTP quá nhiều lần. Vui lòng thử lại sau!");
+      }
+
       throw new Error(data.error || "Lỗi khi gọi API");
     }
 
@@ -31,6 +36,7 @@ const fetchAPI = async (endpoint: string, method = "GET", body?: any) => {
     throw error; // Throw lại lỗi để xử lý ở nơi gọi hàm
   }
 };
+
 
 // Login API (POST)
 export const loginUser = async (email: string, password: string) => {
