@@ -1,7 +1,7 @@
-// NotificationScreen.tsx
 import React from "react";
 import { View, Text, StyleSheet, Image, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
+import BottomTabs from "./BottomTabs"; // Import BottomTabs
 
 export default function NotificationScreen() {
   const router = useRouter();
@@ -35,6 +35,9 @@ export default function NotificationScreen() {
           </View>
         </View>
       </View>
+
+      {/* Hiển thị Bottom Tab */}
+      <BottomTabs />
     </View>
   );
 }
@@ -47,7 +50,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#37ff00", // Màu xanh giống Facebook
+    backgroundColor: "#37ff00",
     padding: 15,
   },
   backButton: {
@@ -63,6 +66,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   body: {
+    flex: 1, // Sử dụng flex để đẩy tab xuống dưới
     padding: 20,
     backgroundColor: "#f5f5f5",
   },
@@ -92,3 +96,4 @@ const styles = StyleSheet.create({
     color: "#333",
   },
 });
+

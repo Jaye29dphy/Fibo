@@ -1,4 +1,3 @@
-// MyCalendar.tsx
 import React, { useState, useEffect } from "react";
 import { View, Text, ActivityIndicator, StyleSheet, Button } from "react-native";
 import { Calendar } from "react-native-calendars";
@@ -8,35 +7,28 @@ import BottomTabs from "./BottomTabs";
 import { useCalendar } from "../hooks/useCalendar";
 
 const statusColors: Record<string, string> = {
-  confirmed: "#4CAF50", // Green
-  pending: "#FFD700", // Yellow
-  cancelled: "#FF6347", // Red
-  completed: "#808080", // Gray
+  confirmed: "#4CAF50",
+  pending: "#FFD700",
+  cancelled: "#FF6347",
+  completed: "#808080",
 };
 
 export default function MyCalendar() {
   const router = useRouter();
-  const { bookings, loading, error, refreshBookings } = useCalendar();
-  const [markedDates, setMarkedDates] = useState<{ [date: string]: any }>({});
+  const { bookings, loading, error, refreshBookings } = useCalendar(); // Không cần ép kiểu
+  const [markedDates, setMarkedDates] = useState<{ [date: string]: { selected: boolean; selectedColor: string } }>({});
 
   useEffect(() => {
-    console.log("Bookings received:", bookings);
     if (bookings.length > 0) {
-      const newMarkedDates: { [date: string]: any } = {};
+      const newMarkedDates: { [date: string]: { selected: boolean; selectedColor: string } } = {};
       bookings.forEach((booking) => {
-        console.log("Processing booking:", booking);
-        // Extract the date (e.g., "2025-03-30" from "2025-03-30 07:00:00Z")
         const date = booking.start_time.split(" ")[0];
-        console.log("Extracted date:", date);
         newMarkedDates[date] = {
           selected: true,
           selectedColor: statusColors[booking.status] || "#0000FF",
         };
       });
-      console.log("New marked dates:", newMarkedDates);
       setMarkedDates(newMarkedDates);
-    } else {
-      console.log("No bookings to mark.");
     }
   }, [bookings]);
 
@@ -52,9 +44,14 @@ export default function MyCalendar() {
           <ActivityIndicator size="large" color="#4CAF50" />
         ) : error ? (
           <Text style={styles.errorText}>{error}</Text>
+        ) : Object.keys(markedDates).length === 0 && !loading ? (
+          <Text style={styles.noBookingsText}>Không có lịch đặt sân nào.</Text>
         ) : (
           <Calendar
             markedDates={markedDates}
+            onDayPress={(day: { dateString: string; day: number; month: number; year: number; timestamp: number }) => {
+              router.push(`/calendar2?selectedDate=${day.dateString}`);
+            }}
             theme={{
               calendarBackground: "white",
               textSectionTitleColor: "black",
@@ -90,4 +87,5 @@ const styles = StyleSheet.create({
   content: { flex: 1, padding: 16, alignItems: "center" },
   bottomTabs: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "white", borderTopWidth: 1, borderTopColor: "#ddd" },
   errorText: { color: "red", fontSize: 16, marginTop: 10 },
+  noBookingsText: { fontSize: 16, color: "gray", textAlign: "center", marginTop: 20 },
 });
