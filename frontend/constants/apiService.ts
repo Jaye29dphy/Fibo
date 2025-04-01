@@ -1,6 +1,7 @@
 // apiService.ts
-import { API_ENDPOINTS } from "./apiConfig"; // Định nghĩa các endpoint ở đây
+import { API_ENDPOINTS , API_URL} from "./apiConfig"; // Định nghĩa các endpoint ở đây
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
 
 const fetchAPI = async (endpoint: string, method = "GET", body?: any) => {
   const token = await AsyncStorage.getItem("token"); // Lấy token từ AsyncStorage
@@ -120,5 +121,34 @@ export const fetchLatestRelease = async (): Promise<GitHubRelease | null> => {
   } catch (error) {
     console.error('Error fetching GitHub release:', error);
     return null;
+  }
+};
+
+export const uploadAvatar = async (formData: FormData): Promise<{ avatar: string }> => {
+  try {
+    const token = await AsyncStorage.getItem("token");
+    console.log("Token:", token);
+
+    const response = await fetch(API_ENDPOINTS.UPLOAD_AVATAR, {
+      method: "POST",
+      headers: {
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+      body: formData,
+    });
+
+    const data = await response.json();
+    console.log("API response data:", data);
+
+    if (!response.ok) {
+      console.error("Lỗi upload avatar:", data);
+      throw new Error(data.error || "Lỗi khi upload ảnh");
+    }
+
+    const avatarUrl = `${API_URL}/avatars/${data.avatar}`;
+    return { avatar: avatarUrl };
+  } catch (error) {
+    console.error("Lỗi khi gọi API upload avatar:", error);
+    throw error;
   }
 };

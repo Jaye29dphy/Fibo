@@ -17,9 +17,8 @@ import * as ImagePicker from "expo-image-picker";
 import { AntDesign, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
 import { getUserInfo, uploadAvatar, fetchLatestRelease } from "../constants/apiService";
 
-// Interface cho dữ liệu user
 type User = {
-  id: number;
+  user_id: number;
   full_name: string;
   email: string;
   phone: string;
@@ -29,7 +28,6 @@ type User = {
   avatar: string;
 };
 
-// Interface cho dữ liệu release từ GitHub
 interface GitHubRelease {
   tag_name: string;
   published_at: string;
@@ -43,10 +41,11 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [editedUser, setEditedUser] = useState<User | null>(null);
-  // State để lưu thông tin release
   const [release, setRelease] = useState<GitHubRelease | null>(null);
   const [releaseLoading, setReleaseLoading] = useState(true);
+  const [tempAvatar, setTempAvatar] = useState<string | null>(null);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -79,10 +78,63 @@ export default function ProfileScreen() {
     getRelease();
   }, []);
 
+  const uploadAvatarToServer = useCallback(async (imageUri: string) => {
+    console.log("Bắt đầu uploadAvatarToServer, imageUri:", imageUri);
+    console.log("User object:", user);
+    if (!user || !user.user_id) { // Sửa user.id thành user.user_id
+      console.log("User or user.user_id is undefined, aborting");
+      Alert.alert("Lỗi", "Không thể upload ảnh vì thông tin user không hợp lệ.");
+      return;
+    }
+  
+    setUploading(true);
+    setTempAvatar(imageUri);
+    console.log("Đã set tempAvatar:", imageUri);
+  
+    const formData = new FormData();
+    formData.append("avatar", {
+      uri: imageUri,
+      name: `${user.user_id}_avatar.jpg`, // Sửa user.id thành user.user_id
+      type: "image/jpeg",
+    } as any);
+    formData.append("user_id", user.user_id.toString()); // Sửa user.id thành user.user_id
+    console.log("FormData đã tạo:", formData);
+  
+    try {
+      const response = await uploadAvatar(formData);
+      console.log("API response:", response);
+      if (response.avatar) {
+        setUser((prevUser) =>
+          prevUser ? { ...prevUser, avatar: response.avatar } : null
+        );
+        setTempAvatar(null);
+        console.log("Upload thành công, avatar từ server:", response.avatar);
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      setTempAvatar(null);
+      Alert.alert("Lỗi", "Không thể cập nhật ảnh đại diện. Vui lòng thử lại.");
+    } finally {
+      setUploading(false);
+      console.log("Hoàn tất uploadAvatarToServer");
+    }
+  }, [user]);
+  
   const pickImage = useCallback(async (useCamera: boolean) => {
     setModalVisible(false);
+    console.log("Bắt đầu pickImage, useCamera:", useCamera);
+  
+    const permission = useCamera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+  
+    if (!permission.granted) {
+      console.log("Không có quyền truy cập camera/thư viện");
+      Alert.alert("Lỗi", "Bạn cần cấp quyền để sử dụng tính năng này!");
+      return;
+    }
+  
     let result;
-
     if (useCamera) {
       result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
@@ -96,37 +148,17 @@ export default function ProfileScreen() {
         quality: 1,
       });
     }
-
-    if (!result.canceled) {
-      uploadAvatarToServer(result.assets[0].uri);
+  
+    console.log("ImagePicker result:", result);
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const imageUri = result.assets[0].uri;
+      console.log("Selected image URI:", imageUri);
+      console.log("User trước khi upload:", user);
+      await uploadAvatarToServer(imageUri);
+    } else {
+      console.log("Image selection canceled or no assets found");
     }
-  }, []);
-
-  const uploadAvatarToServer = useCallback(async (imageUri: string) => {
-    if (!user) return;
-
-    const formData = new FormData();
-    formData.append("avatar", {
-      uri: imageUri,
-      name: `${user.id}_avatar.jpg`,
-      type: "image/jpeg",
-    } as any);
-
-    formData.append("userId", user.id.toString());
-
-    try {
-      const response = await uploadAvatar(formData);
-      if (response.avatar) {
-        setUser((prevUser) =>
-          prevUser ? { ...prevUser, avatar: response.avatar } : null
-        );
-        Alert.alert("Thành công", "Ảnh đại diện đã được cập nhật!");
-      }
-    } catch (error) {
-      console.error("Lỗi khi upload ảnh:", error);
-      Alert.alert("Lỗi", "Không thể cập nhật ảnh đại diện. Vui lòng thử lại.");
-    }
-  }, [user]);
+  }, [uploadAvatarToServer]);
 
   const handleLogout = async () => {
     try {
@@ -140,7 +172,6 @@ export default function ProfileScreen() {
   };
 
   const handleEditUser = () => {
-    // Giả lập API để cập nhật thông tin người dùng
     setUser(editedUser);
     setEditModalVisible(false);
     Alert.alert("Thành công", "Thông tin cá nhân đã được cập nhật!");
@@ -172,18 +203,28 @@ export default function ProfileScreen() {
         <TouchableOpacity
           style={styles.avatarContainer}
           onPress={() => setModalVisible(true)}
+          disabled={uploading}
         >
           <Image
             source={{
               uri:
+                tempAvatar ||
                 user?.avatar ||
                 "https://via.placeholder.com/100.png?text=User",
             }}
             style={styles.avatar}
           />
-          <View style={styles.editIcon}>
-            <FontAwesome5 name="edit" size={16} color="#fff" />
-          </View>
+          {uploading ? (
+            <ActivityIndicator
+              size="small"
+              color="#42ba96"
+              style={styles.editIcon}
+            />
+          ) : (
+            <View style={styles.editIcon}>
+              <FontAwesome5 name="edit" size={16} color="#fff" />
+            </View>
+          )}
         </TouchableOpacity>
         <Text style={styles.userName}>{user?.full_name || "N/A"}</Text>
       </View>
@@ -197,48 +238,42 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
         <View style={styles.divider} />
-
         <View style={styles.infoRow}>
           <AntDesign name="user" size={20} color="#333" />
           <Text style={styles.label}>Tên đầy đủ:</Text>
           <Text style={styles.value}>{user?.full_name || "N/A"}</Text>
         </View>
-
         <View style={styles.infoRow}>
           <AntDesign name="mail" size={20} color="#333" />
           <Text style={styles.label}>Email:</Text>
           <Text style={styles.value}>{user?.email || "N/A"}</Text>
         </View>
-
         <View style={styles.infoRow}>
           <AntDesign name="phone" size={20} color="#333" />
           <Text style={styles.label}>Số điện thoại:</Text>
           <Text style={styles.value}>{user?.phone || "N/A"}</Text>
         </View>
-
         <View style={styles.infoRow}>
           <AntDesign name="idcard" size={20} color="#333" />
           <Text style={styles.label}>Vai trò:</Text>
           <Text style={styles.value}>{user?.role || "N/A"}</Text>
         </View>
-
         <View style={styles.infoRow}>
           <AntDesign name="calendar" size={20} color="#333" />
           <Text style={styles.label}>Ngày tạo:</Text>
           <Text style={styles.value}>
             {user?.created_at
               ? new Date(user.created_at).toLocaleString("vi-VN", {
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-              })
+                  year: "numeric",
+                  month: "2-digit",
+                  day: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                })
               : "N/A"}
           </Text>
         </View>
-
         <View style={styles.infoRow}>
           <AntDesign name="checkcircle" size={20} color="#333" />
           <Text style={styles.label}>Trạng thái:</Text>
@@ -246,13 +281,12 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* Phần thông tin phiên bản (thêm vào đây) */}
+      {/* Thông tin phiên bản */}
       <View style={styles.infoBox}>
         <View style={styles.infoHeader}>
           <Text style={styles.infoTitle}>THÔNG TIN PHIÊN BẢN</Text>
         </View>
         <View style={styles.divider} />
-
         {releaseLoading ? (
           <Text style={styles.value}>Đang tải...</Text>
         ) : release ? (
@@ -286,13 +320,12 @@ export default function ProfileScreen() {
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={[styles.modalTitle, { alignSelf: "center" }]}>
-              Cập nhật ảnh đại diện
-            </Text>
+            <Text style={styles.modalTitle}>Cập nhật ảnh đại diện</Text>
 
             <TouchableOpacity
               style={styles.modalButton}
               onPress={() => pickImage(true)}
+              disabled={uploading}
             >
               <FontAwesome5 name="camera" size={20} color="#42ba96" />
               <Text style={styles.modalButtonText}>Chụp ảnh</Text>
@@ -301,6 +334,7 @@ export default function ProfileScreen() {
             <TouchableOpacity
               style={styles.modalButton}
               onPress={() => pickImage(false)}
+              disabled={uploading}
             >
               <FontAwesome5 name="images" size={20} color="#42ba96" />
               <Text style={styles.modalButtonText}>Chọn từ thư viện</Text>
@@ -320,7 +354,9 @@ export default function ProfileScreen() {
       <Modal visible={editModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={[styles.modalTitle, { alignSelf: "center" }]}>Chỉnh sửa thông tin</Text>
+            <Text style={[styles.modalTitle, { alignSelf: "center" }]}>
+              Chỉnh sửa thông tin
+            </Text>
 
             <Text style={styles.modalLabel}>Tên đầy đủ:</Text>
             <TextInput
@@ -375,6 +411,7 @@ export default function ProfileScreen() {
   );
 }
 
+// Styles giữ nguyên
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f4f4f4", paddingHorizontal: 20 },
   header: {
@@ -505,14 +542,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#ddd",
   },
   modalButtonText: { marginLeft: 10, fontSize: 16, color: "#42ba96" },
-  modalClose: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    width: "100%",
-    justifyContent: "center",
-    marginTop: 10,
-  },
+  modalClose: { marginTop: 10 },
   modalCloseText: { fontSize: 16, color: "#ff4d4d", fontWeight: "bold" },
   input: {
     width: "100%",
