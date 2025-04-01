@@ -286,7 +286,9 @@ export default function ProfileScreen() {
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Cập nhật ảnh đại diện</Text>
+            <Text style={[styles.modalTitle, { alignSelf: "center" }]}>
+              Cập nhật ảnh đại diện
+            </Text>
 
             <TouchableOpacity
               style={styles.modalButton}
@@ -503,7 +505,14 @@ const styles = StyleSheet.create({
     borderBottomColor: "#ddd",
   },
   modalButtonText: { marginLeft: 10, fontSize: 16, color: "#42ba96" },
-  modalClose: { marginTop: 10 },
+  modalClose: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    width: "100%",
+    justifyContent: "center",
+    marginTop: 10,
+  },
   modalCloseText: { fontSize: 16, color: "#ff4d4d", fontWeight: "bold" },
   input: {
     width: "100%",
