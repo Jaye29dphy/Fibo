@@ -43,7 +43,7 @@ export default function LoginScreen() {
 
   return (
     <ImageBackground
-      source={require("../../assets/images/anhbiakhach.jpg")}
+      source={require("../../assets/images/anhbiakhach.png")}
       style={styles.backgroundImage}
     >
       <View style={styles.overlay}>
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderWidth: 1,
     borderColor: "gray",
-    
+
   },
   rememberMeContainer: {
     flexDirection: "row",

@@ -1,4 +1,4 @@
-export const API_URL = "http://192.168.1.8:5000"; // Đổi IP của máy chủ
+export const API_URL = "http://192.168.1.9:5000"; // Đổi IP của máy chủ
 export const GITHUB_REPO = "https://api.github.com/repos/Jaye29dphy/Fibo"; // Thay owner & repo
 
 export const API_ENDPOINTS = {
