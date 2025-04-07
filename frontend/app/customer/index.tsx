@@ -23,15 +23,30 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     setError(null);
-
+  
     try {
       const data = await loginUser(email, password);
       console.log("📥 Response từ server:", data);
-
+  
       if (data.token) {
         await AsyncStorage.setItem("token", data.token);
+        await AsyncStorage.setItem("role", data.user.role);  // Lưu role vào AsyncStorage từ data.user
+  
         Alert.alert("✅ Thành công", "Đăng nhập thành công!");
-        router.push("/customer/dashboard");
+  
+        // Kiểm tra và điều hướng theo vai trò
+        if (data.user.role === 'admin') {
+          router.push("/admin/dashboard");
+          router.replace("/admin/dashboard");
+        } else if (data.user.role === 'owner') {
+          router.push("/owner/dashboard");
+          router.replace("/owner/dashboard");
+        } else if (data.user.role === 'customer') {
+          router.push("/customer/dashboard");
+          router.replace("/customer/dashboard");
+        } else {
+          setError("Vai trò không xác định.");
+        }
       } else {
         setError("Không nhận được token từ server.");
       }
@@ -40,6 +55,7 @@ export default function LoginScreen() {
       setError(error.message || "Không thể kết nối đến server!");
     }
   };
+  
 
   return (
     <ImageBackground
