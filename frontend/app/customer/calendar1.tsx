@@ -4,7 +4,7 @@ import { Calendar } from "react-native-calendars";
 import { useRouter } from "expo-router";
 import { AntDesign } from "@expo/vector-icons";
 import BottomTabs from "./BottomTabs";
-import { useCalendar } from "../hooks/useCalendar";
+import { useCalendar } from "@/hooks/useCalendar";
 
 const statusColors: Record<string, string> = {
   confirmed: "#4CAF50",
@@ -50,7 +50,7 @@ export default function MyCalendar() {
           <Calendar
             markedDates={markedDates}
             onDayPress={(day: { dateString: string; day: number; month: number; year: number; timestamp: number }) => {
-              router.push(`/calendar2?selectedDate=${day.dateString}`);
+              router.push(`/customer/calendar2?selectedDate=${day.dateString}`);
             }}
             theme={{
               calendarBackground: "white",
@@ -70,7 +70,7 @@ export default function MyCalendar() {
           />
         )}
         <Button title="Tải lại lịch hẹn" onPress={refreshBookings} />
-        <Button title="Xem tất cả lịch đặt sân" onPress={() => router.push("/calendar2")} />
+        <Button title="Xem tất cả lịch đặt sân" onPress={() => router.push("/customer/calendar2")} />
       </View>
 
       <View style={styles.bottomTabs}>

@@ -22,7 +22,7 @@ app.use("/api/auth", authRoutes);
 app.use("/courts", courtRoutes);
 app.use("/bookings", calendarRoutes);
 app.use("/upload-avatar", uploadRoutes);
-app.use("/avatars", express.static("C:\\Users\\Admin\\Desktop\\imageFibo\\Avatar"));
+app.use("/avatars", express.static("C:\\Users\\hungd\\OneDrive\\Desktop\\FiboImage\\avatar"));
 
 
 const PORT: number = Number(process.env.PORT) || 5000;

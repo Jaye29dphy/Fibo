@@ -16,7 +16,7 @@ export default function Dashboard() {
   return (
     <View style={styles.container}>
       <View style={styles.logoContainer}>
-        <Image source={require("../assets/images/react-logo.png")} style={styles.logo} />
+        <Image source={require("../../assets/images/react-logo.png")} style={styles.logo} />
       </View>
 
       <Text style={styles.headerText}>Kết nối đam mê, đặt sân mọi lúc!</Text>
@@ -26,31 +26,31 @@ export default function Dashboard() {
           label="Bóng đá"
           color="#4CAF50"
           icon="soccer"
-          onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "football" } })}
+          onPress={() => router.push({ pathname: "/customer/pickfield", params: { sport_type: "football" } })}
         />
         <OptionButton
           label="Bóng rổ"
           color="#F44336"
           icon="basketball"
-          onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "basketball" } })}
+          onPress={() => router.push({ pathname: "/customer/pickfield", params: { sport_type: "basketball" } })}
         />
         <OptionButton
           label="Cầu lông"
           color="#3F51B5"
           icon="badminton"
-          onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "badminton" } })}
+          onPress={() => router.push({ pathname: "/customer/pickfield", params: { sport_type: "badminton" } })}
         />
         <OptionButton
           label="Pickle ball"
           color="#9C27B0"
           icon="volleyball"
-          onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "volleyball" } })}
+          onPress={() => router.push({ pathname: "/customer/pickfield", params: { sport_type: "volleyball" } })}
         />
         <OptionButton
           label="Tennis"
           color="#CDDC39"
           icon="tennis"
-          onPress={() => router.push({ pathname: "/pickfield", params: { sport_type: "tennis" } })}
+          onPress={() => router.push({ pathname: "/customer/pickfield", params: { sport_type: "tennis" } })}
         />
       </View>
 

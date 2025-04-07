@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { AntDesign } from "@expo/vector-icons";
 import BottomTabs from "./BottomTabs";
-import { Booking } from "../hooks/useCalendar";
+import { Booking } from "@/hooks/useCalendar";
 
 const statusColors: Record<string, string> = {
     confirmed: "#4CAF50",

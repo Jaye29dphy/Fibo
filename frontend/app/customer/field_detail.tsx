@@ -74,7 +74,7 @@ const FieldDetail: React.FC = () => {
               key={field.id}
               onPress={() =>
                 router.push({
-                  pathname: "/field_detail",
+                  pathname: "/customer/pickfield",
                   params: field,
                  })
               }
@@ -94,7 +94,7 @@ const FieldDetail: React.FC = () => {
           style={styles.bookingButton} 
           onPress={() => 
             router.push({
-              pathname: "/payment", // Đường dẫn tới màn hình chọn giờ & thanh toán
+              pathname: "/customer/payment", // Đường dẫn tới màn hình chọn giờ & thanh toán
               params: {
                 name, 
                 price, 

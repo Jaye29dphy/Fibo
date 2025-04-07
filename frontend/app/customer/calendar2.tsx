@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { AntDesign } from "@expo/vector-icons";
 import BottomTabs from "./BottomTabs";
-import { useCalendar, Booking } from "../hooks/useCalendar"; // Import Booking từ useCalendar
+import { useCalendar, Booking } from "@/hooks/useCalendar"; // Import Booking từ useCalendar
 
 const statusColors: Record<string, string> = {
   confirmed: "#4CAF50",
@@ -88,7 +88,7 @@ export default function CusCalendar() {
                   key={booking.id}
                   onPress={() =>
                     router.push({
-                      pathname: "/calendar3",
+                      pathname: "/customer/calendar3",
                       params: { booking: JSON.stringify(booking) },
                     })
                   }

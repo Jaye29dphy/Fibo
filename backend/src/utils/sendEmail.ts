@@ -1,10 +1,10 @@
 import nodemailer from 'nodemailer';
 
 const transporter = nodemailer.createTransport({
-  service: 'Gmail', // Hoặc dùng dịch vụ khác như Outlook, Yahoo
+  service: 'Gmail', 
   auth: {
-    user: process.env.EMAIL, // Email dùng để gửi
-    pass: process.env.EMAIL_PASSWORD, // Mật khẩu email
+    user: process.env.EMAIL, 
+    pass: process.env.EMAIL_PASSWORD, 
   },
 });
 

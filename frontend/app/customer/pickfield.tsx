@@ -3,8 +3,8 @@ import { View, Text, TextInput, Image, TouchableOpacity, ScrollView, StyleSheet 
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import BottomTabs from "./BottomTabs";
-import { getFields } from "../hooks/useGetFields"; 
 import { useLocalSearchParams } from "expo-router"; 
+import { getFields } from "@/constants/apiService";
 
 
 const PickField: React.FC = () => {
@@ -54,7 +54,7 @@ const PickField: React.FC = () => {
               key={field.field_id} // Sử dụng field_id làm key
               onPress={() =>
                 router.push({
-                  pathname: "/field_detail",
+                  pathname: "/customer/field_detail",
                   params: field,
                 })
               }

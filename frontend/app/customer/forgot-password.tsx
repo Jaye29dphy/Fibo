@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, TextInput, Button, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { sendOtp } from '../constants/apiService';
+import { sendOtp } from '@/constants/apiService';
 import { Ionicons } from '@expo/vector-icons';
 
 const ForgotPassword = () => {
@@ -38,7 +38,7 @@ const ForgotPassword = () => {
       setError('');
       // Truyền email qua params khi điều hướng
       setTimeout(() => {
-        router.push({ pathname: '/change-password', params: { email } });
+        router.push({ pathname: '/customer/change-password', params: { email } });
       }, 2000);
     } catch (err: any) {
       setMessage('');

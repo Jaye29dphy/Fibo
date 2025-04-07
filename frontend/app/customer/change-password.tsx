@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, TextInput, Button, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { changePassword } from '../constants/apiService';
+import { changePassword } from '@/constants/apiService';
 import { Ionicons } from '@expo/vector-icons';
 
 const ChangePassword = () => {
@@ -31,7 +31,7 @@ const ChangePassword = () => {
       setMessage(response.message || 'Mật khẩu đã được thay đổi thành công!');
       setError('');
       setTimeout(() => {
-        router.push('/');
+        router.push('/customer');
       }, 2000);
     } catch (err: any) {
       setMessage('');

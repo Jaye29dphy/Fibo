@@ -63,7 +63,7 @@ const BookingScreen = () => {
       return;
     }
     router.push({
-      pathname: "/confirmpay",
+      pathname: "/customer/confirmpay",
       params: {
         orderId: "123456789XYZ",
         date: selectedDate,

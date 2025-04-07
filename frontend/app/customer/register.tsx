@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, Alert, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useRouter } from 'expo-router';
-import { registerUser } from '../constants/apiService'; // Import API đăng ký
+import { registerUser } from '@/constants/apiService'; // Import API đăng ký
 import { Ionicons } from '@expo/vector-icons';
 
 export default function Register() {
@@ -42,7 +42,7 @@ export default function Register() {
       console.log('Calling register API...');
       const data = await registerUser(fullName, email, phone, password, role);
       Alert.alert('Success', data.message);
-      router.push('/');
+      router.push('/customer');
     } catch (error: unknown) {
       const errMsg = error instanceof Error ? error.message : 'Failed to register.';
       Alert.alert('Error', errMsg);

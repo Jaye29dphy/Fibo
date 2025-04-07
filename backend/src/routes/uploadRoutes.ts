@@ -8,7 +8,7 @@ import jwt from "jsonwebtoken"; // Thêm để kiểm tra token
 const router = express.Router();
 
 // Thư mục lưu ảnh
-const AVATAR_DIR = "C:\\Users\\Admin\\Desktop\\imageFibo\\Avatar";
+const AVATAR_DIR = "C:\\Users\\hungd\\OneDrive\\Desktop\\FiboImage\\avatar";
 if (!fs.existsSync(AVATAR_DIR)) {
   fs.mkdirSync(AVATAR_DIR, { recursive: true });
 }
@@ -19,7 +19,7 @@ const authenticateToken = (req: any, res: any, next: any) => {
   const token = authHeader && authHeader.split(" ")[1];
   if (!token) return res.status(401).json({ error: "Thiếu token" });
 
-  jwt.verify(token, "your-secret-key", (err: any, user: any) => { // Thay "your-secret-key" bằng secret thực tế
+  jwt.verify(token, "mysecretkey123", (err: any, user: any) => { // Thay "your-secret-key" bằng secret thực tế
     if (err) return res.status(403).json({ error: "Token không hợp lệ" });
     req.user = user;
     next();

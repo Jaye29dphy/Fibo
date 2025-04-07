@@ -25,7 +25,6 @@ const ConfirmPay = () => {
 
     const handlePayment = () => {
         alert(`Thanh toán thành công qua ${selectedPayment}!`);
-        router.push("/");
     };
 
     return (

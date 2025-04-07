@@ -15,7 +15,7 @@ import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { AntDesign, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
-import { getUserInfo, uploadAvatar, fetchLatestRelease } from "../constants/apiService";
+import { getUserInfo, uploadAvatar, fetchLatestRelease } from "@/constants/apiService";
 
 type User = {
   user_id: number;
@@ -52,7 +52,7 @@ export default function ProfileScreen() {
       try {
         const token = await AsyncStorage.getItem("token");
         if (!token) {
-          router.replace("/");
+          router.replace("/customer");
           return;
         }
         const data = await getUserInfo();
@@ -61,7 +61,7 @@ export default function ProfileScreen() {
       } catch (error) {
         console.error("Error fetching user info:", error);
         await AsyncStorage.removeItem("token");
-        router.replace("/");
+        router.replace("/customer");
       } finally {
         setLoading(false);
       }
@@ -163,7 +163,7 @@ export default function ProfileScreen() {
   const handleLogout = async () => {
     try {
       await AsyncStorage.removeItem("token");
-      router.replace("/");
+      router.replace("/customer");
       Alert.alert("Thành công", "Bạn đã đăng xuất thành công!");
     } catch (error) {
       console.error("Lỗi khi đăng xuất:", error);
@@ -305,7 +305,7 @@ export default function ProfileScreen() {
       {/* Nút Xóa tài khoản */}
       <TouchableOpacity
         style={styles.deleteButton}
-        onPress={() => router.push("/confirmdelete")}
+        onPress={() => router.push("/customer/confirmdelete")}
         activeOpacity={0.7}
       >
         <Text style={styles.deleteButtonText}>Xóa tài khoản</Text>

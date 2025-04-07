@@ -39,7 +39,7 @@ export default function ConfirmDeleteScreen() {
 
             if (deleteResponse.ok) {
                 await AsyncStorage.removeItem("token");
-                router.replace("/");
+                router.replace("/customer");
                 Alert.alert("Thông báo", "Tài khoản của bạn đã bị xoá.");
             } else {
                 Alert.alert("Lỗi", "Không thể xoá tài khoản, vui lòng thử lại.");
