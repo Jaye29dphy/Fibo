@@ -1,8 +1,18 @@
 import { useState } from "react";
-import { View, Text, TouchableOpacity, TextInput, StyleSheet, Modal, Alert, ActivityIndicator } from "react-native";
+import {
+    View,
+    Text,
+    TouchableOpacity,
+    TextInput,
+    StyleSheet,
+    Modal,
+    Alert,
+    ActivityIndicator
+} from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { deactivateAccountWithPassword } from "@/constants/apiService"; // ✅ dùng API mới
 
 export default function ConfirmDeleteScreen() {
     const [password, setPassword] = useState("");
@@ -13,44 +23,36 @@ export default function ConfirmDeleteScreen() {
     const handleConfirmDelete = async () => {
         setError("");
         setLoading(true);
-
+    
         try {
-            // Xác thực mật khẩu
-            const verifyResponse = await fetch("https://your-api.com/api/verify-password", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ password }),
-            });
-
-            const verifyData = await verifyResponse.json();
-
-            if (!verifyResponse.ok) {
-                setError("Sai mật khẩu");
-                setLoading(false);
+            const response = await deactivateAccountWithPassword(password);
+            console.log("API response:", response);
+    
+            if (response?.message === "Tài khoản đã bị vô hiệu hóa!") {
+                setModalVisible(false); // 👈 đóng modal trước
+                Alert.alert("Thông báo", "Tài khoản đã bị vô hiệu hóa.");
+                router.push("/customer");
                 return;
             }
-
-            // Gửi yêu cầu xoá tài khoản
-            const deleteResponse = await fetch("https://your-api.com/api/delete-account", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({}),
-            });
-
-            if (deleteResponse.ok) {
-                await AsyncStorage.removeItem("token");
-                router.replace("/customer");
-                Alert.alert("Thông báo", "Tài khoản của bạn đã bị xoá.");
-            } else {
-                Alert.alert("Lỗi", "Không thể xoá tài khoản, vui lòng thử lại.");
+            
+    
+            if (!response.success) {
+                setError("Sai mật khẩu hoặc không thể xoá tài khoản.");
+                return;
             }
-        } catch (error) {
+    
+            await AsyncStorage.removeItem("token");
+            setModalVisible(false);
+            Alert.alert("Thông báo", "Tài khoản của bạn đã bị xoá.");
+            router.push("/customer");
+        } catch (err) {
+            console.error(err);
             Alert.alert("Lỗi", "Lỗi kết nối đến máy chủ.");
         } finally {
             setLoading(false);
-            setModalVisible(false);
         }
     };
+    
 
     return (
         <View style={styles.container}>
@@ -62,13 +64,13 @@ export default function ConfirmDeleteScreen() {
                 <Text style={styles.headerTitle}>Xoá tài khoản</Text>
             </View>
 
-            {/* Cảnh báo */}
+            {/* Warning */}
             <View style={styles.warningBox}>
                 <Ionicons name="warning" size={40} color="#cb0909" />
                 <Text style={styles.warningText}>Cảnh báo</Text>
             </View>
 
-            {/* Mô tả */}
+            {/* Description */}
             <View style={styles.description}>
                 <Text style={styles.descriptionText}>
                     • Một khi bạn nhấn nút xoá tài khoản và nhập đúng mật khẩu, tài khoản của bạn sẽ bị xoá vĩnh viễn.
@@ -80,17 +82,16 @@ export default function ConfirmDeleteScreen() {
                     • Một số thông tin vẫn hiển thị với chủ sân, ngay cả khi bạn xoá tài khoản.
                 </Text>
                 <Text style={styles.descriptionText}>
-                    • Chúng tôi vẫn sẽ lưu dữ liệu của bạn ở trong Cơ sở dữ liệu ngay cả khi bạn xoá tài khoản, nhằm mục đích phát hiện các hành vi phạm pháp luật hay Điều khoản sử dụng của chúng tôi.
+                    • Chúng tôi vẫn sẽ lưu dữ liệu của bạn trong Cơ sở dữ liệu để phục vụ mục đích pháp lý nếu cần.
                 </Text>
             </View>
 
-
-            {/* Nút Xoá tài khoản */}
+            {/* Delete Button */}
             <TouchableOpacity style={styles.deleteButton} onPress={() => setModalVisible(true)}>
                 <Text style={styles.deleteButtonText}>Xoá tài khoản</Text>
             </TouchableOpacity>
 
-            {/* Overlay nhập mật khẩu */}
+            {/* Modal */}
             <Modal visible={modalVisible} transparent animationType="fade">
                 <View style={styles.overlay}>
                     <View style={styles.modalBox}>
@@ -118,7 +119,6 @@ export default function ConfirmDeleteScreen() {
     );
 }
 
-// Styles
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: "#fff", paddingHorizontal: 20, paddingTop: 40 },
     header: { flexDirection: "row", alignItems: "center", marginBottom: 20 },

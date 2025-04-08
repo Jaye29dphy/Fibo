@@ -10,6 +10,13 @@ import {
 import AdminMenu from "./AdminMenu";
 import Taskbar from "./Taskbar";
 import { getUserInfo } from "../../constants/apiService";
+import ManageUsers from "./ManageUsers";
+import ManagePartners from "./ManagePartners";
+import ManageBookings from "./ManageBookings";
+import ManageRevenue from "./ManageRevenue";
+import ManageFeedback from "./ManageFeedback";
+import ManageNotifications from "./ManageNotifications";
+import ManageEvents from "./ManageEvents";
 
 interface UserInfo {
   name: string;
@@ -56,24 +63,23 @@ export default function Dashboard() {
   const renderContent = () => {
     switch (selectedTab) {
       case "users":
-        return <Text>Quản lý người dùng</Text>;
+        return <ManageUsers />;
       case "partners":
-        return <Text>Quản lý đối tác</Text>;
+        return <ManagePartners />;
       case "bookings":
-        return <Text>Quản lý đặt sân</Text>;
+        return <ManageBookings />;
       case "revenue":
-        return <Text>Quản lý doanh thu</Text>;
+        return <ManageRevenue />;
       case "feedback":
-        return <Text>Quản lý phản hồi</Text>;
+        return <ManageFeedback />;
       case "notifications":
-        return <Text>Quản lý thông báo</Text>;
+        return <ManageNotifications />;
       case "events":
-        return <Text>Quản lý sự kiện</Text>;
+        return <ManageEvents />;
       default:
-        return <Text>Chọn một tab để hiển thị nội dung</Text>;
+        return null;
     }
   };
-
   return (
     <View style={styles.container}>
       <Taskbar userInfo={userInfo} onAvatarPress={handleAvatarPress} />
