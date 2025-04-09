@@ -140,6 +140,8 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
 };
 
 
+
+
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
     const { full_name, email, password, role, phone } = req.body;
@@ -174,6 +176,52 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 };
 
 
+// export const login = async (req: Request, res: Response): Promise<void> => {
+//   try {
+//     const { email, password } = req.body;
+
+//     console.log("📥 Yêu cầu đăng nhập:", { email }); // Log email được gửi lên
+
+//     const [users]: any = await pool.execute("SELECT * FROM users WHERE email = ?", [email]);
+//     if (!Array.isArray(users) || users.length === 0) {
+//       console.log("❌ Không tìm thấy email:", email);
+//       res.status(401).json({ error: "Email không tồn tại. Vui lòng kiểm tra lại!" });
+//       return;
+//     }
+
+//     const user = users[0];
+//     const isValid = await bcrypt.compare(password, user.password);
+//     if (!isValid) {
+//       console.log("❌ Sai mật khẩu cho email:", email);
+//       res.status(401).json({ error: "Mật khẩu không chính xác!" });
+//       return;
+//     }
+
+//     // 🔥 Tạo token
+//     const token = jwt.sign({ id: user.user_id, email: user.email }, process.env.JWT_SECRET || "secret", {
+//       expiresIn: "1h",
+//     });
+
+//     console.log("✅ Đăng nhập thành công:", { email, userId: user.user_id });
+
+//     // 🔹 Trả về cả `token` và `user`
+//     res.json({
+//       message: "Đăng nhập thành công!",
+//       token,
+//       user: {
+//         id: user.user_id,
+//         full_name: user.full_name,
+//         email: user.email,
+//         role: user.role,
+//         phone: user.phone, // Nếu có trường `phone`
+//       },
+//     });
+//   } catch (error) {
+//     console.error("🔥 Lỗi trong quá trình đăng nhập:", error);
+//     res.status(500).json({ error: "Lỗi máy chủ nội bộ!" });
+//   }
+// };
+
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
@@ -188,6 +236,14 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     const user = users[0];
+
+    // ⚠️ Kiểm tra trạng thái tài khoản
+    if (user.status === "inactive") {
+      console.log("🚫 Tài khoản đã bị vô hiệu hóa:", email);
+      res.status(403).json({ error: "Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên!" });
+      return;
+    }
+
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) {
       console.log("❌ Sai mật khẩu cho email:", email);

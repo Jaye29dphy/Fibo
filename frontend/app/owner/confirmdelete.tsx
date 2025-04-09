@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
     View,
     Text,
@@ -12,13 +12,35 @@ import {
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { deactivateAccountWithPassword } from "@/constants/apiService"; // ✅ dùng API mới
+import { deactivateAccountWithPassword, fetchOwnerRoutes } from "@/constants/apiService";
 
-export default function ConfirmDeleteScreen() {
+export default function OwnerConfirmDeleteScreen() {
     const [password, setPassword] = useState("");
     const [modalVisible, setModalVisible] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [validRoutes, setValidRoutes] = useState<string[]>([]);
+
+    useEffect(() => {
+      const fetchRoutes = async () => {
+        try {
+          const routes = await fetchOwnerRoutes();
+          setValidRoutes(routes);
+        } catch (error) {
+          console.error("Failed to fetch routes:", error);
+          setValidRoutes([
+            "/owner",
+            "/owner/confirmdelete",
+            "/owner/schedule",
+            "/owner/field-info",
+            "/owner/notifications",
+            "/owner/profile",
+          ]);
+        }
+      };
+
+      fetchRoutes();
+    }, []);
 
     const handleConfirmDelete = async () => {
         setError("");
@@ -29,22 +51,24 @@ export default function ConfirmDeleteScreen() {
             console.log("API response:", response);
     
             if (response?.message === "Tài khoản đã bị vô hiệu hóa!") {
-                setModalVisible(false); // 👈 đóng modal trước
+                setModalVisible(false);
                 Alert.alert("Thông báo", "Tài khoản đã bị vô hiệu hóa.");
-                router.push("/customer");
+                await AsyncStorage.removeItem("token");
+                await AsyncStorage.removeItem("role"); // Xóa role khi xóa tài khoản
+                router.push("/" as const); // Chuyển hướng về màn hình đăng nhập
                 return;
             }
             
-    
             if (!response.success) {
                 setError("Sai mật khẩu hoặc không thể xoá tài khoản.");
                 return;
             }
     
             await AsyncStorage.removeItem("token");
+            await AsyncStorage.removeItem("role"); // Xóa role khi xóa tài khoản
             setModalVisible(false);
             Alert.alert("Thông báo", "Tài khoản của bạn đã bị xoá.");
-            router.push("/customer");
+            router.push("/" as const); // Chuyển hướng về màn hình đăng nhập
         } catch (err) {
             console.error(err);
             Alert.alert("Lỗi", "Lỗi kết nối đến máy chủ.");
@@ -52,7 +76,6 @@ export default function ConfirmDeleteScreen() {
             setLoading(false);
         }
     };
-    
 
     return (
         <View style={styles.container}>
@@ -79,7 +102,7 @@ export default function ConfirmDeleteScreen() {
                     • Bạn không thể khôi phục tài khoản, chỉ có thể tạo tài khoản mới.
                 </Text>
                 <Text style={styles.descriptionText}>
-                    • Một số thông tin vẫn hiển thị với chủ sân, ngay cả khi bạn xoá tài khoản.
+                    • Một số thông tin vẫn hiển thị với khách hàng, ngay cả khi bạn xoá tài khoản.
                 </Text>
                 <Text style={styles.descriptionText}>
                     • Chúng tôi vẫn sẽ lưu dữ liệu của bạn trong Cơ sở dữ liệu để phục vụ mục đích pháp lý nếu cần.

@@ -6,7 +6,8 @@ import dotenv from "dotenv";
 import authRoutes from "./routes/authRoutes";
 import courtRoutes from "./routes/courtRoutes";
 import calendarRoutes from "./routes/calendarRoutes";
-import uploadRoutes from "./routes/uploadRoutes"; // ✅ Import upload routes
+import uploadRoutes from "./routes/uploadRoutes"; 
+import userRoutes from "./routes/userRouter";
 import os from "os";
 
 dotenv.config();
@@ -23,6 +24,7 @@ app.use("/courts", courtRoutes);
 app.use("/bookings", calendarRoutes);
 app.use("/upload-avatar", uploadRoutes);
 app.use("/avatars", express.static("C:\\Users\\hungd\\OneDrive\\Desktop\\FiboImage\\avatar"));
+app.use("/api/users", userRoutes);
 
 
 const PORT: number = Number(process.env.PORT) || 5000;

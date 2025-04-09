@@ -3,40 +3,35 @@ import { API_ENDPOINTS , API_URL} from "./apiConfig"; // Định nghĩa các end
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 
-const fetchAPI = async (endpoint: string, method = "GET", body?: any) => {
-  const token = await AsyncStorage.getItem("token"); // Lấy token từ AsyncStorage
+const fetchAPI = async (endpoint: string, method = "GET", body?: any, isFormData = false) => {
+  const token = await AsyncStorage.getItem("token");
 
-  const headers: HeadersInit = {
-    "Content-Type": "application/json",
-  };
-
-  if (token) headers["Authorization"] = `Bearer ${token}`; // Thêm token vào headers nếu có
+  const headers: HeadersInit = {};
+  if (!isFormData) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (token) headers["Authorization"] = `Bearer ${token}`;
 
   try {
     const response = await fetch(endpoint, {
       method,
       headers,
-      body: body ? JSON.stringify(body) : undefined,
+      body: body ? (isFormData ? body : JSON.stringify(body)) : undefined,
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("API Error:", data);
-
-      if (response.status === 429) {
-        throw new Error("Bạn đã thử OTP quá nhiều lần. Vui lòng thử lại sau!");
-      }
-
       throw new Error(data.error || "Lỗi khi gọi API");
     }
 
-    return data; // Trả về dữ liệu sau khi kiểm tra trạng thái thành công
+    return data;
   } catch (error) {
     console.error("Error fetching API:", error);
-    throw error; // Throw lại lỗi để xử lý ở nơi gọi hàm
+    throw error;
   }
 };
+
 
 
 // Login API (POST)
@@ -198,3 +193,14 @@ export const createBooking = async (
   };
   return fetchAPI(url, "POST", body);
 };
+
+export const getAllUsers = async () => {
+  return fetchAPI(API_ENDPOINTS.GET_ALL_USERS);
+};
+
+// Xác thực mật khẩu
+export const deactivateAccountWithPassword = async (password: string) => {
+  return fetchAPI(API_ENDPOINTS.DEACTIVATE_WITH_PASSWORD, "POST", { password });
+};
+
+
