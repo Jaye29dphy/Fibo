@@ -1,117 +1,188 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, Image, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, Image, StyleSheet, Alert, ScrollView } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { createBooking, getUserInfo } from "@/constants/apiService";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import moment from "moment";
 
 const ConfirmPay = () => {
-    const router = useRouter();
-    const params = useLocalSearchParams();
+  const router = useRouter();
+  const params = useLocalSearchParams();
 
-    // Ép kiểu để tránh lỗi TypeScript
-    const getStringParam = (value: string | string[] | undefined): string => {
-        return Array.isArray(value) ? value[0] : value || "";
+  const getStringParam = (value: string | string[] | undefined): string => {
+    return Array.isArray(value) ? value[0] : value || "";
+  };
+
+  const orderId = getStringParam(params.orderId);
+  const fieldId = getStringParam(params.fieldId);
+  const fieldName = getStringParam(params.fieldName);
+  const fieldType = getStringParam(params.fieldType);
+  const selectedDate = getStringParam(params.date);
+  const selectedTimeSlots = JSON.parse(getStringParam(params.timeSlots)) as string[];
+  const price = getStringParam(params.price);
+  const extraService = getStringParam(params.extraService);
+  const extraPrice = getStringParam(params.extraPrice);
+
+  const totalPrice = parseFloat(price || "0") + (extraPrice ? parseFloat(extraPrice) : 0);
+  const [selectedPayment, setSelectedPayment] = useState<string>("VNPay");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const bankId = "970436";
+  const accountNo = "1031505171";
+  const accountName = "LaanLee";
+
+  // Tạo URL mã QR từ VietQR
+  const qrCodeUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact.png?amount=${totalPrice}&addInfo=${orderId}&accountName=${accountName}`;
+
+  const timeSlotData = selectedTimeSlots.map((slot) => {
+    const [startTimeStr, endTimeStr] = slot.split(" - ");
+    return {
+      startTime: moment(`${selectedDate} ${startTimeStr}`, "DD/MM HH:mm").format("YYYY-MM-DD HH:mm:ss"),
+      endTime: moment(`${selectedDate} ${endTimeStr}`, "DD/MM HH:mm").format("YYYY-MM-DD HH:mm:ss"),
     };
+  });
 
-    const orderId = getStringParam(params.orderId);
-    const fieldType = getStringParam(params.fieldType);
-    const selectedDate = getStringParam(params.selectedDate);
-    const selectedTimeSlot = getStringParam(params.selectedTimeSlot);
-    const price = getStringParam(params.price);
-    const extraService = getStringParam(params.extraService);
-    const extraPrice = getStringParam(params.extraPrice);
+  const handlePayment = async () => {
+    setIsLoading(true);
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token) {
+        Alert.alert("Lỗi", "Bạn cần đăng nhập để thực hiện thanh toán.");
+        return;
+      }
 
-    const totalPrice = parseInt(price || "0") + (extraPrice ? parseInt(extraPrice) : 0);
-    const [selectedPayment, setSelectedPayment] = useState<string>("VNPay");
+      const userInfo = await getUserInfo();
+      const customerId = userInfo.customer_id;
 
-    const handlePayment = () => {
-        alert(`Thanh toán thành công qua ${selectedPayment}!`);
-    };
+      const services = extraService
+        ? extraService.split(", ").map((serviceName) => ({
+            serviceId: parseInt(serviceName.split("-")[1] || "0"),
+            quantity: 1,
+          }))
+        : [];
 
-    return (
-        <View style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color="black" />
-                </TouchableOpacity>
-                <Text style={styles.title}>Xác nhận thanh toán</Text>
-            </View>
+      const responses = await Promise.all(
+        timeSlotData.map((slot) =>
+          createBooking(
+            fieldId,
+            customerId,
+            slot.startTime,
+            slot.endTime,
+            totalPrice / timeSlotData.length,
+            services,
+            selectedPayment.toLowerCase().replace(" ", "_")
+          )
+        )
+      );
 
-            {/* Thông tin dịch vụ */}
-            <View style={styles.infoContainer}>
-                <Text style={styles.sectionTitle}>Thông tin dịch vụ</Text>
-                <Text>Mã đơn hàng: {orderId}</Text>
-                <Text>Loại sân: {fieldType}</Text>
-                <Text>Ngày: {selectedDate}</Text>
-                <Text>Khung giờ: {selectedTimeSlot}</Text>
-                <Text style={styles.price}>Giá sân: {price} VND</Text>
+      Alert.alert("Thành công", `Thanh toán thành công qua ${selectedPayment}! Mã đơn hàng: ${responses[0].booking_id}`);
+      router.push("/");
+    } catch (error) {
+      console.error("Payment error:", error);
+      Alert.alert("Lỗi", "Thanh toán thất bại. Vui lòng thử lại.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-                {extraService && (
-                    <>
-                        <Text>Dịch vụ thêm: {extraService}</Text>
-                        <Text style={styles.price}>Giá dịch vụ: {extraPrice} VND</Text>
-                    </>
-                )}
-
-                <Text style={styles.totalPrice}>Tổng tiền: {totalPrice} VND</Text>
-            </View>
-
-            {/* Chọn phương thức thanh toán */}
-            <Text style={styles.sectionTitle}>Chọn phương thức thanh toán</Text>
-            <View style={styles.paymentMethods}>
-                {["VNPay", "Momo", "Credit Card"].map((method) => (
-                    <TouchableOpacity
-                        key={method}
-                        style={[
-                            styles.paymentButton,
-                            selectedPayment === method && styles.selectedPayment,
-                        ]}
-                        onPress={() => setSelectedPayment(method)}
-                    >
-                        <Text style={selectedPayment === method ? styles.selectedPaymentText : styles.paymentText}>
-                            {method}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-
-            {/* Mã QR giả lập */}
-            <View style={styles.qrContainer}>
-                <Image source={{ uri: "https://via.placeholder.com/150" }} style={styles.qrCode} />
-            </View>
-
-            {/* Nút thanh toán */}
-            <TouchableOpacity style={styles.checkButton} onPress={handlePayment}>
-                <Text style={styles.checkText}>Xác nhận thanh toán</Text>
-            </TouchableOpacity>
+  return (
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} disabled={isLoading}>
+            <Ionicons name="arrow-back" size={24} color="black" />
+          </TouchableOpacity>
+          <Text style={styles.title}>Xác nhận thanh toán</Text>
         </View>
-    );
+  
+        <View style={styles.infoContainer}>
+          <Text style={styles.sectionTitle}>Thông tin dịch vụ</Text>
+          <Text>Mã đơn hàng: {orderId}</Text>
+          <Text>Tên sân: {fieldName}</Text>
+          <Text>Loại sân: {fieldType}</Text>
+          <Text>Ngày: {selectedDate}</Text>
+          <Text>Khung giờ:</Text>
+          {selectedTimeSlots.map((slot, index) => (
+            <Text key={index}>- {slot}</Text>
+          ))}
+          <Text style={styles.price}>Giá sân: {price} VND</Text>
+          {extraService && (
+            <>
+              <Text>Dịch vụ thêm: {extraService}</Text>
+              <Text style={styles.price}>Giá dịch vụ: {extraPrice} VND</Text>
+            </>
+          )}
+          <Text style={styles.totalPrice}>Tổng tiền: {totalPrice} VND</Text>
+        </View>
+  
+        <Text style={styles.sectionTitle}>Chọn phương thức thanh toán</Text>
+        <View style={styles.paymentMethods}>
+          {["VNPay", "Momo", "Credit Card"].map((method) => (
+            <TouchableOpacity
+              key={method}
+              style={[
+                styles.paymentButton,
+                selectedPayment === method && styles.selectedPayment,
+              ]}
+              onPress={() => setSelectedPayment(method)}
+              disabled={isLoading}
+            >
+              <Text style={selectedPayment === method ? styles.selectedPaymentText : styles.paymentText}>
+                {method}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+  
+        {selectedPayment === "VNPay" && (
+          <View style={styles.qrContainer}>
+            <Text style={styles.qrTitle}>Quét mã QR để thanh toán</Text>
+            <Image source={{ uri: qrCodeUrl }} style={styles.qrCode} />
+          </View>
+        )}
+      </ScrollView>
+  
+      <TouchableOpacity
+        style={[styles.checkButton, isLoading && styles.disabledButton]}
+        onPress={handlePayment}
+        disabled={isLoading}
+      >
+        <Text style={styles.checkText}>{isLoading ? "Đang xử lý..." : "Xác nhận thanh toán"}</Text>
+      </TouchableOpacity>
+    </View>
+  );  
 };
 
 export default ConfirmPay;
 
 const styles = StyleSheet.create({
-    container: { flex: 1, padding: 16, backgroundColor: "#fff" },
-    header: { flexDirection: "row", alignItems: "center", padding: 16 },
-    title: { fontSize: 18, fontWeight: "bold", marginLeft: 8 },
-    infoContainer: { padding: 16, borderWidth: 1, borderRadius: 8, marginBottom: 10 },
-    sectionTitle: { fontSize: 16, fontWeight: "bold", marginVertical: 8 },
-    price: { fontWeight: "bold", color: "green" },
-    totalPrice: { fontSize: 18, fontWeight: "bold", marginTop: 10 },
-    paymentMethods: { flexDirection: "row", justifyContent: "space-between", marginVertical: 10 },
-    paymentButton: {
-        padding: 12,
-        borderWidth: 1,
-        borderRadius: 8,
-        width: "30%",
-        alignItems: "center",
-        borderColor: "#16A34A",
-    },
-    paymentText: { fontSize: 14, fontWeight: "bold", color: "black" },
-    selectedPayment: { backgroundColor: "#16A34A", borderColor: "#16A34A" },
-    selectedPaymentText: { fontSize: 14, fontWeight: "bold", color: "white" },
-    qrContainer: { alignItems: "center", marginVertical: 20 },
-    qrCode: { width: 150, height: 150 },
-    checkButton: { backgroundColor: "#16A34A", padding: 14, borderRadius: 8, alignItems: "center" },
-    checkText: { color: "white", fontSize: 16, fontWeight: "bold" },
+  container: { flex: 1, padding: 16, backgroundColor: "#fff" },
+  scrollContainer: {
+    paddingBottom: 20,
+  },
+  header: { flexDirection: "row", alignItems: "center", padding: 16 },
+  title: { fontSize: 18, fontWeight: "bold", marginLeft: 8 },
+  infoContainer: { padding: 16, borderWidth: 1, borderRadius: 8, marginBottom: 10 },
+  sectionTitle: { fontSize: 16, fontWeight: "bold", marginVertical: 8 },
+  price: { fontWeight: "bold", color: "green" },
+  totalPrice: { fontSize: 18, fontWeight: "bold", marginTop: 10 },
+  paymentMethods: { flexDirection: "row", justifyContent: "space-between", marginVertical: 10 },
+  paymentButton: {
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+    width: "30%",
+    alignItems: "center",
+    borderColor: "#16A34A",
+  },
+  paymentText: { fontSize: 14, fontWeight: "bold", color: "black" },
+  selectedPayment: { backgroundColor: "#16A34A", borderColor: "#16A34A" },
+  selectedPaymentText: { fontSize: 14, fontWeight: "bold", color: "white" },
+  qrContainer: { alignItems: "center", marginVertical: 20 },
+  qrTitle: { fontSize: 16, fontWeight: "bold", marginBottom: 10 },
+  qrCode: { width: 200, height: 200 }, // Tăng kích thước để dễ quét
+  checkButton: { backgroundColor: "#16A34A", padding: 14, borderRadius: 8, alignItems: "center" },
+  disabledButton: { backgroundColor: "#A0A0A0" },
+  checkText: { color: "white", fontSize: 16, fontWeight: "bold" },
 });

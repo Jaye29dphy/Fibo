@@ -61,7 +61,7 @@ const PickField: React.FC = () => {
             >
               <View style={styles.fieldCard}>
                 {/* Hiển thị hình ảnh sân */}
-                <Image source={{ uri: field.image || 'default_image_url' }} style={styles.fieldImage} />
+                <Image source={{ uri: field.image || 'https://i.ytimg.com/vi/BFEELI0vNew/maxresdefault.jpg' }} style={styles.fieldImage} />
                 <Text style={styles.fieldName}>{field.name}</Text>
                 <Text style={styles.fieldLocation}>{`Loại sân: ${field.sport_type}`}</Text>
                 <Text style={styles.fieldPrice}>{`Giá: ${field.price_per_hour} VND/giờ`}</Text>

@@ -154,13 +154,47 @@ export const uploadAvatar = async (formData: FormData): Promise<{ avatar: string
 };
 
 export const getFields = async (sportType: string) => {
-  try {
-    const url = `${API_ENDPOINTS.GET_FIELDS}?sport_type=${encodeURIComponent(sportType)}`;
-    const response = await fetch(url);
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error("Error fetching fields:", error);
-    throw error;
-  }
+  const url = `${API_ENDPOINTS.GET_FIELDS}?sport_type=${encodeURIComponent(sportType)}`;
+  return fetchAPI(url, "GET");
+};
+
+// Lấy danh sách SubFields theo field_id
+export const getSubFields = async (fieldId: string) => {
+  const url = `${API_ENDPOINTS.GET_FIELDS}/${fieldId}/subfields`; // Giả định endpoint
+  return fetchAPI(url, "GET");
+};
+
+// Lấy danh sách TimeSlots và giá theo field_id
+export const getTimeSlots = async (fieldId: string) => {
+  const url = `${API_ENDPOINTS.GET_FIELDS}/${fieldId}/timeslots`; // Giả định endpoint
+  return fetchAPI(url, "GET");
+};
+
+// Lấy danh sách Services theo field_id
+export const getServices = async (fieldId: string) => {
+  const url = `${API_ENDPOINTS.GET_FIELDS}/${fieldId}/services`; // Giả định endpoint
+  return fetchAPI(url, "GET");
+};
+
+// apiService.ts
+export const createBooking = async (
+  fieldId: string,
+  customerId: string,
+  startTime: string,
+  endTime: string,
+  totalCost: number,
+  services: { serviceId: number; quantity: number }[], // Thay đổi ở đây
+  paymentMethod: string
+) => {
+  const url = `${API_ENDPOINTS.GET_CALENDAR}`;
+  const body = {
+    field_id: fieldId,
+    customer_id: customerId,
+    start_time: startTime,
+    end_time: endTime,
+    total_cost: totalCost,
+    services,
+    payment_method: paymentMethod,
+  };
+  return fetchAPI(url, "POST", body);
 };

@@ -1,113 +1,131 @@
-import React, { useState } from "react";
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from "react-native"; // Thêm Alert từ react-native
-import { useRouter } from "expo-router";
+import React, { useState, useEffect } from "react";
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from "react-native";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import moment from "moment";
-
-const typefield = [
-  { typef: "Sân 5" },
-  { typef: "Sân 7" },
-  { typef: "Sân 11" },
-];
-
-const timeSlots = [
-  { time: "6:00 - 7:00", price: "100K" },
-  { time: "7:00 - 8:00", price: "120K" },
-  { time: "8:00 - 9:00", price: "150K" },
-  { time: "9:00 - 10:00", price: "180K" },
-  { time: "10:00 - 11:00", price: "200K" },
-  { time: "11:00 - 12:00", price: "220K" },
-  { time: "12:00 - 13:00", price: "250K" },
-  { time: "13:00 - 14:00", price: "270K" },
-  { time: "14:00 - 15:00", price: "300K" },
-  { time: "15:00 - 16:00", price: "320K" },
-  { time: "16:00 - 17:00", price: "350K" },
-  { time: "17:00 - 18:00", price: "400K" },
-];
-
-const extraServices = [
-  { name: "Thuê nước", price: "20K" },
-  { name: "Thuê bóng", price: "50K" },
-  { name: "Thuê phòng tắm", price: "30K" },
-  { name: "Thuê áo đấu", price: "80K" },
-];
-
-// Lấy danh sách 7 ngày tiếp theo
-const getNext7Days = () => {
-  return Array.from({ length: 7 }, (_, index) => ({
-    date: moment().add(index, "days").format("DD/MM"),
-    dayOfWeek: moment().add(index, "days").format("ddd"),
-  }));
-};
+import { getSubFields, getTimeSlots, getServices } from "@/constants/apiService";
 
 const BookingScreen = () => {
   const router = useRouter();
+  const { field_id, name, price, location } = useLocalSearchParams();
+
+  const [subFields, setSubFields] = useState<any[]>([]);
+  const [timeSlots, setTimeSlots] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedFieldType, setSelectedFieldType] = useState<string | null>(null);
-  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [selectedSlots, setSelectedSlots] = useState<string[]>([]); // Thay đổi thành mảng
+  const [selectedServices, setSelectedServices] = useState<{ name: string; id: number }[]>([]);
+
+  const getNext7Days = () => {
+    return Array.from({ length: 7 }, (_, index) => ({
+      date: moment().add(index, "days").format("DD/MM"),
+      dayOfWeek: moment().add(index, "days").format("ddd"),
+    }));
+  };
 
   const dates = getNext7Days();
 
-  // Xử lý chọn dịch vụ
-  const toggleService = (service: string) => {
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        if (!field_id) {
+          Alert.alert("Lỗi", "Không tìm thấy thông tin sân.");
+          return;
+        }
+
+        const subFieldsData = await getSubFields(field_id as string);
+        setSubFields(subFieldsData);
+
+        const timeSlotsData = await getTimeSlots(field_id as string);
+        setTimeSlots(timeSlotsData);
+
+        const servicesData = await getServices(field_id as string);
+        setServices(servicesData);
+      } catch (error) {
+        console.error("Error fetching booking data:", error);
+        Alert.alert("Lỗi", "Không thể tải dữ liệu. Vui lòng thử lại.");
+      }
+    };
+
+    fetchData();
+  }, [field_id]);
+
+  const toggleService = (service: { name: string; id: number }) => {
     setSelectedServices((prev) =>
-      prev.includes(service) ? prev.filter((s) => s !== service) : [...prev, service]
+      prev.some((s) => s.id === service.id)
+        ? prev.filter((s) => s.id !== service.id)
+        : [...prev, service]
     );
   };
 
-  // Kiểm tra nếu chưa chọn đủ các mục
+  // Thêm/xóa khung giờ
+  const toggleSlot = (slot: string) => {
+    setSelectedSlots((prev) =>
+      prev.includes(slot) ? prev.filter((s) => s !== slot) : [...prev, slot]
+    );
+  };
+
   const handlePayment = () => {
-    if (!selectedFieldType || !selectedDate || !selectedSlot) {
-      Alert.alert("Thông báo", "Vui lòng chọn đầy đủ loại sân, ngày và khung giờ trước khi thanh toán.");
+    if (!selectedFieldType || !selectedDate || selectedSlots.length === 0) {
+      Alert.alert("Thông báo", "Vui lòng chọn đầy đủ loại sân, ngày và ít nhất một khung giờ.");
       return;
     }
+
+    const selectedSlotsData = timeSlots.filter((slot) =>
+      selectedSlots.includes(`${slot.start_time} - ${slot.end_time}`)
+    );
+    const totalSlotPrice = selectedSlotsData.reduce(
+      (total, slot) => total + parseFloat(slot.price || "0"),
+      0
+    );
+    const totalServicePrice = selectedServices.reduce((total, service) => {
+      const serviceData = services.find((s) => s.service_id === service.id);
+      return total + (serviceData ? parseFloat(serviceData.price) : 0);
+    }, 0);
+
     router.push({
       pathname: "/customer/confirmpay",
       params: {
-        orderId: "123456789XYZ",
-        date: selectedDate,
-        timeSlot: selectedSlot,
-        price: timeSlots.find(slot => slot.time === selectedSlot)?.price.replace("K", "000") || "0",
-        extraService: selectedServices.join(", "),
-        extraPrice: selectedServices.reduce((total, service) => {
-          const foundService = extraServices.find(s => s.name === service);
-          return total + (foundService ? parseInt(foundService.price.replace("K", "000")) : 0);
-        }, 0).toString(),
+        orderId: `BOOK${Date.now()}`,
+        fieldId: field_id,
+        fieldName: name,
         fieldType: selectedFieldType,
+        date: selectedDate,
+        timeSlots: JSON.stringify(selectedSlots), // Truyền mảng dưới dạng chuỗi JSON
+        price: totalSlotPrice.toString(),
+        extraService: selectedServices.map((s) => `${s.name}-${s.id}`).join(", "),
+        extraPrice: totalServicePrice.toString(),
       },
     });
   };
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
-        <Text style={styles.title}>Lựa chọn dịch vụ</Text>
+        <Text style={styles.title}>Lựa chọn dịch vụ - {name}</Text>
       </View>
 
-      {/* Chọn loại sân */}
       <Text style={styles.sectionTitle}>Chọn loại sân</Text>
       <View style={styles.gridContainer}>
-        {typefield.map((field, index) => (
+        {subFields.map((field) => (
           <TouchableOpacity
-            key={index}
+            key={field.sub_field_id}
             style={[
               styles.optionItem,
-              selectedFieldType === field.typef && styles.selectedOption,
+              selectedFieldType === field.name && styles.selectedOption,
             ]}
-            onPress={() => setSelectedFieldType(field.typef)}
+            onPress={() => setSelectedFieldType(field.name)}
           >
-            <Text style={styles.optionText}>{field.typef}</Text>
+            <Text style={styles.optionText}>{field.name}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 120 }}>
-        {/* Chọn ngày */}
         <Text style={styles.sectionTitle}>Chọn ngày</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
           {dates.map((item, index) => (
@@ -125,54 +143,49 @@ const BookingScreen = () => {
           ))}
         </ScrollView>
 
-        {/* Chọn khung giờ */}
         <Text style={styles.sectionTitle}>Chọn khung giờ</Text>
         <View style={styles.gridContainer}>
-          {timeSlots.map((slot, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.optionItem,
-                selectedSlot === slot.time && styles.selectedOption,
-              ]}
-              onPress={() => setSelectedSlot(slot.time)}
-            >
-              <Text style={styles.optionText}>{slot.time}</Text>
-              <Text style={styles.slotPrice}>{slot.price}</Text>
-            </TouchableOpacity>
-          ))}
+          {timeSlots.map((slot) => {
+            const slotString = `${slot.start_time} - ${slot.end_time}`;
+            return (
+              <TouchableOpacity
+                key={slot.slot_id}
+                style={[
+                  styles.optionItem,
+                  selectedSlots.includes(slotString) && styles.selectedOption,
+                ]}
+                onPress={() => toggleSlot(slotString)}
+              >
+                <Text style={styles.optionText}>{slotString}</Text>
+                <Text style={styles.slotPrice}>{`${slot.price} VND`}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {/* Chọn dịch vụ thêm */}
         <Text style={styles.sectionTitle}>Chọn dịch vụ thêm</Text>
         <View style={styles.gridContainer}>
-          {extraServices.map((service, index) => (
+          {services.map((service) => (
             <TouchableOpacity
-              key={index}
+              key={service.service_id}
               style={[
                 styles.optionItem,
-                selectedServices.includes(service.name) && styles.selectedOption,
+                selectedServices.some((s) => s.id === service.service_id) && styles.selectedOption,
               ]}
-              onPress={() => toggleService(service.name)}
+              onPress={() => toggleService({ name: service.name, id: service.service_id })}
             >
               <Text style={styles.optionText}>
-                {selectedServices.includes(service.name) ? "✅ " : ""} 
-                {service.name}
+                {selectedServices.some((s) => s.id === service.service_id) ? "✅ " : ""} {service.name}
               </Text>
-              <Text style={styles.slotPrice}>{service.price}</Text>
+              <Text style={styles.slotPrice}>{`${service.price} VND`}</Text>
             </TouchableOpacity>
           ))}
         </View>
       </ScrollView>
 
-      {/* Nút thanh toán */}
-      <TouchableOpacity
-        style={styles.payButton}
-        onPress={handlePayment}
-      >
+      <TouchableOpacity style={styles.payButton} onPress={handlePayment}>
         <Text style={styles.payText}>Thanh toán</Text>
       </TouchableOpacity>
-
     </View>
   );
 };

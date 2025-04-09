@@ -6,22 +6,22 @@ import BottomTabs from "./BottomTabs";
 
 const FieldDetail: React.FC = () => {
   const router = useRouter();
-  const { name, price, location, image, description } = useLocalSearchParams();
+  const {field_id, name, price, location, image, description } = useLocalSearchParams();
 
   const fields = [
     {
       id: 1,
-      image: "https://via.placeholder.com/150",
+      image: "https://cdn.ithethao.vn//uploads/2025/03/31/crazyguy-va-cac-dong-doi-gianh-chien-thang-dau-tien_247923.jpeg",
       prev: "Ảnh 1",
     },
     {
       id: 2,
-      image: "https://via.placeholder.com/150",
+      image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRoN_5mOJcPoS2C08E_iOd6n_j36dSGOcquMw&s",
       prev: "Ảnh 2",
     },
     {
       id: 3,
-      image: "https://via.placeholder.com/150",
+      image: "https://i.pinimg.com/736x/3b/05/17/3b051793c182df002e3eddc57f2858dc.jpg",
       prev: "Ảnh 3",
     },
   ];
@@ -55,7 +55,7 @@ const FieldDetail: React.FC = () => {
 
         {/* Thông tin sân */}
         <Text style={styles.fieldName}>{name}</Text>
-        <Text style={styles.fieldPrice}>{price}</Text>
+        <Text style={styles.fieldPrice}>{`${price} VND/giờ`}</Text>
 
         {/* Địa chỉ */}
         <View style={styles.location}>
@@ -96,6 +96,7 @@ const FieldDetail: React.FC = () => {
             router.push({
               pathname: "/customer/payment", // Đường dẫn tới màn hình chọn giờ & thanh toán
               params: {
+                field_id,
                 name, 
                 price, 
                 location, 
