@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, TextInput, Button, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { sendOtp } from '@/constants/apiService';
@@ -8,14 +8,29 @@ const ForgotPassword = () => {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [isButtonDisabled, setIsButtonDisabled] = useState(false);
+  const [countdown, setCountdown] = useState(0);
   const router = useRouter();
+
+  // Hàm đếm ngược
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (countdown > 0) {
+      timer = setInterval(() => {
+        setCountdown((prev) => prev - 1);
+      }, 1000);
+    } else if (countdown === 0) {
+      setIsButtonDisabled(false);
+    }
+    return () => clearInterval(timer); // Dọn dẹp timer khi component unmount hoặc countdown thay đổi
+  }, [countdown]);
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[\w.-]+@[\w.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(email)) {
       return false;
     }
-    if (email.endsWith('.c') || email.endsWith('.co' )) {
+    if (email.endsWith('.c') || email.endsWith('.co')) {
       return false;
     }
     return true;
@@ -26,7 +41,7 @@ const ForgotPassword = () => {
       setError('Vui lòng nhập email');
       return;
     }
-    
+
     if (!validateEmail(email)) {
       setError('Email không hợp lệ. Vui lòng nhập đúng định dạng email.');
       return;
@@ -36,7 +51,8 @@ const ForgotPassword = () => {
       const response = await sendOtp(email);
       setMessage('Mã OTP đã được gửi. Kiểm tra email của bạn!');
       setError('');
-      // Truyền email qua params khi điều hướng
+      setIsButtonDisabled(true); // Vô hiệu hóa nút
+      setCountdown(60); // Bắt đầu đếm ngược từ 60 giây
       setTimeout(() => {
         router.push({ pathname: '/customer/change-password', params: { email } });
       }, 2000);
@@ -62,7 +78,15 @@ const ForgotPassword = () => {
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {message ? <Text style={styles.success}>{message}</Text> : null}
-      <Button title="Gửi mã OTP" onPress={handleSendOtp} />
+      {countdown > 0 && (
+        <Text style={styles.countdown}>Vui lòng đợi {countdown} giây để gửi lại OTP</Text>
+      )}
+      <Button
+        title="Gửi mã OTP"
+        onPress={handleSendOtp}
+        disabled={isButtonDisabled}
+        color={isButtonDisabled ? '#cccccc' : undefined} // Chuyển màu xám khi bị vô hiệu hóa
+      />
     </View>
   );
 };
@@ -77,7 +101,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 40,
     left: 20,
-    zIndex: 1, // Đảm bảo nút back hiển thị trên cùng
+    zIndex: 1,
   },
   header: {
     fontSize: 20,
@@ -105,6 +129,11 @@ const styles = StyleSheet.create({
   success: {
     color: 'green',
     marginBottom: 10,
+  },
+  countdown: {
+    color: '#666',
+    marginBottom: 10,
+    textAlign: 'center',
   },
 });
 

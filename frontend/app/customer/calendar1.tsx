@@ -15,7 +15,7 @@ const statusColors: Record<string, string> = {
 
 export default function MyCalendar() {
   const router = useRouter();
-  const { bookings, loading, error, refreshBookings } = useCalendar(); // Không cần ép kiểu
+  const { bookings, loading, error, refreshBookings } = useCalendar();
   const [markedDates, setMarkedDates] = useState<{ [date: string]: { selected: boolean; selectedColor: string } }>({});
 
   useEffect(() => {
@@ -70,6 +70,10 @@ export default function MyCalendar() {
           />
         )}
         <Button title="Tải lại lịch hẹn" onPress={refreshBookings} />
+      </View>
+
+      {/* Ensure the button is positioned above the BottomTabs */}
+      <View style={styles.buttonContainer}>
         <Button title="Xem tất cả lịch đặt sân" onPress={() => router.push("/customer/calendar2")} />
       </View>
 
@@ -84,8 +88,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "white" },
   header: { backgroundColor: "#4CAF50", paddingVertical: 15, paddingHorizontal: 10, flexDirection: "row", alignItems: "center" },
   title: { color: "white", fontSize: 20, fontWeight: "bold", marginLeft: 10 },
-  content: { flex: 1, padding: 16, alignItems: "center" },
+  content: { flex: 1, padding: 18, alignItems: "center" },
   bottomTabs: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "white", borderTopWidth: 1, borderTopColor: "#ddd" },
   errorText: { color: "red", fontSize: 16, marginTop: 10 },
   noBookingsText: { fontSize: 16, color: "gray", textAlign: "center", marginTop: 20 },
+  buttonContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 100, 
+    paddingTop: 10,
+    backgroundColor: "white", 
+  },
 });
