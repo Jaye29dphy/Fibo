@@ -32,6 +32,22 @@ const fetchAPI = async (endpoint: string, method = "GET", body?: any, isFormData
   }
 };
 
+export const formatCurrency = (value: number | string): string => {
+  const num = typeof value === "string" ? parseFloat(value) : value;
+
+  if (isNaN(num)) return "Giá không khả dụng";
+
+  const formattedNum = num.toFixed(2).replace(/\.00$/, "");
+  const parts = formattedNum.split(".");
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+  return `${parts.join(",")} VND/giờ`;
+};
+
+export const getStringParam = (value: string | string[] | undefined): string => {
+  if (Array.isArray(value)) return value[0] || "";
+  return value || "";
+};
 
 
 // Login API (POST)

@@ -25,6 +25,7 @@ app.use("/bookings", calendarRoutes);
 app.use("/upload-avatar", uploadRoutes);
 app.use("/avatars", express.static("C:\\Users\\hungd\\OneDrive\\Desktop\\FiboImage\\avatar"));
 app.use("/api/users", userRoutes);
+app.use("/fields", express.static("D:\\img\\field"));
 
 
 const PORT: number = Number(process.env.PORT) || 5000;

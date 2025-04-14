@@ -1,34 +1,41 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import BottomTabs from "./BottomTabs";
+import { formatCurrency, getStringParam } from "@/constants/apiService";
+import { API_ENDPOINTS, FIELD_IMAGE_BASE_URL } from "@/constants/apiConfig";
 
 const FieldDetail: React.FC = () => {
   const router = useRouter();
-  const {field_id, name, price, location, image, description } = useLocalSearchParams();
+  const { field_id, name, price, location, image, description } = useLocalSearchParams();
+  const [fieldImages, setFieldImages] = useState<any[]>([]);
 
-  const fields = [
-    {
-      id: 1,
-      image: "https://cdn.ithethao.vn//uploads/2025/03/31/crazyguy-va-cac-dong-doi-gianh-chien-thang-dau-tien_247923.jpeg",
-      prev: "Ảnh 1",
-    },
-    {
-      id: 2,
-      image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRoN_5mOJcPoS2C08E_iOd6n_j36dSGOcquMw&s",
-      prev: "Ảnh 2",
-    },
-    {
-      id: 3,
-      image: "https://i.pinimg.com/736x/3b/05/17/3b051793c182df002e3eddc57f2858dc.jpg",
-      prev: "Ảnh 3",
-    },
-  ];
+  useEffect(() => {
+    const fetchFieldImages = async () => {
+      try {
+        const response = await fetch(`${API_ENDPOINTS.GET_FIELDS}/${field_id}/images`);
+        const data = await response.json();
+        setFieldImages(data);
+      } catch (error) {
+        console.error("Error fetching field images:", error);
+      }
+    };
+
+    if (field_id) fetchFieldImages();
+  }, [field_id]);
+
+  const priceString = getStringParam(price);
+  const displayPrice = priceString ? formatCurrency(priceString) : "Giá không khả dụng";
+  const imageString = getStringParam(image);
+
+  const mainImageUrl = imageString
+    ? `${FIELD_IMAGE_BASE_URL}/${imageString}?t=${Date.now()}` // Thêm cache-busting
+    : "https://via.placeholder.com/150";
+  console.log(`Main image URL for field ${field_id}:`, mainImageUrl);
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="black" />
@@ -36,12 +43,18 @@ const FieldDetail: React.FC = () => {
         <Text style={styles.title}>Chi tiết sân bóng</Text>
       </View>
 
-      {/* Nội dung chính */}
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 120 }}>
-        {/* Ảnh sân */}
-        <Image source={{ uri: image as string }} style={styles.image} />
+        <View style={styles.imageContainer}>
+          <Image
+            source={{ uri: mainImageUrl }}
+            style={styles.image}
+            onError={(error) =>
+              console.log(`Main image load error for field ${field_id}:`, error.nativeEvent.error)
+            }
+            onLoad={() => console.log(`Main image loaded for field ${field_id}:`, mainImageUrl)}
+          />
+        </View>
 
-        {/* Tiện ích */}
         <View style={styles.facilities}>
           <View style={styles.facility}>
             <Ionicons name="wifi-outline" size={16} color="black" />
@@ -53,59 +66,72 @@ const FieldDetail: React.FC = () => {
           </View>
         </View>
 
-        {/* Thông tin sân */}
-        <Text style={styles.fieldName}>{name}</Text>
-        <Text style={styles.fieldPrice}>{`${price} VND/giờ`}</Text>
+        <Text style={styles.fieldName}>{name || "Không có tên"}</Text>
+        <Text style={styles.fieldPrice}>{displayPrice}</Text>
 
-        {/* Địa chỉ */}
         <View style={styles.location}>
           <Ionicons name="location-outline" size={16} color="black" />
-          <Text style={styles.locationText}>{location}</Text>
+          <Text style={styles.locationText}>{location || "Không có địa chỉ"}</Text>
         </View>
 
-        {/* Mô tả */}
         <Text style={styles.descriptionTitle}>Mô tả</Text>
-        <Text style={styles.description}>{description}</Text>
+        <Text style={styles.description}>{description || "Không có mô tả"}</Text>
 
         <Text style={styles.preview}>Một số hình ảnh của sân</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
-          {fields.map((field) => (
-            <TouchableOpacity
-              key={field.id}
-              onPress={() =>
-                router.push({
-                  pathname: "/customer/pickfield",
-                  params: field,
-                 })
-              }
-            >
-              <View style={styles.styleprev}>
-                <Image source={{ uri: field.image }} style={styles.previmg} />
-                <Text>{field.prev}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+          {fieldImages.map((fieldImage, index) => {
+            const subImageUrl = fieldImage.image_name
+              ? `${FIELD_IMAGE_BASE_URL}/${fieldImage.image_name}?t=${Date.now()}` // Thêm cache-busting
+              : "https://via.placeholder.com/150";
+            console.log(`Sub image URL ${index + 1} for field ${field_id}:`, subImageUrl);
+
+            return (
+              <TouchableOpacity
+                key={index}
+                onPress={() =>
+                  router.push({
+                    pathname: "/customer/pickfield",
+                    params: { image: fieldImage.image_name },
+                  })
+                }
+              >
+                <View style={styles.styleprev}>
+                  <View style={styles.subImageContainer}>
+                  <Image
+                    source={{ uri: subImageUrl }}
+                    style={styles.image}
+                    onError={(error) => {
+                      console.log(`Main image load error for field ${field_id}:`, error.nativeEvent);
+                      console.log(`Failed URL:`, mainImageUrl);
+                    }}
+                    onLoad={() => console.log(`Main image loaded for field ${field_id}:`, mainImageUrl)}
+                  />
+                  </View>
+                  <Text>{`Ảnh ${index + 1}`}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       </ScrollView>
 
-      {/* Nút đặt sân */}
       <View style={styles.bookingContainer}>
-        <TouchableOpacity 
-          style={styles.bookingButton} 
-          onPress={() => 
+        <TouchableOpacity
+          style={styles.bookingButton}
+          onPress={() =>
             router.push({
-              pathname: "/customer/payment", // Đường dẫn tới màn hình chọn giờ & thanh toán
+              pathname: "/customer/payment",
               params: {
                 field_id,
-                name, 
-                price, 
-                location, 
-                image,
-              }
+                name,
+                price,
+                location,
+                image: imageString,
+              },
             })
           }
         >
-        <Text style={styles.bookingText}>Đặt ngay</Text>
+          <Text style={styles.bookingText}>Đặt ngay</Text>
         </TouchableOpacity>
       </View>
 
@@ -134,6 +160,12 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 16,
+  },
+  imageContainer: {
+    width: "100%",
+    height: 180,
+    borderRadius: 8,
+    backgroundColor: "#E5E7EB",
   },
   image: {
     width: "100%",
@@ -192,6 +224,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginRight: 8,
   },
+  subImageContainer: {
+    width: 150,
+    height: 100,
+    borderRadius: 8,
+    backgroundColor: "#E5E7EB",
+  },
   previmg: {
     width: 150,
     height: 100,
@@ -199,7 +237,7 @@ const styles = StyleSheet.create({
   },
   bookingContainer: {
     position: "absolute",
-    bottom: 100, 
+    bottom: 100,
     left: 0,
     right: 0,
     paddingHorizontal: 16,

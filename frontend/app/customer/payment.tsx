@@ -3,18 +3,18 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from "rea
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import moment from "moment";
-import { getSubFields, getTimeSlots, getServices } from "@/constants/apiService";
+import { getSubFields, getTimeSlots, getServices, formatCurrency, getStringParam } from "@/constants/apiService";
 
 const BookingScreen = () => {
   const router = useRouter();
-  const { field_id, name, price, location } = useLocalSearchParams();
+  const { field_id, name, price, location, image } = useLocalSearchParams(); // image giờ là image_name
 
   const [subFields, setSubFields] = useState<any[]>([]);
   const [timeSlots, setTimeSlots] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedFieldType, setSelectedFieldType] = useState<string | null>(null);
-  const [selectedSlots, setSelectedSlots] = useState<string[]>([]); // Thay đổi thành mảng
+  const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
   const [selectedServices, setSelectedServices] = useState<{ name: string; id: number }[]>([]);
 
   const getNext7Days = () => {
@@ -59,7 +59,6 @@ const BookingScreen = () => {
     );
   };
 
-  // Thêm/xóa khung giờ
   const toggleSlot = (slot: string) => {
     setSelectedSlots((prev) =>
       prev.includes(slot) ? prev.filter((s) => s !== slot) : [...prev, slot]
@@ -92,13 +91,15 @@ const BookingScreen = () => {
         fieldName: name,
         fieldType: selectedFieldType,
         date: selectedDate,
-        timeSlots: JSON.stringify(selectedSlots), // Truyền mảng dưới dạng chuỗi JSON
+        timeSlots: JSON.stringify(selectedSlots),
         price: totalSlotPrice.toString(),
         extraService: selectedServices.map((s) => `${s.name}-${s.id}`).join(", "),
         extraPrice: totalServicePrice.toString(),
       },
     });
   };
+
+  const priceString = getStringParam(price);
 
   return (
     <View style={styles.container}>
@@ -108,6 +109,8 @@ const BookingScreen = () => {
         </TouchableOpacity>
         <Text style={styles.title}>Lựa chọn dịch vụ - {name}</Text>
       </View>
+
+      <Text style={styles.fieldPrice}>Giá sân: {priceString ? formatCurrency(priceString) : "Giá không khả dụng"}</Text>
 
       <Text style={styles.sectionTitle}>Chọn loại sân</Text>
       <View style={styles.gridContainer}>
@@ -157,7 +160,7 @@ const BookingScreen = () => {
                 onPress={() => toggleSlot(slotString)}
               >
                 <Text style={styles.optionText}>{slotString}</Text>
-                <Text style={styles.slotPrice}>{`${slot.price} VND`}</Text>
+                <Text style={styles.slotPrice}>{formatCurrency(slot.price)}</Text>
               </TouchableOpacity>
             );
           })}
@@ -177,7 +180,7 @@ const BookingScreen = () => {
               <Text style={styles.optionText}>
                 {selectedServices.some((s) => s.id === service.service_id) ? "✅ " : ""} {service.name}
               </Text>
-              <Text style={styles.slotPrice}>{`${service.price} VND`}</Text>
+              <Text style={styles.slotPrice}>{formatCurrency(service.price)}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -210,6 +213,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     marginLeft: 8,
+  },
+  fieldPrice: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#16A34A",
+    marginBottom: 8,
   },
   sectionTitle: {
     fontSize: 16,

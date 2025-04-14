@@ -3,11 +3,11 @@ import pool from "../config/database";
 import { AuthRequest } from "../middleware/authMiddleware"; // Import kiểu mở rộng
 
 interface Field {
-  id: number;
+  field_id: number;
   name: string;
-  price: number;
+  price_per_hour: number;
   location: string;
-  image: string;
+  image_name: string;
   description: string;
 }
 
@@ -36,11 +36,15 @@ export const getFields = async (req: Request, res: Response): Promise<void> => {
   try {
     const { sport_type } = req.query;
 
-    let query = "SELECT * FROM fields";
+    let query = `
+      SELECT f.*, fi.image_name
+      FROM fields f
+      LEFT JOIN Field_Images fi ON f.field_id = fi.field_id AND fi.image_type = 'main'
+    `;
     let params: any[] = [];
 
     if (sport_type) {
-      query += " WHERE sport_type = ?";
+      query += " WHERE f.sport_type = ?";
       params.push(sport_type);
     }
 
@@ -60,14 +64,21 @@ export const getFields = async (req: Request, res: Response): Promise<void> => {
 
 export const getFieldDetail = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params; // Lấy ID của sân từ params
+    const { field_id } = req.params;
 
-    const [rows] = await pool.execute("SELECT * FROM fields WHERE field_id = ?", [id]); // Lấy sân theo ID
+    const [rows] = await pool.execute(
+      `
+      SELECT f.*, fi.image_name
+      FROM fields f
+      LEFT JOIN Field_Images fi ON f.field_id = fi.field_id AND fi.image_type = 'main'
+      WHERE f.field_id = ?
+      `,
+      [field_id]
+    );
 
-    if (Array.isArray(rows) && rows.length > 0) { // Kiểm tra nếu rows là mảng và có kết quả
-      const field = rows[0] as Field; // Ép kiểu cho dữ liệu
-
-      res.json(field); // Trả về sân chi tiết
+    if (Array.isArray(rows) && rows.length > 0) {
+      const field = rows[0] as Field;
+      res.json(field);
     } else {
       res.status(404).json({ error: "Field not found" });
     }
@@ -75,6 +86,7 @@ export const getFieldDetail = async (req: Request, res: Response): Promise<void>
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
 
 export const getSubFields = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -202,5 +214,18 @@ export const generateQRCode = async (req: AuthRequest, res: Response): Promise<v
     res.status(200).json({ qrCodeUrl: data.data.qrDataURL });
   } catch (error) {
     res.status(500).json({ error: "Failed to generate QR code" });
+  }
+};
+
+export const getFieldImages = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { fieldId } = req.params;
+    const [rows] = await pool.execute(
+      "SELECT image_name, image_type FROM Field_Images WHERE field_id = ?",
+      [fieldId]
+    );
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error" });
   }
 };

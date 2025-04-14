@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { View, Text, TouchableOpacity, Image, StyleSheet, Alert, ScrollView } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { createBooking, getUserInfo } from "@/constants/apiService";
+import { createBooking, getUserInfo, formatCurrency } from "@/constants/apiService"; // Import formatCurrency
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import moment from "moment";
 
@@ -32,7 +32,6 @@ const ConfirmPay = () => {
   const accountNo = "1031505171";
   const accountName = "LaanLee";
 
-  // Tạo URL mã QR từ VietQR
   const qrCodeUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact.png?amount=${totalPrice}&addInfo=${orderId}&accountName=${accountName}`;
 
   const timeSlotData = selectedTimeSlots.map((slot) => {
@@ -95,7 +94,7 @@ const ConfirmPay = () => {
           </TouchableOpacity>
           <Text style={styles.title}>Xác nhận thanh toán</Text>
         </View>
-  
+
         <View style={styles.infoContainer}>
           <Text style={styles.sectionTitle}>Thông tin dịch vụ</Text>
           <Text>Mã đơn hàng: {orderId}</Text>
@@ -106,19 +105,19 @@ const ConfirmPay = () => {
           {selectedTimeSlots.map((slot, index) => (
             <Text key={index}>- {slot}</Text>
           ))}
-          <Text style={styles.price}>Giá sân: {price} VND</Text>
+          <Text style={styles.price}>Giá sân: {formatCurrency(price)}</Text>
           {extraService && (
             <>
               <Text>Dịch vụ thêm: {extraService}</Text>
-              <Text style={styles.price}>Giá dịch vụ: {extraPrice} VND</Text>
+              <Text style={styles.price}>Giá dịch vụ: {formatCurrency(extraPrice)}</Text>
             </>
           )}
-          <Text style={styles.totalPrice}>Tổng tiền: {totalPrice} VND</Text>
+          <Text style={styles.totalPrice}>Tổng tiền: {formatCurrency(totalPrice)}</Text>
         </View>
-  
+
         <Text style={styles.sectionTitle}>Chọn phương thức thanh toán</Text>
         <View style={styles.paymentMethods}>
-          {["VNPay", "Momo", "Credit Card"].map((method) => (
+          {["VNPay", "Momo"].map((method) => (
             <TouchableOpacity
               key={method}
               style={[
@@ -134,7 +133,7 @@ const ConfirmPay = () => {
             </TouchableOpacity>
           ))}
         </View>
-  
+
         {selectedPayment === "VNPay" && (
           <View style={styles.qrContainer}>
             <Text style={styles.qrTitle}>Quét mã QR để thanh toán</Text>
@@ -142,7 +141,7 @@ const ConfirmPay = () => {
           </View>
         )}
       </ScrollView>
-  
+
       <TouchableOpacity
         style={[styles.checkButton, isLoading && styles.disabledButton]}
         onPress={handlePayment}
@@ -151,7 +150,7 @@ const ConfirmPay = () => {
         <Text style={styles.checkText}>{isLoading ? "Đang xử lý..." : "Xác nhận thanh toán"}</Text>
       </TouchableOpacity>
     </View>
-  );  
+  );
 };
 
 export default ConfirmPay;
@@ -167,7 +166,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: "bold", marginVertical: 8 },
   price: { fontWeight: "bold", color: "green" },
   totalPrice: { fontSize: 18, fontWeight: "bold", marginTop: 10 },
-  paymentMethods: { flexDirection: "row", justifyContent: "space-between", marginVertical: 10 },
+  paymentMethods: { flexDirection: "row", justifyContent: "space-evenly", marginVertical: 10 },
   paymentButton: {
     padding: 12,
     borderWidth: 1,
@@ -181,7 +180,7 @@ const styles = StyleSheet.create({
   selectedPaymentText: { fontSize: 14, fontWeight: "bold", color: "white" },
   qrContainer: { alignItems: "center", marginVertical: 20 },
   qrTitle: { fontSize: 16, fontWeight: "bold", marginBottom: 10 },
-  qrCode: { width: 200, height: 200 }, // Tăng kích thước để dễ quét
+  qrCode: { width: 200, height: 200 },
   checkButton: { backgroundColor: "#16A34A", padding: 14, borderRadius: 8, alignItems: "center" },
   disabledButton: { backgroundColor: "#A0A0A0" },
   checkText: { color: "white", fontSize: 16, fontWeight: "bold" },
