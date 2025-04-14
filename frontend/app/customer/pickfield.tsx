@@ -10,7 +10,9 @@ import { FIELD_IMAGE_BASE_URL } from "@/constants/apiConfig";
 const PickField: React.FC = () => {
   const router = useRouter();
   const { sport_type } = useLocalSearchParams();
-  const [fields, setFields] = useState<any[]>([]);
+  const [fields, setFields] = useState<any[]>([]); // Danh sách sân gốc
+  const [filteredFields, setFilteredFields] = useState<any[]>([]); // Danh sách sân đã lọc
+  const [searchQuery, setSearchQuery] = useState<string>(""); // Giá trị tìm kiếm
 
   useEffect(() => {
     const fetchFields = async () => {
@@ -18,13 +20,35 @@ const PickField: React.FC = () => {
         console.log("Sport type:", sport_type);
         const fieldsData = await getFields(sport_type as string);
         console.log("Fields data in pickField:", fieldsData);
-        setFields(fieldsData);
+        if (Array.isArray(fieldsData)) {
+          setFields(fieldsData);
+          setFilteredFields(fieldsData); // Ban đầu hiển thị toàn bộ sân
+        } else {
+          console.error("Fields data is not an array:", fieldsData);
+          setFields([]);
+          setFilteredFields([]);
+        }
       } catch (error) {
         console.error("Error fetching fields:", error);
+        setFields([]);
+        setFilteredFields([]);
       }
     };
     if (sport_type) fetchFields();
   }, [sport_type]);
+
+  // Xử lý tìm kiếm sân
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    if (query.trim() === "") {
+      setFilteredFields(fields); // Nếu không có từ khóa, hiển thị toàn bộ sân
+    } else {
+      const filtered = fields.filter((field) =>
+        field.name.toLowerCase().includes(query.toLowerCase())
+      );
+      setFilteredFields(filtered); // Lọc sân theo tên
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -39,18 +63,23 @@ const PickField: React.FC = () => {
 
       <View style={styles.searchBar}>
         <FontAwesome name="search" size={20} color="#9CA3AF" />
-        <TextInput placeholder="Nhập tên sân..." style={styles.searchInput} />
+        <TextInput
+          placeholder="Nhập tên sân..."
+          style={styles.searchInput}
+          value={searchQuery}
+          onChangeText={handleSearch} // Gọi hàm handleSearch khi người dùng nhập
+        />
       </View>
 
       <ScrollView style={styles.content}>
         <Text style={styles.sectionTitle}>Tất cả các sân</Text>
         <View style={styles.fieldsList}>
-          {fields.length === 0 ? (
+          {filteredFields.length === 0 ? (
             <Text>Không có sân nào được tìm thấy.</Text>
           ) : (
-            fields.map((field) => {
+            filteredFields.map((field) => {
               const imageUrl = field.image_name
-                ? `${FIELD_IMAGE_BASE_URL}/${field.image_name}?t=${Date.now()}` // Thêm cache-busting
+                ? `${FIELD_IMAGE_BASE_URL}/${field.image_name}?t=${Date.now()}`
                 : "https://via.placeholder.com/150";
               console.log(`Image URL for field ${field.field_id}:`, imageUrl);
 
@@ -73,15 +102,16 @@ const PickField: React.FC = () => {
                 >
                   <View style={styles.fieldCard}>
                     <View style={styles.imageContainer}>
-                    <Image
-                      source={{ uri: imageUrl }}
-                      style={styles.fieldImage}
-                      onError={(error) => {
-                        console.log(`Image load error for field ${field.field_id}:`, error.nativeEvent);
-                        console.log(`Failed URL:`, imageUrl);
-                      }}
-                      onLoad={() => console.log(`Image loaded for field ${field.field_id}:`, imageUrl)}
-                    />
+                      <Image
+                        source={{ uri: imageUrl }}
+                        style={styles.fieldImage}
+                        onError={(error) => {
+                          console.log(`Image load error for field ${field.field_id}:`, error.nativeEvent);
+                          console.log(`Failed URL:`, imageUrl);
+                        }}
+                        onLoad={() => console.log(`Image loaded for field ${field.field_id}:`, imageUrl)}
+                        onLoadEnd={() => console.log(`Image load ended for field ${field.field_id}`)}
+                      />
                     </View>
                     <Text style={styles.fieldName}>{field.name}</Text>
                     <Text style={styles.fieldLocation}>{`Loại sân: ${field.sport_type}`}</Text>

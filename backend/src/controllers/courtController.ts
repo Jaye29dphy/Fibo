@@ -221,11 +221,19 @@ export const getFieldImages = async (req: Request, res: Response): Promise<void>
   try {
     const { fieldId } = req.params;
     const [rows] = await pool.execute(
-      "SELECT image_name, image_type FROM Field_Images WHERE field_id = ?",
+      "SELECT image_id, image_name, image_type, upload_date FROM Field_Images WHERE field_id = ? ORDER BY image_type ASC",
       [fieldId]
     );
+
+    if (Array.isArray(rows) && rows.length === 0) {
+      res.status(404).json({ error: "No images found for this field" });
+      return;
+    }
+
     res.json(rows);
   } catch (error) {
+    console.error("Error fetching field images:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
