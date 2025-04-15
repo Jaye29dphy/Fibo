@@ -1,13 +1,12 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import pool from "../config/database"; // Thêm import để truy vấn database
+import pool from "../config/database"; // Kết nối database
 
 export interface AuthRequest extends Request {
     user?: {
         id: number;
         role: string;
         email?: string;
-        customer_id?: number; // Thêm customer_id
     };
 }
 
@@ -30,12 +29,10 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
             id: number;
             role: string;
             email?: string;
-            customer_id?: number; // Thêm customer_id vào decoded
         };
 
-        // Truy vấn database để lấy customer_id nếu cần
         const [users] = await pool.execute(
-            "SELECT user_id AS id, role, email, customer_id FROM Users LEFT JOIN Customers ON Users.user_id = Customers.user_id WHERE Users.user_id = ?",
+            "SELECT user_id AS id, role, email FROM users WHERE user_id = ?",
             [decoded.id]
         );
         const user = (users as any[])[0];
@@ -49,7 +46,6 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
             id: user.id,
             role: user.role,
             email: user.email,
-            customer_id: user.customer_id, // Gán customer_id từ database
         };
         next();
     } catch (err) {
