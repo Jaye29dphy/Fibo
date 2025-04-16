@@ -1,107 +1,51 @@
-import React from "react";
+// BottomTabs.tsx
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, usePathname } from "expo-router";
+import { useRouter } from "expo-router";
 
-const BottomTabs = () => {
+export default function BottomTabs() {
   const router = useRouter();
-  const pathname = usePathname(); // To determine the current route for active tab styling
-
-  const tabs: {
-    name: string;
-    icon: "calendar-outline" | "information-circle-outline" | "notifications-outline" | "person-outline";
-    route: string;
-    hasNotification?: boolean;
-  }[] = [
-    {
-      name: "Quản lý lịch",
-      icon: "calendar-outline",
-      route: "/owner/schedule",
-    },
-    {
-      name: "Thông tin sân",
-      icon: "information-circle-outline",
-      route: "/owner/field-info",
-    },
-    {
-      name: "Thông báo",
-      icon: "notifications-outline",
-      route: "/owner/notifications",
-      hasNotification: true, // For the red dot
-    },
-    {
-      name: "Hồ sơ",
-      icon: "person-outline",
-      route: "/owner/profile",
-    },
-  ];
 
   return (
-    <View style={styles.tabContainer}>
-      {tabs.map((tab, index) => {
-        const isActive = pathname === tab.route;
-        return (
-          <TouchableOpacity
-            key={index}
-            style={styles.tabItem}
-            onPress={() => router.push({ pathname: tab.route as typeof pathname })}
-          >
-            <View style={styles.iconContainer}>
-              <Ionicons
-                name={tab.icon}
-                size={24}
-                color={isActive ? "#3F51B5" : "#000"}
-              />
-              {tab.hasNotification && (
-                <View style={styles.notificationDot} />
-              )}
-            </View>
-            <Text
-              style={[
-                styles.tabText,
-                { color: isActive ? "#3F51B5" : "#000" },
-              ]}
-            >
-              {tab.name}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
+    <View style={styles.container}>
+      <TabButton icon="calendar-outline" label="Quản lý lịch" onPress={() => router.push("/owner/manage-schedule")} />
+      <TabButton icon="information-outline" label="Thông tin sân" onPress={() => router.push("/owner/field-info")} />
+      <TabButton icon="notifications-outline" label="Thông báo" onPress={() => router.push("/owner/notifications")} />
+      <TabButton icon="person-outline" label="Hồ sơ" onPress={() => router.push("/owner/profile")} />
     </View>
   );
+}
+
+type TabButtonProps = {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
 };
 
+function TabButton({ icon, label, onPress }: TabButtonProps) {
+  return (
+    <TouchableOpacity style={styles.tabButton} onPress={onPress}>
+      <Ionicons name={icon} size={24} color="#3F51B5" />
+      <Text style={styles.tabLabel}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
-  tabContainer: {
+  container: {
     flexDirection: "row",
     justifyContent: "space-around",
-    alignItems: "center",
     backgroundColor: "#fff",
     borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
+    borderTopColor: "#ccc",
     paddingVertical: 10,
-    paddingBottom: 20, // Extra padding for safe area on iOS
   },
-  tabItem: {
+  tabButton: {
     alignItems: "center",
-    justifyContent: "center",
   },
-  iconContainer: {
-    position: "relative",
-  },
-  notificationDot: {
-    position: "absolute",
-    top: -2,
-    right: -2,
-    width: 10,
-    height: 10,
-    backgroundColor: "red",
-    borderRadius: 5,
-  },
-  tabText: {
+  tabLabel: {
     fontSize: 12,
-    marginTop: 5,
+    color: "#3F51B5",
+    marginTop: 4,
   },
 });
-
-export default BottomTabs;

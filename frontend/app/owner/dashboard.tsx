@@ -12,7 +12,7 @@ export default function OwnerDashboard() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>FIBO</Text>
-        <Text style={styles.subtitle}>Chủ sân muốn làm gì?</Text>
+        <Text style={styles.subtitle}>Chủ nhân muốn làm gì?</Text>
       </View>
 
       {/* Action Buttons */}
@@ -24,7 +24,14 @@ export default function OwnerDashboard() {
           <Ionicons name="cloud-upload-outline" size={24} color="#000" />
           <Text style={styles.buttonText}>Cập nhật thông tin sân</Text>
         </TouchableOpacity>
-
+        {/* New Register Field Button */}
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => router.push("/owner/register-field")}
+        >
+          <Ionicons name="add-circle-outline" size={24} color="#000" />
+          <Text style={styles.buttonText}>Đăng ký sân</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => router.push("/owner/handle-requests")}
@@ -33,13 +40,8 @@ export default function OwnerDashboard() {
           <Text style={styles.buttonText}>Xử lý yêu cầu nại</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => router.push("/owner/revenue")}
-        >
-          <Ionicons name="camera-outline" size={24} color="#000" />
-          <Text style={styles.buttonText}>Doanh thu</Text>
-        </TouchableOpacity>
+
+
       </View>
 
       {/* Bottom Tabs */}

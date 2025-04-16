@@ -8,8 +8,9 @@ import courtRoutes from "./routes/courtRoutes";
 import calendarRoutes from "./routes/calendarRoutes";
 import uploadRoutes from "./routes/uploadRoutes";
 import userRoutes from "./routes/userRouter";
+import fieldRoutes from "./routes/fieldRoutes";
 import os from "os";
-import imageMiddleware from "./middleware/imageMiddleware"; // Import middleware
+import imageMiddleware from "./middleware/imageMiddleware";
 
 dotenv.config();
 const app = express();
@@ -29,6 +30,7 @@ app.use("/bookings", calendarRoutes);
 app.use("/upload-avatar", uploadRoutes);
 app.use("/avatars", express.static("D:\\img\\ava"));
 app.use("/api/users", userRoutes);
+app.use("/api/fields", fieldRoutes);
 
 const PORT: number = Number(process.env.PORT) || 5000;
 const localIP = Object.values(os.networkInterfaces())
