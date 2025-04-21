@@ -1,5 +1,5 @@
-import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons"; // Hoặc từ react-native-vector-icons
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Platform } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import BottomTabs from "./BottomTabs";
 
@@ -15,44 +15,50 @@ export default function Dashboard() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.logoContainer}>
-        <Image source={require("../../assets/images/react-logo.png")} style={styles.logo} />
-      </View>
+      <ScrollView
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={Platform.OS === "web"} // Hiển thị thanh cuộn trên web
+      >
+        <View style={styles.logoContainer}>
+          <Image source={require("../../assets/images/react-logo.png")} style={styles.logo} />
+        </View>
 
-      <Text style={styles.headerText}>Kết nối đam mê, đặt sân mọi lúc!</Text>
+        <Text style={styles.headerText}>Kết nối đam mê, đặt sân mọi lúc!</Text>
 
-      <View style={styles.optionsContainer}>
-        <OptionButton
-          label="Bóng đá"
-          color="#4CAF50"
-          icon="soccer"
-          onPress={() => router.push({ pathname: "/customer/pickfield", params: { sport_type: "football" } })}
-        />
-        <OptionButton
-          label="Bóng rổ"
-          color="#F44336"
-          icon="basketball"
-          onPress={() => router.push({ pathname: "/customer/pickfield", params: { sport_type: "basketball" } })}
-        />
-        <OptionButton
-          label="Cầu lông"
-          color="#3F51B5"
-          icon="badminton"
-          onPress={() => router.push({ pathname: "/customer/pickfield", params: { sport_type: "badminton" } })}
-        />
-        <OptionButton
-          label="Pickle ball"
-          color="#9C27B0"
-          icon="volleyball"
-          onPress={() => router.push({ pathname: "/customer/pickfield", params: { sport_type: "volleyball" } })}
-        />
-        <OptionButton
-          label="Tennis"
-          color="#CDDC39"
-          icon="tennis"
-          onPress={() => router.push({ pathname: "/customer/pickfield", params: { sport_type: "tennis" } })}
-        />
-      </View>
+        <View style={styles.optionsContainer}>
+          <OptionButton
+            label="Bóng đá"
+            color="#4CAF50"
+            icon="soccer"
+            onPress={() => router.push({ pathname: "/customer/pickfield", params: { sport_type: "football" } })}
+          />
+          <OptionButton
+            label="Bóng rổ"
+            color="#F44336"
+            icon="basketball"
+            onPress={() => router.push({ pathname: "/customer/pickfield", params: { sport_type: "basketball" } })}
+          />
+          <OptionButton
+            label="Cầu lông"
+            color="#3F51B5"
+            icon="badminton"
+            onPress={() => router.push({ pathname: "/customer/pickfield", params: { sport_type: "badminton" } })}
+          />
+          <OptionButton
+            label="Pickle ball"
+            color="#9C27B0"
+            icon="volleyball"
+            onPress={() => router.push({ pathname: "/customer/pickfield", params: { sport_type: "volleyball" } })}
+          />
+          <OptionButton
+            label="Tennis"
+            color="#CDDC39"
+            icon="tennis"
+            onPress={() => router.push({ pathname: "/customer/pickfield", params: { sport_type: "tennis" } })}
+          />
+        </View>
+      </ScrollView>
 
       <BottomTabs />
     </View>
@@ -73,6 +79,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
   },
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 20, // Đảm bảo nội dung không bị che bởi BottomTabs
+    alignItems: "center",
+  },
   logoContainer: {
     alignItems: "center",
     marginTop: 30,
@@ -91,9 +104,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   optionsContainer: {
-    flex: 1,
+    width: "100%",
     alignItems: "center",
     justifyContent: "space-evenly",
+    paddingVertical: 20,
   },
   optionButton: {
     width: "80%",
@@ -103,6 +117,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 15,
     elevation: 2,
+    marginVertical: 10, // Thêm khoảng cách giữa các nút
   },
   icon: {
     marginRight: 15,

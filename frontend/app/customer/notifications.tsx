@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, Image, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import BottomTabs from "./BottomTabs"; // Import BottomTabs
+import { AntDesign } from "@expo/vector-icons";
 
 export default function NotificationScreen() {
   const router = useRouter();
@@ -16,7 +17,7 @@ export default function NotificationScreen() {
       {/* Thanh màu xanh thông báo */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
+        <AntDesign name="arrowleft" size={24} color="white" />
         </TouchableOpacity>
         <Text style={styles.notificationTitle}>Thông báo</Text>
       </View>

@@ -10,6 +10,7 @@ import {
   Alert,
   ScrollView,
   TextInput,
+  Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -81,25 +82,25 @@ export default function ProfileScreen() {
   const uploadAvatarToServer = useCallback(async (imageUri: string) => {
     console.log("Bắt đầu uploadAvatarToServer, imageUri:", imageUri);
     console.log("User object:", user);
-    if (!user || !user.user_id) { // Sửa user.id thành user.user_id
+    if (!user || !user.user_id) {
       console.log("User or user.user_id is undefined, aborting");
       Alert.alert("Lỗi", "Không thể upload ảnh vì thông tin user không hợp lệ.");
       return;
     }
-  
+
     setUploading(true);
     setTempAvatar(imageUri);
     console.log("Đã set tempAvatar:", imageUri);
-  
+
     const formData = new FormData();
     formData.append("avatar", {
       uri: imageUri,
-      name: `${user.user_id}_avatar.jpg`, // Sửa user.id thành user.user_id
+      name: `${user.user_id}_avatar.jpg`,
       type: "image/jpeg",
     } as any);
-    formData.append("user_id", user.user_id.toString()); // Sửa user.id thành user.user_id
+    formData.append("user_id", user.user_id.toString());
     console.log("FormData đã tạo:", formData);
-  
+
     try {
       const response = await uploadAvatar(formData);
       console.log("API response:", response);
@@ -119,21 +120,21 @@ export default function ProfileScreen() {
       console.log("Hoàn tất uploadAvatarToServer");
     }
   }, [user]);
-  
+
   const pickImage = useCallback(async (useCamera: boolean) => {
     setModalVisible(false);
     console.log("Bắt đầu pickImage, useCamera:", useCamera);
-  
+
     const permission = useCamera
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
-  
+
     if (!permission.granted) {
       console.log("Không có quyền truy cập camera/thư viện");
       Alert.alert("Lỗi", "Bạn cần cấp quyền để sử dụng tính năng này!");
       return;
     }
-  
+
     let result;
     if (useCamera) {
       result = await ImagePicker.launchCameraAsync({
@@ -148,7 +149,7 @@ export default function ProfileScreen() {
         quality: 1,
       });
     }
-  
+
     console.log("ImagePicker result:", result);
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const imageUri = result.assets[0].uri;
@@ -189,12 +190,9 @@ export default function ProfileScreen() {
     <ScrollView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <AntDesign
-          name="arrowleft"
-          size={24}
-          color="white"
-          onPress={() => router.back()}
-        />
+        <TouchableOpacity onPress={() => router.back()}>
+          <AntDesign name="arrowleft" size={24} color="white" />
+        </TouchableOpacity>
         <Text style={styles.title}>Hồ Sơ</Text>
       </View>
 
@@ -411,23 +409,38 @@ export default function ProfileScreen() {
   );
 }
 
-// Styles giữ nguyên
+const { width } = Dimensions.get("window");
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f4f4f4", paddingHorizontal: 20 },
+  container: {
+    flex: 1,
+    backgroundColor: "#f4f4f4",
+  },
   header: {
     backgroundColor: "#42ba96",
     paddingVertical: 15,
+    paddingHorizontal: 15,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 15,
+    justifyContent: "space-between", // Căn chỉnh nút quay lại và tiêu đề
+    width: "100%", // Đảm bảo header chiếm toàn màn hình
     elevation: 5,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
   },
-  title: { fontSize: 20, color: "white", fontWeight: "bold", marginLeft: 10 },
-  avatarSection: { alignItems: "center", marginVertical: 20 },
+  title: {
+    fontSize: 20,
+    color: "white",
+    fontWeight: "bold",
+    flex: 1, // Cho phép tiêu đề chiếm không gian còn lại
+    textAlign: "center", // Căn giữa tiêu đề
+  },
+  avatarSection: {
+    alignItems: "center",
+    marginVertical: 20,
+  },
   avatarContainer: {
     position: "relative",
     padding: 10,
@@ -465,6 +478,7 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     marginBottom: 20,
+    marginHorizontal: 20, // Đảm bảo căn đều với container
     elevation: 3,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -476,17 +490,39 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  infoTitle: { fontSize: 16, fontWeight: "bold", color: "#333" },
-  divider: { height: 1, backgroundColor: "#ddd", marginVertical: 10 },
-  infoRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
-  label: { marginLeft: 8, fontSize: 14, color: "#555" },
-  value: { marginLeft: "auto", fontSize: 14, fontWeight: "bold", color: "#333" },
+  infoTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#ddd",
+    marginVertical: 10,
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  label: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: "#555",
+  },
+  value: {
+    marginLeft: "auto",
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#333",
+  },
   logoutButton: {
     backgroundColor: "#ff4d4d",
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: "center",
     marginBottom: 20,
+    marginHorizontal: 20, // Đảm bảo căn đều với container
     elevation: 3,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -501,13 +537,18 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     marginBottom: 10,
+    marginHorizontal: 20, // Đảm bảo căn đều với container
   },
   deleteButtonText: {
     color: "#cb0909",
     fontSize: 16,
     fontWeight: "bold",
   },
-  logoutText: { fontSize: 16, color: "#fff", fontWeight: "bold" },
+  logoutText: {
+    fontSize: 16,
+    color: "#fff",
+    fontWeight: "bold",
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -531,7 +572,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 3,
   },
-  modalTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 15, color: "#333" },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 15,
+    color: "#333",
+  },
   modalButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -541,9 +587,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#ddd",
   },
-  modalButtonText: { marginLeft: 10, fontSize: 16, color: "#42ba96" },
-  modalClose: { marginTop: 10 },
-  modalCloseText: { fontSize: 16, color: "#ff4d4d", fontWeight: "bold" },
+  modalButtonText: {
+    marginLeft: 10,
+    fontSize: 16,
+    color: "#42ba96",
+  },
+  modalClose: {
+    marginTop: 10,
+  },
+  modalCloseText: {
+    fontSize: 16,
+    color: "#ff4d4d",
+    fontWeight: "bold",
+  },
   input: {
     width: "100%",
     borderWidth: 1,
@@ -562,5 +618,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
   },
-  saveButtonText: { fontSize: 16, color: "#fff", fontWeight: "bold" },
+  saveButtonText: {
+    fontSize: 16,
+    color: "#fff",
+    fontWeight: "bold",
+  },
 });
