@@ -1,10 +1,9 @@
-<<<<<<< Updated upstream
-export const API_URL = "http://192.168.1.103:5000";
-=======
+
+
 
 export const API_URL = "http://192.168.40.204:5000";
 
->>>>>>> Stashed changes
+
 export const GITHUB_REPO = "https://api.github.com/repos/Jaye29dphy/Fibo";
 export const FIELD_IMAGE_BASE_URL = `${API_URL}/fields`;
 
