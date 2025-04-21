@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
-import { API_ENDPOINTS } from '../constants/apiConfig'; 
+import { API_ENDPOINTS } from '../constants/apiConfig';
 
 interface FieldData {
   name: string;
@@ -21,7 +21,7 @@ const useRegister = () => {
   const [fieldData, setFieldData] = useState<FieldData>({
     name: '',
     location: '',
-    type: 'football', // Giá trị mặc định khớp với enum trong bảng fields
+    type: 'football',
     description: '',
     price: '',
     images: [],
@@ -72,13 +72,27 @@ const useRegister = () => {
     formData.append('type', fieldData.type);
     formData.append('description', fieldData.description);
     formData.append('price', fieldData.price);
-    fieldData.images.forEach((imageUri, index) => {
-      formData.append('images', {
-        uri: imageUri,
-        name: `image_${index}.jpg`,
-        type: 'image/jpeg',
-      } as any);
-    });
+
+    // Chuyển đổi URI ảnh thành Blob để gửi dưới dạng file
+    for (const [index, imageUri] of fieldData.images.entries()) {
+      // Nếu URI là base64, chuyển đổi thành Blob
+      if (imageUri.startsWith('data:image')) {
+        const base64Data = imageUri.split(',')[1];
+        const byteString = atob(base64Data);
+        const arrayBuffer = new ArrayBuffer(byteString.length);
+        const uint8Array = new Uint8Array(arrayBuffer);
+        for (let i = 0; i < byteString.length; i++) {
+          uint8Array[i] = byteString.charCodeAt(i);
+        }
+        const blob = new Blob([uint8Array], { type: 'image/jpeg' });
+        formData.append('images', blob, `image_${index}.jpg`);
+      } else {
+        // Nếu URI là file (ví dụ trên thiết bị), chuyển thành Blob
+        const response = await fetch(imageUri);
+        const blob = await response.blob();
+        formData.append('images', blob, `image_${index}.jpg`);
+      }
+    }
 
     console.log('Sending formData:', {
       name: fieldData.name,

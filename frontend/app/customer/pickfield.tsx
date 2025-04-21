@@ -10,9 +10,9 @@ import { FIELD_IMAGE_BASE_URL } from "@/constants/apiConfig";
 const PickField: React.FC = () => {
   const router = useRouter();
   const { sport_type } = useLocalSearchParams();
-  const [fields, setFields] = useState<any[]>([]); // Danh sách sân gốc
-  const [filteredFields, setFilteredFields] = useState<any[]>([]); // Danh sách sân đã lọc
-  const [searchQuery, setSearchQuery] = useState<string>(""); // Giá trị tìm kiếm
+  const [fields, setFields] = useState<any[]>([]);
+  const [filteredFields, setFilteredFields] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   useEffect(() => {
     const fetchFields = async () => {
@@ -22,7 +22,7 @@ const PickField: React.FC = () => {
         console.log("Fields data in pickField:", fieldsData);
         if (Array.isArray(fieldsData)) {
           setFields(fieldsData);
-          setFilteredFields(fieldsData); // Ban đầu hiển thị toàn bộ sân
+          setFilteredFields(fieldsData);
         } else {
           console.error("Fields data is not an array:", fieldsData);
           setFields([]);
@@ -37,16 +37,15 @@ const PickField: React.FC = () => {
     if (sport_type) fetchFields();
   }, [sport_type]);
 
-  // Xử lý tìm kiếm sân
   const handleSearch = (query: string) => {
     setSearchQuery(query);
     if (query.trim() === "") {
-      setFilteredFields(fields); // Nếu không có từ khóa, hiển thị toàn bộ sân
+      setFilteredFields(fields);
     } else {
       const filtered = fields.filter((field) =>
         field.name.toLowerCase().includes(query.toLowerCase())
       );
-      setFilteredFields(filtered); // Lọc sân theo tên
+      setFilteredFields(filtered);
     }
   };
 
@@ -67,7 +66,7 @@ const PickField: React.FC = () => {
           placeholder="Nhập tên sân..."
           style={styles.searchInput}
           value={searchQuery}
-          onChangeText={handleSearch} // Gọi hàm handleSearch khi người dùng nhập
+          onChangeText={handleSearch}
         />
       </View>
 
@@ -78,10 +77,11 @@ const PickField: React.FC = () => {
             <Text>Không có sân nào được tìm thấy.</Text>
           ) : (
             filteredFields.map((field) => {
+              // Đảm bảo chỉ hiển thị ảnh main (image_name từ API đã là ảnh main)
               const imageUrl = field.image_name
                 ? `${FIELD_IMAGE_BASE_URL}/${field.image_name}?t=${Date.now()}`
                 : "https://via.placeholder.com/150";
-              console.log(`Image URL for field ${field.field_id}:`, imageUrl);
+              console.log(`Main image URL for field ${field.field_id}:`, imageUrl);
 
               return (
                 <TouchableOpacity
@@ -94,7 +94,7 @@ const PickField: React.FC = () => {
                         name: field.name,
                         price: field.price_per_hour,
                         location: field.location,
-                        image: field.image_name,
+                        image: field.image_name, // Truyền image_name (ảnh main)
                         description: field.description,
                       },
                     })
@@ -106,11 +106,11 @@ const PickField: React.FC = () => {
                         source={{ uri: imageUrl }}
                         style={styles.fieldImage}
                         onError={(error) => {
-                          console.log(`Image load error for field ${field.field_id}:`, error.nativeEvent);
+                          console.log(`Main image load error for field ${field.field_id}:`, error.nativeEvent);
                           console.log(`Failed URL:`, imageUrl);
                         }}
-                        onLoad={() => console.log(`Image loaded for field ${field.field_id}:`, imageUrl)}
-                        onLoadEnd={() => console.log(`Image load ended for field ${field.field_id}`)}
+                        onLoad={() => console.log(`Main image loaded for field ${field.field_id}:`, imageUrl)}
+                        onLoadEnd={() => console.log(`Main image load ended for field ${field.field_id}`)}
                       />
                     </View>
                     <Text style={styles.fieldName}>{field.name}</Text>

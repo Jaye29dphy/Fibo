@@ -2,6 +2,10 @@ import { Request, Response } from 'express';
 import pool from '../config/database';
 import fs from 'fs';
 import path from 'path';
+import { promisify } from 'util';
+
+// Promisify fs.writeFile để sử dụng async/await
+const writeFileAsync = promisify(fs.writeFile);
 
 // Đường dẫn thư mục lưu ảnh
 const UPLOAD_DIR = 'D:\\img\\field';
@@ -80,7 +84,9 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
     console.log('Inserted field with field_id:', fieldId);
 
     // Lưu ảnh vào thư mục và bảng field_images
-    if (images && images.length > 0) {
+    if (!images || images.length === 0) {
+      console.log('No images provided, skipping image upload');
+    } else {
       console.log('Processing images:', images.length);
       for (const [index, image] of images.entries()) {
         if (!image.buffer) {
@@ -94,13 +100,14 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
 
         console.log('Saving image:', imageName, 'to:', imagePath);
         // Lưu file ảnh vào thư mục
-        fs.writeFileSync(imagePath, image.buffer);
+        await writeFileAsync(imagePath, image.buffer);
 
         // Kiểm tra xem file đã được lưu thành công chưa
         if (!fs.existsSync(imagePath)) {
           console.log('Failed to save image:', imagePath);
-          throw new Error('Failed to save image');
+          throw new Error('Failed to save image to disk');
         }
+        console.log('Image saved successfully:', imagePath);
 
         // Xác định image_type (main cho ảnh đầu tiên, sub cho các ảnh còn lại)
         const imageType = index === 0 ? 'main' : 'sub';
@@ -119,8 +126,6 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
         console.log('Inserting image with values:', imageValues);
         await pool.execute(insertImageQuery, imageValues);
       }
-    } else {
-      console.log('No images provided');
     }
 
     res.status(200).json({ message: 'Đăng ký sân thành công!' });

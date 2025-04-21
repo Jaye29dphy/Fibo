@@ -6,14 +6,14 @@ import BottomTabs from "./BottomTabs";
 import { formatCurrency, getStringParam } from "@/constants/apiService";
 import { API_ENDPOINTS, FIELD_IMAGE_BASE_URL } from "@/constants/apiConfig";
 
-const { width, height } = Dimensions.get("window"); // Lấy kích thước màn hình
+const { width, height } = Dimensions.get("window");
 
 const FieldDetail: React.FC = () => {
   const router = useRouter();
   const { field_id, name, price, location, image, description } = useLocalSearchParams();
   const [fieldImages, setFieldImages] = useState<any[]>([]);
-  const [modalVisible, setModalVisible] = useState(false); // Trạng thái hiển thị modal
-  const [selectedImage, setSelectedImage] = useState<string | null>(null); // Ảnh được chọn để phóng to
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchFieldImages = async () => {
@@ -40,12 +40,15 @@ const FieldDetail: React.FC = () => {
   const displayPrice = priceString ? formatCurrency(priceString) : "Giá không khả dụng";
   const imageString = getStringParam(image);
 
-  const mainImageUrl = imageString
+  // Tìm ảnh main từ danh sách fieldImages (nếu API trả về cả main và sub)
+  const mainImage = fieldImages.find((img) => img.image_type === "main");
+  const mainImageUrl = mainImage?.image_name
+    ? `${FIELD_IMAGE_BASE_URL}/${mainImage.image_name}?t=${Date.now()}`
+    : imageString
     ? `${FIELD_IMAGE_BASE_URL}/${imageString}?t=${Date.now()}`
     : "https://via.placeholder.com/150";
   console.log(`Main image URL for field ${field_id}:`, mainImageUrl);
 
-  // Mở modal và hiển thị ảnh phóng to
   const openImageModal = (imageName: string) => {
     const imageUrl = imageName
       ? `${FIELD_IMAGE_BASE_URL}/${imageName}?t=${Date.now()}`
@@ -54,7 +57,6 @@ const FieldDetail: React.FC = () => {
     setModalVisible(true);
   };
 
-  // Đóng modal
   const closeImageModal = () => {
     setModalVisible(false);
     setSelectedImage(null);
@@ -71,16 +73,18 @@ const FieldDetail: React.FC = () => {
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 120 }}>
         <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: mainImageUrl }}
-            style={styles.image}
-            onError={(error) => {
-              console.log(`Main image load error for field ${field_id}:`, error.nativeEvent);
-              console.log(`Failed URL:`, mainImageUrl);
-            }}
-            onLoad={() => console.log(`Main image loaded for field ${field_id}:`, mainImageUrl)}
-            onLoadEnd={() => console.log(`Main image load ended for field ${field_id}`)}
-          />
+          <TouchableOpacity onPress={() => openImageModal(mainImage?.image_name || imageString)}>
+            <Image
+              source={{ uri: mainImageUrl }}
+              style={styles.image}
+              onError={(error) => {
+                console.log(`Main image load error for field ${field_id}:`, error.nativeEvent);
+                console.log(`Failed URL:`, mainImageUrl);
+              }}
+              onLoad={() => console.log(`Main image loaded for field ${field_id}:`, mainImageUrl)}
+              onLoadEnd={() => console.log(`Main image load ended for field ${field_id}`)}
+            />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.facilities}>
@@ -118,7 +122,7 @@ const FieldDetail: React.FC = () => {
               return (
                 <TouchableOpacity
                   key={index}
-                  onPress={() => openImageModal(fieldImage.image_name)} // Mở modal khi nhấn vào ảnh
+                  onPress={() => openImageModal(fieldImage.image_name)}
                 >
                   <View style={styles.styleprev}>
                     <View style={styles.subImageContainer}>
@@ -141,17 +145,16 @@ const FieldDetail: React.FC = () => {
         </ScrollView>
       </ScrollView>
 
-      {/* Modal để hiển thị ảnh phóng to */}
       <Modal
         animationType="fade"
         transparent={true}
         visible={modalVisible}
-        onRequestClose={closeImageModal} // Đóng modal khi nhấn nút back trên Android
+        onRequestClose={closeImageModal}
       >
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={closeImageModal} // Đóng modal khi nhấn ra ngoài ảnh
+          onPress={closeImageModal}
         >
           <View style={styles.modalContainer}>
             {selectedImage && (
@@ -310,10 +313,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
-  // Styles cho modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.8)", // Nền tối với độ mờ
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
     justifyContent: "center",
     alignItems: "center",
   },
