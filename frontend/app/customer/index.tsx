@@ -1,10 +1,8 @@
-// LoginScreen.tsx
 import React, { useState } from "react";
 import {
   View,
   Text,
   TextInput,
-  Button,
   StyleSheet,
   Alert,
   ImageBackground,
@@ -30,11 +28,10 @@ export default function LoginScreen() {
   
       if (data.token) {
         await AsyncStorage.setItem("token", data.token);
-        await AsyncStorage.setItem("role", data.user.role);  // Lưu role vào AsyncStorage từ data.user
-  
+        await AsyncStorage.setItem("role", data.user.role);
+
         Alert.alert("✅ Thành công", "Đăng nhập thành công!");
   
-        // Kiểm tra và điều hướng theo vai trò
         if (data.user.role === 'admin') {
           router.push("/admin/dashboard");
           router.replace("/admin/dashboard");
@@ -55,7 +52,6 @@ export default function LoginScreen() {
       setError(error.message || "Không thể kết nối đến server!");
     }
   };
-  
 
   return (
     <ImageBackground
@@ -63,67 +59,70 @@ export default function LoginScreen() {
       style={styles.backgroundImage}
     >
       <View style={styles.overlay}>
-        <View style={styles.header}>
-          <ImageBackground
-            source={require("../../assets/images/doituyencc.png")} // Logo MU
-            style={styles.logo}
+        {/* Container bao quanh khu vực đăng nhập/đăng ký với lớp phủ trắng trong suốt */}
+        <View style={styles.loginContainer}>
+          <View style={styles.header}>
+            <ImageBackground
+              source={require("../../assets/images/doituyencc.png")}
+              style={styles.logo}
+            />
+            <Text style={styles.title}>FIBO</Text>
+          </View>
+
+          <Text style={styles.inputLabel}>Tài khoản*</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            placeholderTextColor="#888"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
           />
-          <Text style={styles.title}>FIBO</Text>
-        </View>
 
-        <Text style={styles.inputLabel}>Tài khoản*</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
+          <Text style={styles.inputLabel}>Mật khẩu*</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Mật khẩu"
+            placeholderTextColor="#888"
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+          />
 
-        <Text style={styles.inputLabel}>Mật khẩu*</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Mật khẩu"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
+          <View style={styles.rememberMeContainer}>
+            <TouchableOpacity onPress={() => setRememberMe(!rememberMe)}>
+              <Text style={styles.rememberMeText}>
+                {rememberMe ? "☑" : "☐"} Remember me
+              </Text>
+            </TouchableOpacity>
 
-        <View style={styles.rememberMeContainer}>
-          <TouchableOpacity onPress={() => setRememberMe(!rememberMe)}>
-            <Text style={styles.rememberMeText}>
-              {rememberMe ? "☑" : "☐"} Remember me
-            </Text>
+            <TouchableOpacity onPress={() => router.push("/customer/forgot-password")}>
+              <Text style={styles.forgotPasswordText}>Quên mật khẩu?</Text>
+            </TouchableOpacity>
+          </View>
+
+          {error && <Text style={styles.error}>{error}</Text>}
+
+          <TouchableOpacity onPress={handleLogin} style={styles.loginButton}>
+            <Text style={styles.loginButtonText}>Đăng Nhập</Text>
           </TouchableOpacity>
 
-          {/* Thêm "Quên mật khẩu?" bên phải */}
-          <TouchableOpacity onPress={() => router.push("/customer/forgot-password")}>
-            <Text style={styles.forgotPasswordText}>Quên mật khẩu?</Text>
+          <View style={styles.orContainer}>
+            <View style={styles.line}></View>
+            <Text style={styles.orText}>OR</Text>
+            <View style={styles.line}></View>
+          </View>
+
+          <TouchableOpacity onPress={() => router.push("/customer/register")} style={styles.registerButton}>
+            <Text style={styles.registerText}>Đăng ký</Text>
           </TouchableOpacity>
         </View>
-
-        {error && <Text style={styles.error}>{error}</Text>}
-
-        <View style={styles.buttonsContainer}>
-          <Button title="Đăng Nhập" onPress={handleLogin} color="#ff6200" />
-        </View>
-
-        <View style={styles.orContainer}>
-          <View style={styles.line}></View>
-          <Text style={styles.orText}>OR</Text>
-          <View style={styles.line}></View>
-        </View>
-
-        <TouchableOpacity onPress={() => router.push("/customer/register")} style={styles.registerButton}>
-          <Text style={styles.registerText}>Đăng ký</Text>
-        </TouchableOpacity>
       </View>
     </ImageBackground>
   );
 }
 
-// Phần styles đã cải tiến
 const styles = StyleSheet.create({
   backgroundImage: {
     flex: 1,
@@ -133,62 +132,109 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "space-between", // Thay đổi để căn chỉnh phần tử xuống dưới
+    backgroundColor: "rgba(0, 0, 0, 0.5)", // Lớp phủ tối bên ngoài
+    justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
+  // Container bao quanh khu vực đăng nhập/đăng ký với lớp phủ trắng trong suốt
+  loginContainer: {
+    width: "100%",
+    maxWidth: 400,
+    backgroundColor: "rgba(255, 255, 255, 0.2)", // Lớp phủ trắng trong suốt (glassmorphism)
+    borderRadius: 15,
     padding: 20,
-    paddingBottom: 40, // Cung cấp không gian cho các nút ở dưới cùng
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)", // Viền nhẹ
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+    backdropFilter: "blur(10px)", // Hiệu ứng mờ (lưu ý: không hỗ trợ trực tiếp trong React Native, cần thư viện nếu muốn)
   },
   header: {
     alignItems: "center",
-    marginBottom: 30,
+    marginBottom: 40,
   },
   logo: {
-    width: 100,
-    height: 100,
-    marginBottom: 10,
+    width: 120,
+    height: 120,
+    marginBottom: 15,
   },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "white",
+    fontSize: 32,
+    fontWeight: "700",
+    color: "#ffffff",
+    fontFamily: "Poppins",
+    textTransform: "uppercase",
+    letterSpacing: 2,
   },
   inputLabel: {
     alignSelf: "flex-start",
-    color: "white",
-    fontSize: 14,
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "500",
+    marginBottom: 8,
   },
   input: {
     width: "100%",
-    padding: 10,
-    backgroundColor: "white",
+    padding: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.9)", // Trường nhập liệu hơi trong suốt
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: "gray",
-
+    borderColor: "#d1d1d1",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    marginBottom: 20,
+    fontSize: 16,
+    color: "#333",
   },
   rememberMeContainer: {
     flexDirection: "row",
-    justifyContent: "space-between", // Căn lề để hai phần nhớ tôi và quên mật khẩu nằm cạnh nhau
+    justifyContent: "space-between",
     alignItems: "center",
     width: "100%",
-    marginBottom: 10,
+    marginBottom: 20,
   },
   rememberMeText: {
-    color: "white",
+    color: "#ffffff",
     fontSize: 16,
+    fontWeight: "500",
   },
   forgotPasswordText: {
-    color: "lightblue",
+    color: "#40c4ff",
     fontSize: 16,
+    fontWeight: "500",
     textDecorationLine: "underline",
   },
   error: {
-    color: "red",
-    marginBottom: 10,
+    color: "#ff5252",
+    fontSize: 14,
+    marginBottom: 20,
+    textAlign: "center",
   },
-  buttonsContainer: {
+  loginButton: {
     width: "100%",
-    marginBottom: 10, // Thêm khoảng cách dưới nút đăng nhập
+    paddingVertical: 15,
+    backgroundColor: "#ff6200",
+    borderRadius: 8,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+    marginBottom: 20,
+  },
+  loginButtonText: {
+    fontSize: 18,
+    color: "#ffffff",
+    fontWeight: "600",
   },
   orContainer: {
     flexDirection: "row",
@@ -199,24 +245,29 @@ const styles = StyleSheet.create({
   line: {
     flex: 1,
     height: 1,
-    backgroundColor: "white",
+    backgroundColor: "rgba(255, 255, 255, 0.5)",
   },
   orText: {
-    color: "white",
+    color: "#ffffff",
     fontSize: 16,
-    paddingHorizontal: 10,
+    paddingHorizontal: 15,
+    fontWeight: "500",
   },
   registerButton: {
     width: "100%",
     paddingVertical: 15,
     backgroundColor: "#ff0040",
-    borderRadius: 5,
-    marginTop: 20,
+    borderRadius: 8,
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   registerText: {
     fontSize: 18,
-    color: "white",
-    fontWeight: "bold",
+    color: "#ffffff",
+    fontWeight: "600",
   },
 });

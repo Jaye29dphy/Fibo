@@ -1,9 +1,20 @@
 import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Modal, FlatList } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+  Modal,
+  FlatList,
+  Platform,
+  ScrollView,
+} from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import useRegister from '../../hooks/useRegister'; 
+import useRegister from '../../hooks/useRegister';
 
 export default function RegisterField() {
   const router = useRouter();
@@ -26,104 +37,143 @@ export default function RegisterField() {
 
   return (
     <View style={styles.container}>
-      {/* Nút Back */}
-      <TouchableOpacity style={styles.backButton} onPress={() => router.push('/owner/dashboard')}>
-        <Ionicons name="arrow-back" size={24} color="#000" />
-      </TouchableOpacity>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Back Button */}
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.push('/owner/dashboard')}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={28} color="#FFFFFF" />
+        </TouchableOpacity>
 
-      <Text style={styles.title}>Thông tin sân cho thuê</Text>
+        {/* Title */}
+        <Text style={styles.title}>Đăng ký sân cho thuê</Text>
 
-      <Text style={styles.label}>Tên sân</Text>
-      <TextInput
-        style={styles.input}
-        value={fieldData.name}
-        onChangeText={(text) => updateFieldData('name', text)}
-        placeholder="Nhập tên sân"
-      />
+        {/* Form Fields */}
+        <View style={styles.formContainer}>
+          {/* Field Name */}
+          <Text style={styles.label}>Tên sân</Text>
+          <TextInput
+            style={styles.input}
+            value={fieldData.name}
+            onChangeText={(text) => updateFieldData('name', text)}
+            placeholder="Nhập tên sân"
+            placeholderTextColor="#9CA3AF"
+          />
 
-      <Text style={styles.label}>Vị trí</Text>
-      <TextInput
-        style={styles.input}
-        value={fieldData.location}
-        onChangeText={(text) => updateFieldData('location', text)}
-        placeholder="Nhập vị trí"
-      />
+          {/* Location */}
+          <Text style={styles.label}>Vị trí</Text>
+          <TextInput
+            style={styles.input}
+            value={fieldData.location}
+            onChangeText={(text) => updateFieldData('location', text)}
+            placeholder="Nhập vị trí"
+            placeholderTextColor="#9CA3AF"
+          />
 
-      <Text style={styles.label}>Loại sân</Text>
-      <Picker
-        selectedValue={fieldData.type}
-        style={styles.picker}
-        onValueChange={(itemValue) => updateFieldData('type', itemValue)}
-      >
-        <Picker.Item label="Bóng đá" value="football" />
-        <Picker.Item label="Bóng rổ" value="basketball" />
-        <Picker.Item label="Cầu lông" value="badminton" />
-        <Picker.Item label="Tennis" value="tennis" />
-      </Picker>
-
-      <Text style={styles.label}>Đặc điểm sân</Text>
-      <TextInput
-        style={styles.input}
-        value={fieldData.description}
-        onChangeText={(text) => updateFieldData('description', text)}
-        placeholder="Nhập đặc điểm sân"
-        multiline
-      />
-
-      <Text style={styles.label}>Giá sân (thuê theo giờ)</Text>
-      <TextInput
-        style={styles.input}
-        value={fieldData.price}
-        onChangeText={(text) => updateFieldData('price', text)}
-        placeholder="Nhập giá sân (VD: 250000)"
-        keyboardType="numeric"
-      />
-
-      <Text style={styles.label}>Ảnh sân (nếu có)</Text>
-      <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
-        <Text style={styles.uploadText}>Tải ảnh</Text>
-      </TouchableOpacity>
-
-      {/* Hiển thị danh sách ảnh đã tải */}
-      <FlatList
-        data={fieldData.images}
-        horizontal
-        renderItem={({ item, index }) => (
-          <View style={styles.imageContainer}>
-            <Image source={{ uri: item }} style={styles.image} />
-            <TouchableOpacity
-              style={styles.removeButton}
-              onPress={() => removeImage(index)}
+          {/* Field Type */}
+          <Text style={styles.label}>Loại sân</Text>
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={fieldData.type}
+              style={styles.picker}
+              onValueChange={(itemValue) => updateFieldData('type', itemValue)}
+              dropdownIconColor="#6B7280"
             >
-              <Ionicons name="close-circle" size={24} color="red" />
-            </TouchableOpacity>
+              <Picker.Item label="Bóng đá" value="football" />
+              <Picker.Item label="Bóng rổ" value="basketball" />
+              <Picker.Item label="Cầu lông" value="badminton" />
+              <Picker.Item label="Tennis" value="tennis" />
+            </Picker>
           </View>
-        )}
-        keyExtractor={(item, index) => index.toString()}
-        style={styles.imageList}
-      />
 
-      <TouchableOpacity
-        style={[styles.submitButton, isSubmitting && styles.disabledButton]}
-        onPress={handleSubmit}
-        disabled={isSubmitting}
-      >
-        <Text style={styles.submitText}>{isSubmitting ? 'Đang gửi...' : 'SUBMIT'}</Text>
-      </TouchableOpacity>
+          {/* Description */}
+          <Text style={styles.label}>Đặc điểm sân</Text>
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            value={fieldData.description}
+            onChangeText={(text) => updateFieldData('description', text)}
+            placeholder="Mô tả đặc điểm sân"
+            placeholderTextColor="#9CA3AF"
+            multiline
+            numberOfLines={4}
+          />
 
-      {/* Pop-up Modal */}
+          {/* Price */}
+          <Text style={styles.label}>Giá sân (theo giờ)</Text>
+          <TextInput
+            style={styles.input}
+            value={fieldData.price}
+            onChangeText={(text) => updateFieldData('price', text)}
+            placeholder="Nhập giá (VD: 250000)"
+            placeholderTextColor="#9CA3AF"
+            keyboardType="numeric"
+          />
+
+          {/* Image Upload */}
+          <Text style={styles.label}>Ảnh sân</Text>
+          <TouchableOpacity
+            style={styles.uploadButton}
+            onPress={pickImage}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.uploadText}>Tải ảnh lên</Text>
+          </TouchableOpacity>
+
+          {/* Image List */}
+          <FlatList
+            data={fieldData.images}
+            horizontal
+            renderItem={({ item, index }) => (
+              <View style={styles.imageContainer}>
+                <Image source={{ uri: item }} style={styles.image} />
+                <TouchableOpacity
+                  style={styles.removeButton}
+                  onPress={() => removeImage(index)}
+                >
+                  <Text style={styles.removeButtonText}>×</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            keyExtractor={(item, index) => index.toString()}
+            style={styles.imageList}
+            showsHorizontalScrollIndicator={false}
+          />
+        </View>
+
+        {/* Submit Button */}
+        <TouchableOpacity
+          style={[styles.submitButton, isSubmitting && styles.disabledButton]}
+          onPress={handleSubmit}
+          disabled={isSubmitting}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.submitText}>
+            {isSubmitting ? 'Đang xử lý...' : 'Đăng ký sân'}
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      {/* Modal */}
       <Modal
         animationType="fade"
-        transparent={true}
+        transparent
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalContainer}>
-          <View style={[styles.modalContent, modalSuccess ? styles.modalSuccess : styles.modalError]}>
+          <View
+            style={[
+              styles.modalContent,
+              modalSuccess ? styles.modalSuccess : styles.modalError,
+            ]}
+          >
             <Text style={styles.modalText}>{modalMessage}</Text>
             <TouchableOpacity
               style={styles.modalButton}
               onPress={() => setModalVisible(false)}
+              activeOpacity={0.7}
             >
               <Text style={styles.modalButtonText}>Đóng</Text>
             </TouchableOpacity>
@@ -137,108 +187,186 @@ export default function RegisterField() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#F1F5F9',
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingVertical: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 40,
   },
   backButton: {
-    marginBottom: 10,
+    padding: 12,
+    backgroundColor: '#3B82F6',
+    borderRadius: 50,
+    alignSelf: 'flex-start',
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
   },
   title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 20,
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 32,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+  formContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   label: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 5,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   input: {
-    borderBottomWidth: 1,
-    borderColor: '#ccc',
-    padding: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 16,
     fontSize: 16,
+    color: '#1E293B',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     marginBottom: 20,
+  },
+  multilineInput: {
+    height: 120,
+    textAlignVertical: 'top',
+  },
+  pickerContainer: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 20,
+    overflow: 'hidden',
+    minHeight: 60, // Đảm bảo chiều cao tối thiểu
   },
   picker: {
-    borderBottomWidth: 1,
-    borderColor: '#ccc',
-    padding: 10,
     fontSize: 16,
-    marginBottom: 20,
+    color: '#1E293B',
+    height: 60, // Tăng chiều cao để trông cân đối
+    paddingVertical: 10, // Thêm padding để text không bị chèn
   },
   uploadButton: {
-    backgroundColor: '#ddd',
-    padding: 10,
+    backgroundColor: '#3B82F6',
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    borderRadius: 5,
     marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
   },
   uploadText: {
     fontSize: 16,
-    color: '#000',
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
   },
   imageList: {
     marginBottom: 20,
   },
   imageContainer: {
     position: 'relative',
-    marginRight: 10,
+    marginRight: 12,
   },
   image: {
-    width: 100,
-    height: 100,
-    borderRadius: 5,
+    width: 96,
+    height: 96,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   removeButton: {
     position: 'absolute',
-    top: -10,
-    right: -10,
+    top: -8,
+    right: -8,
+    backgroundColor: '#EF4444',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 24,
   },
   submitButton: {
-    backgroundColor: '#000',
-    padding: 15,
+    backgroundColor: '#10B981',
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    borderRadius: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
   },
   disabledButton: {
-    backgroundColor: '#666',
+    backgroundColor: '#6B7280',
+    opacity: 0.7,
   },
   submitText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
   },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   modalContent: {
-    width: 300,
-    padding: 20,
-    borderRadius: 10,
+    width: '80%',
+    maxWidth: 400,
+    padding: 24,
+    borderRadius: 16,
     alignItems: 'center',
   },
   modalSuccess: {
-    backgroundColor: '#d4edda',
+    backgroundColor: '#D1FAE5',
   },
   modalError: {
-    backgroundColor: '#f8d7da',
+    backgroundColor: '#FEE2E2',
   },
   modalText: {
     fontSize: 16,
-    marginBottom: 15,
+    color: '#1E293B',
+    marginBottom: 20,
     textAlign: 'center',
   },
   modalButton: {
-    backgroundColor: '#007bff',
-    padding: 10,
-    borderRadius: 5,
+    backgroundColor: '#3B82F6',
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 12,
   },
   modalButtonText: {
-    color: '#fff',
     fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
