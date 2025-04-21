@@ -13,10 +13,10 @@ export default function AdminMenu({ onSelect }: AdminMenuProps) {
         <Text style={styles.buttonText}>Quản lý người dùng</Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={() => onSelect("partners")} style={styles.button}>
-        <Text style={styles.buttonText}>Quản lý đối tác</Text>
+        <Text style={styles.buttonText}>Quản lý sân</Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={() => onSelect("bookings")} style={styles.button}>
-        <Text style={styles.buttonText}>Quản lý đặt sân</Text>
+        <Text style={styles.buttonText}>Quản lý đơn đặt sân</Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={() => onSelect("revenue")} style={styles.button}>
         <Text style={styles.buttonText}>Quản lý doanh thu</Text>

@@ -1,6 +1,7 @@
 // controllers/calendarController.ts
 import { Request, Response } from 'express';
 import db from '../config/database';
+import pool from '../config/database';
 
 interface Booking {
   id: number;
@@ -52,5 +53,31 @@ export const getCalendarBookings = async (_req: Request, res: Response) => {
   } catch (error) {
     console.error("Lỗi khi lấy dữ liệu lịch hẹn:", error);
     res.status(500).json({ message: "Lỗi server" });
+  }
+};
+
+
+export const getCalendarData = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const query = `
+      SELECT 
+        b.booking_id AS id,
+        b.customer_id AS customerId,
+        b.field_id AS fieldId,
+        f.name AS fieldName,
+        u.full_name AS customerName,
+        b.start_time AS startTime,
+        b.end_time AS endTime,
+        b.status,
+        b.total_cost AS totalCost
+      FROM Bookings b
+      JOIN Fields f ON b.field_id = f.field_id
+      JOIN Users u ON b.customer_id = u.user_id
+    `;
+    const [rows] = await pool.execute(query);
+    res.json(rows);
+  } catch (error) {
+    console.error("Error fetching bookings:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 };
