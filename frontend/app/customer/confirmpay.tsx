@@ -14,7 +14,7 @@ const ConfirmPay = () => {
     return Array.isArray(value) ? value[0] : value || "";
   };
 
-  const orderId = getStringParam(params.orderId);
+  const booking_code = getStringParam(params.booking_code);
   const fieldId = getStringParam(params.fieldId);
   const fieldName = getStringParam(params.fieldName);
   const fieldType = getStringParam(params.fieldType);
@@ -32,7 +32,7 @@ const ConfirmPay = () => {
   const accountNo = "1031505171";
   const accountName = "LaanLee";
 
-  const qrCodeUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact.png?amount=${totalPrice}&addInfo=${orderId}&accountName=${accountName}`;
+  const qrCodeUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact.png?amount=${totalPrice}&addInfo=${booking_code}&accountName=${accountName}`;
 
   const timeSlotData = selectedTimeSlots.map((slot) => {
     const [startTimeStr, endTimeStr] = slot.split(" - ");
@@ -52,7 +52,7 @@ const ConfirmPay = () => {
       }
 
       const userInfo = await getUserInfo();
-      const customerId = userInfo.customer_id;
+      const user_Id = userInfo.user_id;
 
       const services = extraService
         ? extraService.split(", ").map((serviceName) => ({
@@ -65,18 +65,20 @@ const ConfirmPay = () => {
         timeSlotData.map((slot) =>
           createBooking(
             fieldId,
-            customerId,
+            user_Id,
+            booking_code,
             slot.startTime,
             slot.endTime,
             totalPrice / timeSlotData.length,
             services,
-            selectedPayment.toLowerCase().replace(" ", "_")
+            selectedPayment.toLowerCase().replaceAll(" ", "_")
           )
         )
       );
+      console.log(booking_code);
 
-      Alert.alert("Thành công", `Thanh toán thành công qua ${selectedPayment}! Mã đơn hàng: ${responses[0].booking_id}`);
-      router.push("/");
+      Alert.alert("Thành công", `Thanh toán thành công qua ${selectedPayment}! Mã đơn hàng: ${booking_code}`);
+      router.push("/customer/dashboard");
     } catch (error) {
       console.error("Payment error:", error);
       Alert.alert("Lỗi", "Thanh toán thất bại. Vui lòng thử lại.");
@@ -97,7 +99,7 @@ const ConfirmPay = () => {
 
         <View style={styles.infoContainer}>
           <Text style={styles.sectionTitle}>Thông tin dịch vụ</Text>
-          <Text>Mã đơn hàng: {orderId}</Text>
+          <Text>Mã đơn hàng: {booking_code}</Text>
           <Text>Tên sân: {fieldName}</Text>
           <Text>Loại sân: {fieldType}</Text>
           <Text>Ngày: {selectedDate}</Text>

@@ -44,6 +44,18 @@ export const formatCurrency = (value: number | string): string => {
   return `${parts.join(",")} VND/giờ`;
 };
 
+export const formatServicePr = (value: number | string): string => {
+  const num = typeof value === "string" ? parseFloat(value) : value;
+
+  if (isNaN(num)) return "Giá không khả dụng";
+
+  const formattedNum = num.toFixed(2).replace(/\.00$/, "");
+  const parts = formattedNum.split(".");
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+  return `${parts.join(",")} VND`;
+};
+
 export const getStringParam = (value: string | string[] | undefined): string => {
   if (Array.isArray(value)) return value[0] || "";
   return value || "";
@@ -84,7 +96,7 @@ export const getCalendarData = async () => {
     const data = await fetchAPI(API_ENDPOINTS.GET_CALENDAR, "GET");
     return data.map((booking: any) => ({
       id: booking.id,
-      customerId: booking.customerId,
+      user_id: booking.user_id,
       fieldId: booking.fieldId,
       fieldName: booking.fieldName,
       customerName: booking.customerName,
@@ -183,17 +195,19 @@ export const getServices = async (fieldId: string) => {
 // apiService.ts
 export const createBooking = async (
   fieldId: string,
-  customerId: string,
+  userId: string,
+  bookingCode: string,
   startTime: string,
   endTime: string,
   totalCost: number,
   services: { serviceId: number; quantity: number }[], // Thay đổi ở đây
   paymentMethod: string
 ) => {
-  const url = `${API_ENDPOINTS.GET_CALENDAR}`;
+  const url = `${API_ENDPOINTS.GET_ORDER}`;
   const body = {
     field_id: fieldId,
-    customer_id: customerId,
+    user_id: userId,
+    booking_code: bookingCode,
     start_time: startTime,
     end_time: endTime,
     total_cost: totalCost,

@@ -131,14 +131,15 @@ export const createBooking = async (req: AuthRequest, res: Response): Promise<vo
     const {
       field_id,
       start_time,
+      booking_code,
+      user_id,
       end_time,
       total_cost,
       services,
       payment_method,
     } = req.body;
-    const customer_id = req.user?.customer_id; // Lấy từ token/user info
 
-    if (!customer_id) {
+    if (!user_id) {
       res.status(403).json({ error: "Unauthorized" });
       return;
     }
@@ -156,16 +157,16 @@ export const createBooking = async (req: AuthRequest, res: Response): Promise<vo
 
     // Tạo booking
     const [bookingResult] = await pool.execute(
-      "INSERT INTO Bookings (customer_id, field_id, start_time, end_time, total_cost, status) VALUES (?, ?, ?, ?, ?, 'confirmed')",
-      [customer_id, field_id, start_time, end_time, total_cost]
+      "INSERT INTO Bookings (user_id, field_id, start_time, end_time, total_cost, booking_code, payment_method, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+  [user_id, field_id, start_time, end_time, total_cost, booking_code, payment_method, 'confirmed']
     );
     const bookingId = (bookingResult as any).insertId;
 
     // Tạo payment
-    const [paymentResult] = await pool.execute(
-      "INSERT INTO Payments (booking_id, amount, payment_method, status) VALUES (?, ?, ?, 'completed')",
-      [bookingId, total_cost, payment_method]
-    );
+    // const [paymentResult] = await pool.execute(
+    //   "INSERT INTO Payments (booking_id, amount, payment_method, status) VALUES (?, ?, ?, 'completed')",
+    //   [bookingId, total_cost, payment_method]
+    // );
 
     // Thêm dịch vụ nếu có
     if (services && services.length > 0) {

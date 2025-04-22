@@ -1,7 +1,7 @@
 
 
 
-export const API_URL = "http://192.168.1.5:5000";
+export const API_URL = "http://192.168.40.204:5000";
 
 
 export const GITHUB_REPO = "https://api.github.com/repos/Jaye29dphy/Fibo";
@@ -21,4 +21,5 @@ export const API_ENDPOINTS = {
   GET_ALL_USERS: `${API_URL}/api/users`,
   DEACTIVATE_WITH_PASSWORD: `${API_URL}/api/users/deactivate`,
   REGISTER_FIELD: `${API_URL}/api/fields/register`, 
+  GET_ORDER: `${API_URL}/courts/bookings`, 
 };

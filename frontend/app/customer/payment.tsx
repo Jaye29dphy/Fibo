@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from "rea
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import moment from "moment";
-import { getSubFields, getTimeSlots, getServices, formatCurrency, getStringParam } from "@/constants/apiService";
+import { getSubFields, getTimeSlots, getServices, formatCurrency, getStringParam, formatServicePr } from "@/constants/apiService";
 
 const BookingScreen = () => {
   const router = useRouter();
@@ -86,7 +86,7 @@ const BookingScreen = () => {
     router.push({
       pathname: "/customer/confirmpay",
       params: {
-        orderId: `BOOK${Date.now()}`,
+        booking_code: `BOOK${Date.now()}`,
         fieldId: field_id,
         fieldName: name,
         fieldType: selectedFieldType,
@@ -180,7 +180,7 @@ const BookingScreen = () => {
               <Text style={styles.optionText}>
                 {selectedServices.some((s) => s.id === service.service_id) ? "✅ " : ""} {service.name}
               </Text>
-              <Text style={styles.slotPrice}>{formatCurrency(service.price)}</Text>
+              <Text style={styles.slotPrice}>{formatServicePr(service.price)}</Text>
             </TouchableOpacity>
           ))}
         </View>

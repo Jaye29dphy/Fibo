@@ -206,7 +206,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     // 🔥 Tạo token
     const token = jwt.sign({ id: user.user_id, email: user.email }, process.env.JWT_SECRET || "secret", {
-      expiresIn: "1h",
+      expiresIn: "48h",
     });
 
     console.log("✅ Đăng nhập thành công:", { email, userId: user.user_id });
