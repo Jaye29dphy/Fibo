@@ -5,6 +5,7 @@ import pool from '../config/database';
 
 interface Booking {
   id: number;
+  booking_code: string;
   start_time: string;
   end_time: string;
   status: 'confirmed' | 'pending' | 'cancelled' | 'completed';
@@ -13,7 +14,8 @@ interface Booking {
 
 interface BookingRow {
   booking_id: number;
-  customer_id: number;
+  booking_code: string;
+  use_id: number;
   field_id: number;
   start_time: string | Date; // Allow for Date object from MySQL
   end_time: string | Date;
@@ -23,7 +25,7 @@ interface BookingRow {
 export const getCalendarBookings = async (_req: Request, res: Response) => {
   try {
     const query = `
-      SELECT booking_id, customer_id, field_id, start_time, end_time, status 
+      SELECT booking_id,booking_code , user_id, field_id, start_time, end_time, status 
       FROM bookings
       ORDER BY start_time ASC;
     `;
@@ -43,6 +45,7 @@ export const getCalendarBookings = async (_req: Request, res: Response) => {
 
       return {
         id: row.booking_id,
+        booking_code: row.booking_code,
         start_time: formatDate(row.start_time),
         end_time: formatDate(row.end_time),
         status: row.status,
@@ -62,7 +65,7 @@ export const getCalendarData = async (req: Request, res: Response): Promise<void
     const query = `
       SELECT 
         b.booking_id AS id,
-        b.customer_id AS customerId,
+        b.user_id AS customerId,
         b.field_id AS fieldId,
         f.name AS fieldName,
         u.full_name AS customerName,
@@ -72,7 +75,7 @@ export const getCalendarData = async (req: Request, res: Response): Promise<void
         b.total_cost AS totalCost
       FROM Bookings b
       JOIN Fields f ON b.field_id = f.field_id
-      JOIN Users u ON b.customer_id = u.user_id
+      JOIN Users u ON b.user_id = u.user_id
     `;
     const [rows] = await pool.execute(query);
     res.json(rows);
