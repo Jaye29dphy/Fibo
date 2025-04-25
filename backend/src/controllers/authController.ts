@@ -258,7 +258,7 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
     // 🔹 Tạo đường dẫn ảnh đầy đủ
     user.avatar = user.avatar
       ? `http://localhost:5000${user.avatar}` // Nếu có ảnh, trả về URL đầy đủ
-      : "http://localhost:5000/avatars/default.png"; // Ảnh mặc định nếu user chưa upload avatar
+      : "D://img//ava//default.png"; // Ảnh mặc định nếu user chưa upload avatar
 
     res.json(user);
   } catch (error) {

@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
+import * as FileSystem from "expo-file-system"; 
+import { Platform } from "react-native";
 import {
   View,
   Text,
@@ -87,21 +89,36 @@ export default function ProfileScreen() {
       Alert.alert("Lỗi", "Không thể upload ảnh vì thông tin user không hợp lệ.");
       return;
     }
-
+  
     setUploading(true);
     setTempAvatar(imageUri);
     console.log("Đã set tempAvatar:", imageUri);
-
-    const formData = new FormData();
-    formData.append("avatar", {
-      uri: imageUri,
-      name: `${user.user_id}_avatar.jpg`,
-      type: "image/jpeg",
-    } as any);
-    formData.append("user_id", user.user_id.toString());
-    console.log("FormData đã tạo:", formData);
-
+  
     try {
+      let blob;
+      let extension = "jpg"; // Default extension
+  
+      if (Platform.OS === "web") {
+        // On web, imageUri is a data URL (e.g., data:image/png;base64,...)
+        const mimeType = imageUri.split(";")[0].split(":")[1]; // e.g., image/png
+        extension = mimeType.split("/")[1]; // e.g., png
+        const response = await fetch(imageUri);
+        blob = await response.blob();
+      } else {
+        // On mobile, use expo-file-system to read the image as base64
+        const fileInfo = await FileSystem.readAsStringAsync(imageUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        // Assume JPEG by default; you can enhance this by checking the file type
+        blob = await (await fetch(`data:image/jpeg;base64,${fileInfo}`)).blob();
+      }
+  
+      // Create FormData and append the Blob
+      const formData = new FormData();
+      formData.append("avatar", blob, `${user.user_id}_avatar.${extension}`);
+      formData.append("user_id", user.user_id.toString());
+      console.log("FormData đã tạo:", formData);
+  
       const response = await uploadAvatar(formData);
       console.log("API response:", response);
       if (response.avatar) {
@@ -122,44 +139,44 @@ export default function ProfileScreen() {
   }, [user]);
 
   const pickImage = useCallback(async (useCamera: boolean) => {
-    setModalVisible(false);
     console.log("Bắt đầu pickImage, useCamera:", useCamera);
-
-    const permission = useCamera
-      ? await ImagePicker.requestCameraPermissionsAsync()
-      : await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      console.log("Không có quyền truy cập camera/thư viện");
-      Alert.alert("Lỗi", "Bạn cần cấp quyền để sử dụng tính năng này!");
-      return;
+    try {
+      const permissionResult = useCamera
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+  
+      if (!permissionResult.granted) {
+        Alert.alert("Lỗi", "Ứng dụng cần quyền truy cập để tiếp tục!");
+        return;
+      }
+  
+      const result = useCamera
+        ? await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 1,
+          })
+        : await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 1,
+          });
+  
+      console.log("ImagePicker result:", result);
+  
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const imageUri = result.assets[0].uri;
+        console.log("Selected image URI:", imageUri);
+        console.log("User trước khi upload:", user);
+        await uploadAvatarToServer(imageUri);
+      }
+    } catch (error) {
+      console.error("Error picking image:", error);
+      Alert.alert("Lỗi", "Không thể chọn ảnh. Vui lòng thử lại.");
     }
-
-    let result;
-    if (useCamera) {
-      result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 1,
-      });
-    } else {
-      result = await ImagePicker.launchImageLibraryAsync({
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 1,
-      });
-    }
-
-    console.log("ImagePicker result:", result);
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const imageUri = result.assets[0].uri;
-      console.log("Selected image URI:", imageUri);
-      console.log("User trước khi upload:", user);
-      await uploadAvatarToServer(imageUri);
-    } else {
-      console.log("Image selection canceled or no assets found");
-    }
-  }, [uploadAvatarToServer]);
+  }, [user, uploadAvatarToServer]);
 
   const handleLogout = async () => {
     try {

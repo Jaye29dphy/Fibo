@@ -23,12 +23,14 @@ app.use(express.json());
 // Sử dụng middleware để xử lý route /fields
 app.use("/fields", imageMiddleware, express.static("D:\\img\\field"));
 
+// Sử dụng middleware để xử lý route /avatars
+app.use("/avatars", express.static("D:\\img\\ava"));
+
 // API Routes
 app.use("/api/auth", authRoutes);
 app.use("/courts", courtRoutes);
 app.use("/bookings", calendarRoutes);
 app.use("/upload-avatar", uploadRoutes);
-app.use("/avatars", express.static("D:\\img\\ava"));
 app.use("/api/users", userRoutes);
 app.use("/api/fields", fieldRoutes);
 

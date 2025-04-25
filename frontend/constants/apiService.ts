@@ -1,5 +1,5 @@
 // apiService.ts
-import { API_ENDPOINTS , API_URL} from "./apiConfig"; // Định nghĩa các endpoint ở đây
+import { API_ENDPOINTS , API_URL} from "./apiConfig"; 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 
@@ -28,6 +28,40 @@ const fetchAPI = async (endpoint: string, method = "GET", body?: any, isFormData
     return data;
   } catch (error) {
     console.error("Error fetching API:", error);
+    throw error;
+  }
+};
+
+export const uploadAvatar = async (formData: FormData): Promise<{ avatar: string }> => {
+  try {
+    const token = await AsyncStorage.getItem("token");
+    console.log("Token:", token);
+
+    // Debug: Log FormData entries
+    for (const [key, value] of formData.entries()) {
+      console.log(`FormData entry: ${key}=${value}`);
+    }
+
+    const response = await fetch(API_ENDPOINTS.UPLOAD_AVATAR, {
+      method: "POST",
+      headers: {
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+      body: formData,
+    });
+
+    const data = await response.json();
+    console.log("API response data:", data);
+
+    if (!response.ok) {
+      console.error("Lỗi upload avatar:", data);
+      throw new Error(data.error || "Lỗi khi upload ảnh");
+    }
+
+    const avatarUrl = `${API_URL}/avatars/${data.avatar}`;
+    return { avatar: avatarUrl };
+  } catch (error) {
+    console.error("Lỗi khi gọi API upload avatar:", error);
     throw error;
   }
 };
@@ -140,34 +174,7 @@ export const fetchLatestRelease = async (): Promise<GitHubRelease | null> => {
   }
 };
 
-export const uploadAvatar = async (formData: FormData): Promise<{ avatar: string }> => {
-  try {
-    const token = await AsyncStorage.getItem("token");
-    console.log("Token:", token);
-
-    const response = await fetch(API_ENDPOINTS.UPLOAD_AVATAR, {
-      method: "POST",
-      headers: {
-        Authorization: token ? `Bearer ${token}` : "",
-      },
-      body: formData,
-    });
-
-    const data = await response.json();
-    console.log("API response data:", data);
-
-    if (!response.ok) {
-      console.error("Lỗi upload avatar:", data);
-      throw new Error(data.error || "Lỗi khi upload ảnh");
-    }
-
-    const avatarUrl = `${API_URL}/avatars/${data.avatar}`;
-    return { avatar: avatarUrl };
-  } catch (error) {
-    console.error("Lỗi khi gọi API upload avatar:", error);
-    throw error;
-  }
-};
+// Lấy danh sách sân theo loại thể thao
 
 export const getFields = async (sportType: string) => {
   const url = `${API_ENDPOINTS.GET_FIELDS}?sport_type=${encodeURIComponent(sportType)}`;

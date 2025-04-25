@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
+import * as FileSystem from "expo-file-system"; 
+import { Platform } from "react-native";
 import {
   View,
   Text,
@@ -10,12 +12,13 @@ import {
   Alert,
   ScrollView,
   TextInput,
+  Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { AntDesign, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
-import { getUserInfo, uploadAvatar, fetchLatestRelease, fetchOwnerRoutes, updateProfile } from "@/constants/apiService";
+import { getUserInfo, uploadAvatar, fetchLatestRelease } from "@/constants/apiService";
 
 type User = {
   user_id: number;
@@ -35,11 +38,10 @@ interface GitHubRelease {
   body?: string;
 }
 
-export default function OwnerProfileScreen() {
+export default function ProfileScreen() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -47,62 +49,22 @@ export default function OwnerProfileScreen() {
   const [release, setRelease] = useState<GitHubRelease | null>(null);
   const [releaseLoading, setReleaseLoading] = useState(true);
   const [tempAvatar, setTempAvatar] = useState<string | null>(null);
-  const [validRoutes, setValidRoutes] = useState<string[]>([]);
 
   useEffect(() => {
-    const fetchRoutes = async () => {
-      try {
-        const routes = await fetchOwnerRoutes();
-        setValidRoutes(routes);
-      } catch (error) {
-        console.error("Failed to fetch routes:", error);
-        setValidRoutes([
-          "/owner",
-          "/owner/confirmdelete",
-          "/owner/schedule",
-          "/owner/field-info",
-          "/owner/notifications",
-          "/owner/profile",
-        ]);
-      }
-    };
-
     const checkAuth = async () => {
       try {
         const token = await AsyncStorage.getItem("token");
-        const role = await AsyncStorage.getItem("role");
-
-        console.log("Checking auth in profile...");
-        console.log("Token:", token);
-        console.log("Role:", role);
-
         if (!token) {
-          console.log("No token found, redirecting to login...");
-          setError("Không tìm thấy token. Vui lòng đăng nhập lại.");
+          router.replace("/customer");
           return;
         }
-
-        if (role !== "owner") {
-          console.log("User is not an owner, redirecting to login...");
-          setError("Bạn không có quyền truy cập. Vui lòng đăng nhập lại.");
-          return;
-        }
-
         const data = await getUserInfo();
-        console.log("User data from API:", data);
-
-        if (!data || !data.user_id) {
-          console.log("Invalid user data, redirecting to login...");
-          setError("Dữ liệu người dùng không hợp lệ. Vui lòng đăng nhập lại.");
-          return;
-        }
-
-        const ownerData = { ...data, role: "Owner" };
-        setUser(ownerData);
-        setEditedUser(ownerData);
+        setUser(data);
+        setEditedUser(data);
       } catch (error) {
         console.error("Error fetching user info:", error);
-        setError("Không thể tải thông tin người dùng. Vui lòng thử lại.");
+        await AsyncStorage.removeItem("token");
+        router.replace("/customer");
       } finally {
         setLoading(false);
       }
@@ -110,39 +72,14 @@ export default function OwnerProfileScreen() {
 
     const getRelease = async () => {
       setReleaseLoading(true);
-      try {
-        const latestRelease = await fetchLatestRelease();
-        setRelease(latestRelease);
-      } catch (error) {
-        console.error("Error fetching latest release:", error);
-        setRelease(null);
-      } finally {
-        setReleaseLoading(false);
-      }
+      const latestRelease = await fetchLatestRelease();
+      setRelease(latestRelease);
+      setReleaseLoading(false);
     };
 
-    fetchRoutes();
     checkAuth();
     getRelease();
   }, []);
-
-  const handleRetry = async () => {
-    setError(null);
-    setLoading(true);
-    await checkAuth();
-  };
-
-  const handleLogout = async () => {
-    try {
-      await AsyncStorage.removeItem("token");
-      await AsyncStorage.removeItem("role");
-      router.replace("/" as const);
-      Alert.alert("Thành công", "Bạn đã đăng xuất thành công!");
-    } catch (error) {
-      console.error("Lỗi khi đăng xuất:", error);
-      Alert.alert("Lỗi", "Không thể đăng xuất. Vui lòng thử lại.");
-    }
-  };
 
   const uploadAvatarToServer = useCallback(async (imageUri: string) => {
     console.log("Bắt đầu uploadAvatarToServer, imageUri:", imageUri);
@@ -152,21 +89,36 @@ export default function OwnerProfileScreen() {
       Alert.alert("Lỗi", "Không thể upload ảnh vì thông tin user không hợp lệ.");
       return;
     }
-
+  
     setUploading(true);
     setTempAvatar(imageUri);
     console.log("Đã set tempAvatar:", imageUri);
-
-    const formData = new FormData();
-    formData.append("avatar", {
-      uri: imageUri,
-      name: `${user.user_id}_avatar.jpg`,
-      type: "image/jpeg",
-    } as any);
-    formData.append("user_id", user.user_id.toString());
-    console.log("FormData đã tạo:", formData);
-
+  
     try {
+      let blob;
+      let extension = "jpg"; // Default extension
+  
+      if (Platform.OS === "web") {
+        // On web, imageUri is a data URL (e.g., data:image/png;base64,...)
+        const mimeType = imageUri.split(";")[0].split(":")[1]; // e.g., image/png
+        extension = mimeType.split("/")[1]; // e.g., png
+        const response = await fetch(imageUri);
+        blob = await response.blob();
+      } else {
+        // On mobile, use expo-file-system to read the image as base64
+        const fileInfo = await FileSystem.readAsStringAsync(imageUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        // Assume JPEG by default; you can enhance this by checking the file type
+        blob = await (await fetch(`data:image/jpeg;base64,${fileInfo}`)).blob();
+      }
+  
+      // Create FormData and append the Blob
+      const formData = new FormData();
+      formData.append("avatar", blob, `${user.user_id}_avatar.${extension}`);
+      formData.append("user_id", user.user_id.toString());
+      console.log("FormData đã tạo:", formData);
+  
       const response = await uploadAvatar(formData);
       console.log("API response:", response);
       if (response.avatar) {
@@ -187,95 +139,77 @@ export default function OwnerProfileScreen() {
   }, [user]);
 
   const pickImage = useCallback(async (useCamera: boolean) => {
-    setModalVisible(false);
     console.log("Bắt đầu pickImage, useCamera:", useCamera);
-
-    const permission = useCamera
-      ? await ImagePicker.requestCameraPermissionsAsync()
-      : await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      console.log("Không có quyền truy cập camera/thư viện");
-      Alert.alert("Lỗi", "Bạn cần cấp quyền để sử dụng tính năng này!");
-      return;
-    }
-
-    let result;
-    if (useCamera) {
-      result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 1,
-      });
-    } else {
-      result = await ImagePicker.launchImageLibraryAsync({
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 1,
-      });
-    }
-
-    console.log("ImagePicker result:", result);
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const imageUri = result.assets[0].uri;
-      console.log("Selected image URI:", imageUri);
-      console.log("User trước khi upload:", user);
-      await uploadAvatarToServer(imageUri);
-    } else {
-      console.log("Image selection canceled or no assets found");
-    }
-  }, [uploadAvatarToServer]);
-
-  const handleEditUser = async () => {
-    if (!editedUser) return;
-
     try {
-      await updateProfile(editedUser.full_name, editedUser.email, editedUser.phone);
-      setUser(editedUser);
-      setEditModalVisible(false);
-      Alert.alert("Thành công", "Thông tin cá nhân đã được cập nhật!");
+      const permissionResult = useCamera
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+  
+      if (!permissionResult.granted) {
+        Alert.alert("Lỗi", "Ứng dụng cần quyền truy cập để tiếp tục!");
+        return;
+      }
+  
+      const result = useCamera
+        ? await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 1,
+          })
+        : await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 1,
+          });
+  
+      console.log("ImagePicker result:", result);
+  
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const imageUri = result.assets[0].uri;
+        console.log("Selected image URI:", imageUri);
+        console.log("User trước khi upload:", user);
+        await uploadAvatarToServer(imageUri);
+      }
     } catch (error) {
-      console.error("Error updating profile:", error);
-      Alert.alert("Lỗi", "Không thể cập nhật thông tin. Vui lòng thử lại.");
+      console.error("Error picking image:", error);
+      Alert.alert("Lỗi", "Không thể chọn ảnh. Vui lòng thử lại.");
     }
+  }, [user, uploadAvatarToServer]);
+
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem("token");
+      router.replace("/customer");
+      Alert.alert("Thành công", "Bạn đã đăng xuất thành công!");
+    } catch (error) {
+      console.error("Lỗi khi đăng xuất:", error);
+      Alert.alert("Lỗi", "Không thể đăng xuất. Vui lòng thử lại.");
+    }
+  };
+
+  const handleEditUser = () => {
+    setUser(editedUser);
+    setEditModalVisible(false);
+    Alert.alert("Thành công", "Thông tin cá nhân đã được cập nhật!");
   };
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles.container}>
         <ActivityIndicator size="large" color="#42ba96" />
       </View>
     );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-          <Text style={styles.retryButtonText}>Thử lại</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Đăng Xuất</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  if (!user) {
-    return null; // Tránh render giao diện nếu user không hợp lệ
   }
 
   return (
     <ScrollView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <AntDesign
-          name="arrowleft"
-          size={24}
-          color="white"
-          onPress={() => router.back()}
-        />
+        <TouchableOpacity onPress={() => router.back()}>
+          <AntDesign name="arrowleft" size={24} color="white" />
+        </TouchableOpacity>
         <Text style={styles.title}>Hồ Sơ</Text>
       </View>
 
@@ -337,7 +271,7 @@ export default function OwnerProfileScreen() {
         <View style={styles.infoRow}>
           <AntDesign name="idcard" size={20} color="#333" />
           <Text style={styles.label}>Vai trò:</Text>
-          <Text style={styles.value}>{user?.role || "Owner"}</Text>
+          <Text style={styles.value}>{user?.role || "N/A"}</Text>
         </View>
         <View style={styles.infoRow}>
           <AntDesign name="calendar" size={20} color="#333" />
@@ -386,7 +320,7 @@ export default function OwnerProfileScreen() {
       {/* Nút Xóa tài khoản */}
       <TouchableOpacity
         style={styles.deleteButton}
-        onPress={() => router.push("/owner/confirmdelete" as const)}
+        onPress={() => router.push("/customer/confirmdelete")}
         activeOpacity={0.7}
       >
         <Text style={styles.deleteButtonText}>Xóa tài khoản</Text>
@@ -492,47 +426,38 @@ export default function OwnerProfileScreen() {
   );
 }
 
+const { width } = Dimensions.get("window");
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f4f4f4", paddingHorizontal: 20 },
-  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  errorContainer: {
+  container: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  errorText: {
-    fontSize: 16,
-    color: "#ff4d4d",
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  retryButton: {
-    backgroundColor: "#42ba96",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 5,
-    marginBottom: 10,
-  },
-  retryButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
+    backgroundColor: "#f4f4f4",
   },
   header: {
     backgroundColor: "#42ba96",
     paddingVertical: 15,
+    paddingHorizontal: 15,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 15,
+    justifyContent: "space-between", // Căn chỉnh nút quay lại và tiêu đề
+    width: "100%", // Đảm bảo header chiếm toàn màn hình
     elevation: 5,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
   },
-  title: { fontSize: 20, color: "white", fontWeight: "bold", marginLeft: 10 },
-  avatarSection: { alignItems: "center", marginVertical: 20 },
+  title: {
+    fontSize: 20,
+    color: "white",
+    fontWeight: "bold",
+    flex: 1, // Cho phép tiêu đề chiếm không gian còn lại
+    textAlign: "center", // Căn giữa tiêu đề
+  },
+  avatarSection: {
+    alignItems: "center",
+    marginVertical: 20,
+  },
   avatarContainer: {
     position: "relative",
     padding: 10,
@@ -570,6 +495,7 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     marginBottom: 20,
+    marginHorizontal: 20, // Đảm bảo căn đều với container
     elevation: 3,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -581,17 +507,39 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  infoTitle: { fontSize: 16, fontWeight: "bold", color: "#333" },
-  divider: { height: 1, backgroundColor: "#ddd", marginVertical: 10 },
-  infoRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
-  label: { marginLeft: 8, fontSize: 14, color: "#555" },
-  value: { marginLeft: "auto", fontSize: 14, fontWeight: "bold", color: "#333" },
+  infoTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#ddd",
+    marginVertical: 10,
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  label: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: "#555",
+  },
+  value: {
+    marginLeft: "auto",
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#333",
+  },
   logoutButton: {
     backgroundColor: "#ff4d4d",
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: "center",
     marginBottom: 20,
+    marginHorizontal: 20, // Đảm bảo căn đều với container
     elevation: 3,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -606,13 +554,18 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     marginBottom: 10,
+    marginHorizontal: 20, // Đảm bảo căn đều với container
   },
   deleteButtonText: {
     color: "#cb0909",
     fontSize: 16,
     fontWeight: "bold",
   },
-  logoutText: { fontSize: 16, color: "#fff", fontWeight: "bold" },
+  logoutText: {
+    fontSize: 16,
+    color: "#fff",
+    fontWeight: "bold",
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -636,7 +589,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 3,
   },
-  modalTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 15, color: "#333" },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 15,
+    color: "#333",
+  },
   modalButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -646,9 +604,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#ddd",
   },
-  modalButtonText: { marginLeft: 10, fontSize: 16, color: "#42ba96" },
-  modalClose: { marginTop: 10 },
-  modalCloseText: { fontSize: 16, color: "#ff4d4d", fontWeight: "bold" },
+  modalButtonText: {
+    marginLeft: 10,
+    fontSize: 16,
+    color: "#42ba96",
+  },
+  modalClose: {
+    marginTop: 10,
+  },
+  modalCloseText: {
+    fontSize: 16,
+    color: "#ff4d4d",
+    fontWeight: "bold",
+  },
   input: {
     width: "100%",
     borderWidth: 1,
@@ -667,9 +635,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
   },
-  saveButtonText: { fontSize: 16, color: "#fff", fontWeight: "bold" },
+  saveButtonText: {
+    fontSize: 16,
+    color: "#fff",
+    fontWeight: "bold",
+  },
 });
-
-function checkAuth() {
-    throw new Error("Function not implemented.");
-}
