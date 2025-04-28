@@ -3,6 +3,8 @@ export const API_URL = "http://192.168.1.113:5000";
 
 export const GITHUB_REPO = "https://api.github.com/repos/Jaye29dphy/Fibo";
 export const FIELD_IMAGE_BASE_URL = `${API_URL}/fields`;
+// Đảm bảo đường dẫn khớp với cấu hình express.static trong backend
+export const AVATAR_BASE_URL = `${API_URL}/avatars`;
 
 export const API_ENDPOINTS = {
   LOGIN: `${API_URL}/api/auth/login`,

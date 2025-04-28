@@ -1,5 +1,5 @@
 // apiService.ts
-import { API_ENDPOINTS , API_URL} from "./apiConfig"; 
+import { API_ENDPOINTS, API_URL, AVATAR_BASE_URL } from "./apiConfig"; 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 
@@ -58,7 +58,8 @@ export const uploadAvatar = async (formData: FormData): Promise<{ avatar: string
       throw new Error(data.error || "Lỗi khi upload ảnh");
     }
 
-    const avatarUrl = `${API_URL}/avatars/${data.avatar}`;
+    const avatarUrl = `${AVATAR_BASE_URL}/${data.avatar}?t=${Date.now()}`;
+    console.log("Constructed avatar URL:", avatarUrl);
     return { avatar: avatarUrl };
   } catch (error) {
     console.error("Lỗi khi gọi API upload avatar:", error);

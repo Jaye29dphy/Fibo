@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import pool from "../config/database";
+import fs from "fs";
+import path from "path";
 
 export const uploadAvatar = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -19,6 +21,23 @@ export const uploadAvatar = async (req: Request, res: Response): Promise<void> =
     const mimeType = req.file.mimetype; // e.g., "image/png"
     const extension = mimeType.split("/")[1]; // e.g., "png"
     const avatarPath = `${userId}_avatar.${extension}`;
+    
+    // Đường dẫn tới file tạm và file đích
+    const tempFilePath = path.join("D:\\img\\ava", req.file.filename);
+    const targetFilePath = path.join("D:\\img\\ava", avatarPath);
+    
+    // Đổi tên file từ tên tạm thời sang tên chính thức
+    try {
+      // Nếu file đích đã tồn tại, xóa nó trước
+      if (fs.existsSync(targetFilePath)) {
+        fs.unlinkSync(targetFilePath);
+      }
+      fs.renameSync(tempFilePath, targetFilePath);
+    } catch (error) {
+      console.error("Error renaming file:", error);
+      res.status(500).json({ error: "Error processing uploaded file" });
+      return;
+    }
 
     // Update the user's avatar URL in the database using the pool
     const [result] = await pool.execute(

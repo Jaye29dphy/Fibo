@@ -19,6 +19,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { AntDesign, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
 import { getUserInfo, uploadAvatar, fetchLatestRelease } from "@/constants/apiService";
+import { AVATAR_BASE_URL } from "@/constants/apiConfig";
 
 type User = {
   user_id: number;
@@ -95,32 +96,30 @@ export default function ProfileScreen() {
     console.log("Đã set tempAvatar:", imageUri);
   
     try {
-      let blob;
-      let extension = "jpg"; // Default extension
-  
-      if (Platform.OS === "web") {
-        // On web, imageUri is a data URL (e.g., data:image/png;base64,...)
-        const mimeType = imageUri.split(";")[0].split(":")[1]; // e.g., image/png
-        extension = mimeType.split("/")[1]; // e.g., png
-        const response = await fetch(imageUri);
-        blob = await response.blob();
-      } else {
-        // On mobile, use expo-file-system to read the image as base64
-        const fileInfo = await FileSystem.readAsStringAsync(imageUri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        // Assume JPEG by default; you can enhance this by checking the file type
-        blob = await (await fetch(`data:image/jpeg;base64,${fileInfo}`)).blob();
-      }
-  
-      // Create FormData and append the Blob
+      // Create the FormData object
       const formData = new FormData();
-      formData.append("avatar", blob, `${user.user_id}_avatar.${extension}`);
+      
+      // Add the image to FormData with appropriate metadata
+      const filename = imageUri.split('/').pop() || `avatar_${Date.now()}.jpg`;
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      
+      // Prepare the file object in a format Expo & React Native can handle
+      // @ts-ignore - Type definition mismatch with React Native's FormData
+      formData.append('avatar', {
+        uri: imageUri,
+        name: filename,
+        type
+      });
+      
+      // Add user_id as a separate field
       formData.append("user_id", user.user_id.toString());
-      console.log("FormData đã tạo:", formData);
+      
+      console.log("FormData đã tạo với các trường:", Object.fromEntries(formData));
   
       const response = await uploadAvatar(formData);
       console.log("API response:", response);
+      
       if (response.avatar) {
         setUser((prevUser) =>
           prevUser ? { ...prevUser, avatar: response.avatar } : null
@@ -224,10 +223,11 @@ export default function ProfileScreen() {
             source={{
               uri:
                 tempAvatar ||
-                user?.avatar ||
+                (user?.avatar && (user.avatar.startsWith('http') ? user.avatar : `${AVATAR_BASE_URL}/${user.avatar}?t=${Date.now()}`)) ||
                 "https://via.placeholder.com/100.png?text=User",
             }}
             style={styles.avatar}
+            onError={() => console.log("Error loading avatar image")}
           />
           {uploading ? (
             <ActivityIndicator

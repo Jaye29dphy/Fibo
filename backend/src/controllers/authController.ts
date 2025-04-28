@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { sendEmail } from "../utils/sendEmail";
+import fs from "fs";
 
 
 // export const sendOtp = async (req: Request, res: Response): Promise<void> => {
@@ -256,9 +257,44 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
     const user = users[0];
 
     // 🔹 Tạo đường dẫn ảnh đầy đủ
-    user.avatar = user.avatar
-      ? `http://localhost:5000${user.avatar}` // Nếu có ảnh, trả về URL đầy đủ
-      : "D://img//ava//default.png"; // Ảnh mặc định nếu user chưa upload avatar
+    const networkInterfaces = require('os').networkInterfaces();
+    
+    interface NetworkInterface {
+      address: string;
+      netmask: string;
+      family: string;
+      mac: string;
+      internal: boolean;
+      cidr: string;
+    }
+    
+    const localIP = Object.values(networkInterfaces)
+      .flat()
+      .find((iface): iface is NetworkInterface => {
+        if (!iface) return false;
+        const netIface = iface as NetworkInterface;
+        return netIface.family === "IPv4" && 
+               !netIface.internal && 
+               netIface.address.startsWith("192.168.");
+      })?.address || 'localhost';
+    
+    if (user.avatar) {
+      // Thay đổi đường dẫn kiểm tra từ ./public/avatars/ sang D:\img\ava
+      const avatarPath = `D:\\img\\ava\\${user.avatar}`;
+      try {
+        if (fs.existsSync(avatarPath)) {
+          user.avatar = `http://${localIP}:5000/avatars/${user.avatar}`;
+        } else {
+          console.log(`Avatar file not found: ${avatarPath}`);
+          user.avatar = `http://${localIP}:5000/avatars/default-avatar.jpg`;
+        }
+      } catch (error) {
+        console.error(`Error checking avatar file: ${error}`);
+        user.avatar = `http://${localIP}:5000/avatars/default-avatar.jpg`;
+      }
+    } else {
+      user.avatar = `http://${localIP}:5000/avatars/default-avatar.jpg`;
+    }
 
     res.json(user);
   } catch (error) {

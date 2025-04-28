@@ -8,13 +8,15 @@ const storage = multer.diskStorage({
     cb(null, "D:\\img\\ava");
   },
   filename: (req, file, cb) => {
-    const userId = req.body.user_id;
-    const timestamp = Date.now(); // Add timestamp for uniqueness
-    const ext = path.extname(file.originalname);
-    cb(null, `${userId}_avatar_${timestamp}${ext}`); 
+    // Lấy phần mở rộng từ mimetype
+    const mimeType = file.mimetype;
+    const extension = mimeType.split("/")[1]; // e.g., "png", "jpeg"
+    
+    // Tạo tên file tạm thời, sẽ được đổi tên sau khi xử lý xong
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, `temp_${uniqueSuffix}.${extension}`);
   },
 });
-
 
 // File filter to accept only images
 const fileFilter = (req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {

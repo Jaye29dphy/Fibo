@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
+import { AVATAR_BASE_URL } from "@/constants/apiConfig";
 
 interface UserInfo {
   name: string;
@@ -18,12 +19,13 @@ export default function Taskbar({ userInfo, onAvatarPress }: TaskbarProps) {
   const getAvatarUri = () => {
     if (!userInfo?.avatar) return defaultAvatar;
 
-    // Nếu đường dẫn có localhost thì thay bằng IP hoặc trả về ảnh mặc định
-    if (userInfo.avatar.includes("localhost")) {
-      return defaultAvatar;
+    // If avatar is already a full URL
+    if (userInfo.avatar.startsWith("http")) {
+      return userInfo.avatar;
     }
-
-    return userInfo.avatar;
+    
+    // If it's just a filename, prepend the avatar base URL
+    return `${AVATAR_BASE_URL}/${userInfo.avatar}?t=${Date.now()}`;
   };
 
   return (
