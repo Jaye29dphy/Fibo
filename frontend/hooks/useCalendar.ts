@@ -2,13 +2,17 @@
 import { API_ENDPOINTS } from "../constants/apiConfig";
 import { useState, useEffect } from "react";
 
-// Định nghĩa kiểu Booking (đồng bộ với các file khác)
+// Định nghĩa kiểu Booking
 export interface Booking {
-  id: string; // Thay đổi từ number thành string
+  fieldName: any;
+  customerName: any;
+  booking_code: string;
   start_time: string;
   end_time: string;
   status: "confirmed" | "pending" | "cancelled" | "completed";
-  field_id: string; // Thay đổi từ number thành string
+  field_id: string;
+  total_cost?: number; // Thêm optional để tránh lỗi nếu không có
+  payment_method?: string; // Thêm optional để tránh lỗi nếu không có
 }
 
 // Định nghĩa kiểu trả về của hook
@@ -19,13 +23,15 @@ export interface UseCalendarReturn {
   refreshBookings: () => void;
 }
 
-// Định nghĩa kiểu dữ liệu thô từ API (nếu API trả về number)
+// Định nghĩa kiểu dữ liệu thô từ API
 export interface RawBooking {
-  id: number;
+  booking_code: string;
   start_time: string;
   end_time: string;
   status: "confirmed" | "pending" | "cancelled" | "completed";
   field_id: number;
+  total_cost?: number; // Thêm optional
+  payment_method?: string; // Thêm optional
 }
 
 export const useCalendar = (): UseCalendarReturn => {
@@ -44,15 +50,20 @@ export const useCalendar = (): UseCalendarReturn => {
         throw new Error(`Lỗi khi lấy dữ liệu lịch hẹn: ${response.status} - ${errorText}`);
       }
       const rawData: RawBooking[] = await response.json();
+      console.log("Raw API response:", rawData); // Thêm log để kiểm tra dữ liệu thô
       
       // Chuyển đổi dữ liệu thô thành kiểu Booking
       const data: Booking[] = rawData.map((item) => ({
         ...item,
-        id: String(item.id), // Chuyển number thành string
-        field_id: String(item.field_id), // Chuyển number thành string
+        booking_code: String(item.booking_code),
+        field_id: String(item.field_id),
+        total_cost: item.total_cost ?? undefined,
+        payment_method: item.payment_method ?? undefined,
+        fieldName: item.field_id,
+        customerName: item.booking_code,
       }));
 
-      console.log("Fetched bookings:", data);
+      console.log("Transformed bookings:", data); // Thêm log để kiểm tra dữ liệu sau khi chuyển đổi
       setBookings(data);
     } catch (err) {
       console.error("Fetch error:", err);

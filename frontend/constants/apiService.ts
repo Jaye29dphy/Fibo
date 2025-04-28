@@ -234,3 +234,12 @@ export const deactivateAccountWithPassword = async (password: string) => {
   return fetchAPI(API_ENDPOINTS.DEACTIVATE_WITH_PASSWORD, "POST", { password });
 };
 
+
+export const getNotifications = async () => {
+  return fetchAPI(API_ENDPOINTS.GET_NOTIFICATIONS, "GET");
+};
+
+
+export const getNotification = async () => {
+  return fetchAPI(API_ENDPOINTS.GET_NOTIFICATION, "GET");
+}

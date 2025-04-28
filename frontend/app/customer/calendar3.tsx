@@ -16,6 +16,7 @@ export default function Calendar3() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const booking: Booking | null = params.booking ? JSON.parse(params.booking as string) : null;
+    console.log("Parsed booking in Calendar3:", booking); // Thêm log để kiểm tra
 
     if (!booking) {
         return (
@@ -69,7 +70,7 @@ export default function Calendar3() {
                     </View>
                     <View style={styles.detailRow}>
                         <Text style={styles.label}>Mã đặt sân:</Text>
-                        <Text style={styles.value}>{booking.id}</Text>
+                        <Text style={styles.value}>{booking.booking_code}</Text>
                     </View>
                 </View>
 

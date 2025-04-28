@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   TextInput,
   Image,
-  Dimensions,
 } from "react-native";
 import { getFields, formatCurrency } from "@/constants/apiService";
 import { FIELD_IMAGE_BASE_URL } from "@/constants/apiConfig";
@@ -21,7 +20,8 @@ interface SportsField {
   price_per_hour: number;
   status: "available" | "unavailable";
   created_at: string;
-  image_name?: string; // Tên ảnh chính từ Field_Images
+  image_name?: string;
+  description: string;
 }
 
 const ManageSportsFields = () => {
@@ -38,10 +38,12 @@ const ManageSportsFields = () => {
     try {
       const sportType = selectedSportType === "all" ? "" : selectedSportType;
       const data = await getFields(sportType);
+      console.log("Fetched fields:", data); // Debug log
       setFields(data);
       filterFields(data, selectedStatus, searchKeyword);
     } catch (err: any) {
       setError(err.message || "Đã xảy ra lỗi khi lấy danh sách sân thể thao.");
+      console.error("Fetch error:", err);
     } finally {
       setLoading(false);
     }
@@ -59,11 +61,13 @@ const ManageSportsFields = () => {
       filtered = filtered.filter(
         (field) =>
           field.name.toLowerCase().includes(lowerKeyword) ||
-          field.location.toLowerCase().includes(lowerKeyword)
+          field.location.toLowerCase().includes(lowerKeyword) ||
+          field.description.toLowerCase().includes(lowerKeyword)
       );
     }
 
     setFilteredFields(filtered);
+    console.log("Filtered fields:", filtered); // Debug log
   };
 
   useEffect(() => {
@@ -88,23 +92,19 @@ const ManageSportsFields = () => {
             resizeMode="cover"
             onError={(error) => {
               console.log(`Image load error for field ${item.field_id}:`, error.nativeEvent);
-              console.log(`Failed URL:`, imageUrl);
             }}
-            onLoad={() => console.log(`Image loaded for field ${item.field_id}:`, imageUrl)}
-            onLoadEnd={() => console.log(`Image load ended for field ${item.field_id}`)}
           />
         </View>
-        <Text style={styles.name} numberOfLines={1} ellipsizeMode="tail">
-          {item.name}
-        </Text>
-        <Text style={styles.info} numberOfLines={1} ellipsizeMode="tail">
-          {item.location}
-        </Text>
-        <Text style={styles.info}>Loại: {item.sport_type}</Text>
-        <Text style={styles.info}>
-          {item.status === "available" ? "Có sẵn" : "Không có sẵn"}
-        </Text>
-        <Text style={styles.info}>{formatCurrency(item.price_per_hour)}</Text>
+        <View style={styles.infoContainer}>
+          <Text style={styles.name}>{item.name}</Text>
+          <Text style={styles.info}>Địa điểm: {item.location}</Text>
+          <Text style={styles.info}>Loại sân: {item.sport_type}</Text>
+          <Text style={styles.info}>
+            Trạng thái: {item.status === "available" ? "Có sẵn" : "Không có sẵn"}
+          </Text>
+          <Text style={styles.info}>Giá: {formatCurrency(item.price_per_hour)}</Text>
+          <Text style={styles.info}>Mô tả: {item.description || "Không có mô tả"}</Text>
+        </View>
       </View>
     );
   };
@@ -142,7 +142,7 @@ const ManageSportsFields = () => {
 
       {/* Thanh tìm kiếm */}
       <TextInput
-        placeholder="Tìm theo tên hoặc địa điểm..."
+        placeholder="Tìm theo tên, địa điểm hoặc mô tả..."
         style={styles.searchInput}
         value={searchKeyword}
         onChangeText={setSearchKeyword}
@@ -150,62 +150,55 @@ const ManageSportsFields = () => {
 
       {/* Bộ lọc trạng thái */}
       <View style={styles.filterContainer}>
-        <Text style={styles.filterLabel}>Trạng thái:</Text>
-        <View style={styles.statusFilterContainer}>
-          {statuses.map((status) => (
-            <TouchableOpacity
-              key={status.value}
+        {statuses.map((status) => (
+          <TouchableOpacity
+            key={status.value}
+            style={[
+              styles.filterButton,
+              selectedStatus === status.value && styles.filterButtonSelected,
+            ]}
+            onPress={() => setSelectedStatus(status.value)}
+          >
+            <Text
               style={[
-                styles.filterButton,
-                selectedStatus === status.value && styles.filterButtonSelected,
+                styles.filterButtonText,
+                selectedStatus === status.value && styles.filterButtonTextSelected,
               ]}
-              onPress={() => setSelectedStatus(status.value)}
             >
-              <Text
-                style={[
-                  styles.filterButtonText,
-                  selectedStatus === status.value && styles.filterButtonTextSelected,
-                ]}
-              >
-                {status.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+              {status.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {/* Bộ lọc loại sân */}
       <View style={styles.filterContainer}>
-        <Text style={styles.filterLabel}>Loại sân:</Text>
-        <View style={styles.sportTypeFilterContainer}>
-          {sportTypes.map((sport) => (
-            <TouchableOpacity
-              key={sport.value}
+        {sportTypes.map((sport) => (
+          <TouchableOpacity
+            key={sport.value}
+            style={[
+              styles.filterButton,
+              selectedSportType === sport.value && styles.filterButtonSelected,
+            ]}
+            onPress={() => setSelectedSportType(sport.value)}
+          >
+            <Text
               style={[
-                styles.filterButton,
-                selectedSportType === sport.value && styles.filterButtonSelected,
+                styles.filterButtonText,
+                selectedSportType === sport.value && styles.filterButtonTextSelected,
               ]}
-              onPress={() => setSelectedSportType(sport.value)}
             >
-              <Text
-                style={[
-                  styles.filterButtonText,
-                  selectedSportType === sport.value && styles.filterButtonTextSelected,
-                ]}
-              >
-                {sport.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+              {sport.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
-      {/* Danh sách sân thể thao dạng lưới */}
+      {/* Danh sách sân thể thao */}
       <FlatList
         data={filteredFields}
         keyExtractor={(item) => item.field_id.toString()}
         renderItem={renderFieldItem}
-        numColumns={2}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <Text style={styles.emptyText}>Không tìm thấy sân thể thao nào.</Text>
@@ -216,9 +209,6 @@ const ManageSportsFields = () => {
 };
 
 export default ManageSportsFields;
-
-const { width } = Dimensions.get("window");
-const itemWidth = (width - 48) / 3; // 48 = padding trái/phải (16 * 2) + khoảng cách giữa các item (8 * 2)
 
 const styles = StyleSheet.create({
   container: {
@@ -241,29 +231,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   filterContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-around",
     marginBottom: 16,
-  },
-  filterLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
-  statusFilterContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "flex-start",
-  },
-  sportTypeFilterContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "flex-start",
   },
   filterButton: {
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 20,
     backgroundColor: "#E0E0E0",
-    marginRight: 8,
     marginBottom: 8,
   },
   filterButtonSelected: {
@@ -278,33 +255,36 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   fieldItem: {
-    width: itemWidth,
-    margin: 45, // Khoảng cách giữa các item
+    flexDirection: "row",
+    padding: 12,
+    marginBottom: 10,
+    borderRadius: 10,
     backgroundColor: "#F1F1F1",
-    borderRadius: 8,
-    padding: 8,
   },
   imageContainer: {
-    width: "100%",
-    height: itemWidth * 0.75, // Tỷ lệ ảnh 4:3
+    width: 140,
+    height: 140,
     borderRadius: 8,
     backgroundColor: "#E5E7EB",
-    marginBottom: 4,
+    marginRight: 12,
   },
   fieldImage: {
     width: "100%",
     height: "100%",
     borderRadius: 8,
   },
+  infoContainer: {
+    flex: 1,
+  },
   name: {
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: "600",
-    marginBottom: 2,
+    marginBottom: 4,
   },
   info: {
-    fontSize: 12,
-    color: "#555",
-    marginBottom: 2,
+    fontSize: 14,
+    color: "#888",
+    marginBottom: 4,
   },
   loading: {
     flex: 1,

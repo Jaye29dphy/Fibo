@@ -7,20 +7,18 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  Dimensions,
 } from "react-native";
-import { getCalendarData, formatCurrency } from "@/constants/apiService";
+import { API_ENDPOINTS } from "@/constants/apiConfig";
 
 interface Booking {
-  id: number; // booking_id
-  customerId: number; // customer_id
-  fieldId: number; // field_id
-  fieldName: string; // Từ Fields.name
-  customerName: string; // Từ Users.full_name
-  startTime: string; // start_time
-  endTime: string; // end_time
-  status: "confirmed" | "cancelled" | "pending";
-  totalCost: number; // total_cost
+  id: number;
+  booking_code: string | null;
+  start_time: string;
+  end_time: string;
+  status: "pending" | "confirmed" | "cancelled" | "completed";
+  total_cost: number;
+  field_name: string;
+  customer_name: string;
 }
 
 const ManageBookings = () => {
@@ -34,11 +32,17 @@ const ManageBookings = () => {
   const fetchBookings = async () => {
     setLoading(true);
     try {
-      const data = await getCalendarData();
+      const response = await fetch(`${API_ENDPOINTS.GET_CALENDAR}/bookings`);
+      if (!response.ok) {
+        throw new Error("Lỗi khi lấy danh sách đặt sân.");
+      }
+      const data: Booking[] = await response.json();
+      console.log("Fetched bookings:", data); // Debug log
       setBookings(data);
       filterBookings(data, selectedStatus, searchKeyword);
     } catch (err: any) {
-      setError(err.message || "Đã xảy ra lỗi khi lấy danh sách đơn đặt sân.");
+      setError(err.message || "Đã xảy ra lỗi khi lấy danh sách đặt sân.");
+      console.error("Fetch error:", err);
     } finally {
       setLoading(false);
     }
@@ -55,12 +59,14 @@ const ManageBookings = () => {
       const lowerKeyword = keyword.toLowerCase();
       filtered = filtered.filter(
         (booking) =>
-          booking.fieldName.toLowerCase().includes(lowerKeyword) ||
-          booking.customerName.toLowerCase().includes(lowerKeyword)
+          booking.booking_code?.toLowerCase().includes(lowerKeyword) ||
+          booking.customer_name.toLowerCase().includes(lowerKeyword) ||
+          booking.field_name.toLowerCase().includes(lowerKeyword)
       );
     }
 
     setFilteredBookings(filtered);
+    console.log("Filtered bookings:", filtered); // Debug log
   };
 
   useEffect(() => {
@@ -69,37 +75,31 @@ const ManageBookings = () => {
 
   useEffect(() => {
     filterBookings(bookings, selectedStatus, searchKeyword);
-  }, [selectedStatus, searchKeyword, bookings]);
+  }, [selectedStatus, searchKeyword]);
 
   const renderBookingItem = ({ item }: { item: Booking }) => (
     <View style={styles.bookingItem}>
-      <Text style={styles.id} numberOfLines={1} ellipsizeMode="tail">
-        Đơn #{item.id}
+      <Text style={styles.code}>
+        Mã đặt sân: {item.booking_code || "Không có mã"}
       </Text>
-      <Text style={styles.info} numberOfLines={1} ellipsizeMode="tail">
-        Sân: {item.fieldName}
-      </Text>
-      <Text style={styles.info} numberOfLines={1} ellipsizeMode="tail">
-        Khách: {item.customerName}
-      </Text>
+      <Text style={styles.info}>ID: {item.id}</Text>
+      <Text style={styles.info}>Sân: {item.field_name}</Text>
+      <Text style={styles.info}>Khách hàng: {item.customer_name}</Text>
       <Text style={styles.info}>
-        Bắt đầu: {new Date(item.startTime).toLocaleString()}
+        Thời gian: {new Date(item.start_time).toLocaleString()} -{" "}
+        {new Date(item.end_time).toLocaleString()}
       </Text>
-      <Text style={styles.info}>
-        Kết thúc: {new Date(item.endTime).toLocaleString()}
-      </Text>
-      <Text style={styles.info}>
-        Trạng thái: {item.status === "confirmed" ? "Đã xác nhận" : item.status === "cancelled" ? "Đã hủy" : "Đang chờ"}
-      </Text>
-      <Text style={styles.info}>Tổng: {formatCurrency(item.totalCost)}</Text>
+      <Text style={styles.info}>Trạng thái: {item.status}</Text>
+      <Text style={styles.info}>Tổng chi phí: {item.total_cost.toLocaleString()} VND</Text>
     </View>
   );
 
   const statuses = [
     { label: "Tất cả", value: "all" },
+    { label: "Đang chờ", value: "pending" },
     { label: "Đã xác nhận", value: "confirmed" },
     { label: "Đã hủy", value: "cancelled" },
-    { label: "Đang chờ", value: "pending" },
+    { label: "Hoàn thành", value: "completed" },
   ];
 
   if (loading) {
@@ -116,51 +116,47 @@ const ManageBookings = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Quản lý đơn đặt sân</Text>
+      <Text style={styles.title}>Danh sách đặt sân</Text>
 
       {/* Thanh tìm kiếm */}
       <TextInput
-        placeholder="Tìm theo tên sân hoặc khách hàng..."
+        placeholder="Tìm theo mã đặt sân, tên khách hàng, hoặc tên sân..."
         style={styles.searchInput}
         value={searchKeyword}
         onChangeText={setSearchKeyword}
       />
 
       {/* Bộ lọc trạng thái */}
-      <View style={styles.filterContainer}>
-        <Text style={styles.filterLabel}>Trạng thái:</Text>
-        <View style={styles.statusFilterContainer}>
-          {statuses.map((status) => (
-            <TouchableOpacity
-              key={status.value}
+      <View style={styles.statusFilterContainer}>
+        {statuses.map((status) => (
+          <TouchableOpacity
+            key={status.value}
+            style={[
+              styles.statusButton,
+              selectedStatus === status.value && styles.statusButtonSelected,
+            ]}
+            onPress={() => setSelectedStatus(status.value)}
+          >
+            <Text
               style={[
-                styles.filterButton,
-                selectedStatus === status.value && styles.filterButtonSelected,
+                styles.statusButtonText,
+                selectedStatus === status.value && styles.statusButtonTextSelected,
               ]}
-              onPress={() => setSelectedStatus(status.value)}
             >
-              <Text
-                style={[
-                  styles.filterButtonText,
-                  selectedStatus === status.value && styles.filterButtonTextSelected,
-                ]}
-              >
-                {status.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+              {status.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
-      {/* Danh sách đơn đặt sân dạng lưới */}
+      {/* Danh sách đặt sân */}
       <FlatList
         data={filteredBookings}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderBookingItem}
-        numColumns={2}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>Không tìm thấy đơn đặt sân nào.</Text>
+          <Text style={styles.emptyText}>Không tìm thấy đặt sân nào.</Text>
         }
       />
     </View>
@@ -168,9 +164,6 @@ const ManageBookings = () => {
 };
 
 export default ManageBookings;
-
-const { width } = Dimensions.get("window");
-const itemWidth = (width - 48) / 3;
 
 const styles = StyleSheet.create({
   container: {
@@ -192,54 +185,43 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginBottom: 12,
   },
-  filterContainer: {
-    marginBottom: 16,
-  },
-  filterLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
   statusFilterContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "flex-start",
+    justifyContent: "space-around",
+    marginBottom: 16,
   },
-  filterButton: {
+  statusButton: {
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 20,
     backgroundColor: "#E0E0E0",
-    marginRight: 8,
     marginBottom: 8,
   },
-  filterButtonSelected: {
+  statusButtonSelected: {
     backgroundColor: "#4CAF50",
   },
-  filterButtonText: {
+  statusButtonText: {
     color: "#000",
     fontWeight: "500",
   },
-  filterButtonTextSelected: {
+  statusButtonTextSelected: {
     color: "#fff",
     fontWeight: "700",
   },
   bookingItem: {
-    width: itemWidth,
-    margin: 45, // Khoảng cách giữa các item
+    padding: 12,
+    marginBottom: 10,
+    borderRadius: 10,
     backgroundColor: "#F1F1F1",
-    borderRadius: 8,
-    padding: 8,
   },
-  id: {
-    fontSize: 14,
+  code: {
+    fontSize: 18,
     fontWeight: "600",
-    marginBottom: 2,
   },
   info: {
-    fontSize: 12,
-    color: "#555",
-    marginBottom: 2,
+    fontSize: 14,
+    color: "#888",
   },
   loading: {
     flex: 1,

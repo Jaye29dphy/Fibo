@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { AntDesign } from "@expo/vector-icons";
 import BottomTabs from "./BottomTabs";
-import { useCalendar, Booking } from "@/hooks/useCalendar"; // Import Booking từ useCalendar
+import { useCalendar, Booking } from "@/hooks/useCalendar";
 
 const statusColors: Record<string, string> = {
   confirmed: "#4CAF50",
@@ -85,13 +85,14 @@ export default function CusCalendar() {
               <Text style={styles.timeHeader}>{timeSlot}</Text>
               {items.map((booking: Booking) => (
                 <TouchableOpacity
-                  key={booking.id}
-                  onPress={() =>
+                  key={booking.booking_code}
+                  onPress={() => {
+                    console.log("Booking being passed to Calendar3:", booking); // Thêm log để kiểm tra
                     router.push({
                       pathname: "/customer/calendar3",
                       params: { booking: JSON.stringify(booking) },
-                    })
-                  }
+                    });
+                  }}
                   style={[styles.card, { backgroundColor: statusColors[booking.status] || "#FFFFFF" }]}
                 >
                   <View style={styles.info}>

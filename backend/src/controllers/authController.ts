@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { sendEmail } from "../utils/sendEmail";
 import fs from "fs";
+import { AuthRequest } from "../middleware/authMiddleware";
 
 
 // export const sendOtp = async (req: Request, res: Response): Promise<void> => {
@@ -300,5 +301,29 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
   } catch (error) {
     console.error("JWT Error:", error); // In lỗi chi tiết
     res.status(500).json({ error: "Invalid token" });
+  }
+};
+
+
+// authController.ts
+export const getNotifications = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id; // Lấy user_id từ middleware authenticate
+
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized: User not authenticated" });
+      return;
+    }
+
+    // Truy vấn danh sách thông báo từ bảng notifications
+    const [notifications]: [any[], any] = await pool.execute(
+      "SELECT notification_id, message, is_read, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC",
+      [userId]
+    );
+
+    res.status(200).json(notifications);
+  } catch (error) {
+    console.error("Lỗi khi lấy thông báo:", error);
+    res.status(500).json({ error: "Lỗi máy chủ!" });
   }
 };
