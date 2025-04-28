@@ -1,17 +1,31 @@
 import React from "react";
-import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import OwnerBottomTabs from "./BottomTabs"; 
+import OwnerBottomTabs from "./BottomTabs";
+import useOwnerFields from "../../hooks/useOwnerFields";
 
 export default function ManageSchedule() {
   const router = useRouter();
+  const { fields, loading, error, refreshFields } = useOwnerFields();
 
-  const fields = [
-    { id: 1, name: "Sân bóng đá Hà Đông 1", type: "Đấu 6 độ Hà Đông", rating: 4.5, price: "400.000VNĐ/h", image: "https://via.placeholder.com/150" },
-    { id: 2, name: "Sân bóng đá Hà Đông 2", type: "Đấu 6 độ Hà Đông", rating: 4.0, price: "400.000VNĐ/h", image: "https://via.placeholder.com/150" },
-    { id: 3, name: "Sân bóng rổ Văn Quán", type: "Đấu 6 độ Hà Đông", rating: 5.0, price: "400.000VNĐ/h", image: "https://via.placeholder.com/150" },
-  ];
+  // Format giá tiền
+  const formatPrice = (price: number): string => {
+    return `${price.toLocaleString('vi-VN')}đ/h`;
+  };
+
+  // Chuyển đổi loại sân sang tiếng Việt
+  const getFieldTypeText = (sportType: string): string => {
+    const typeMapping: Record<string, string> = {
+      'football': 'Sân bóng đá',
+      'basketball': 'Sân bóng rổ',
+      'badminton': 'Sân cầu lông',
+      'tennis': 'Sân tennis',
+      'pickleball': 'Sân pickleball'
+    };
+
+    return typeMapping[sportType] || sportType;
+  };
 
   return (
     <View style={styles.container}>
@@ -28,26 +42,68 @@ export default function ManageSchedule() {
       <Text style={styles.subtitle}>Chọn sân bạn muốn quản lý lịch đặt</Text>
 
       {/* Field List */}
-      <ScrollView style={styles.scrollView}>
-        {fields.map((field) => (
-          <TouchableOpacity
-            key={field.id}
-            style={styles.fieldCard}
-            onPress={() => router.push("/owner/schedule-details")}
-          >
-            <Image source={{ uri: field.image }} style={styles.fieldImage} />
-            <View style={styles.fieldInfo}>
-              <Text style={styles.fieldName}>{field.name}</Text>
-              <Text style={styles.fieldType}>{field.type}</Text>
-              <View style={styles.ratingContainer}>
-                <Ionicons name="star" size={16} color="#FFD700" />
-                <Text style={styles.ratingText}>{field.rating}</Text>
-              </View>
-              <Text style={styles.price}>{field.price}</Text>
-            </View>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#3F51B5" />
+          <Text style={styles.loadingText}>Đang tải danh sách sân...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={50} color="#ff6b6b" />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={refreshFields}>
+            <Text style={styles.retryButtonText}>Thử lại</Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
+        </View>
+      ) : fields.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="information-circle-outline" size={50} color="#3F51B5" />
+          <Text style={styles.emptyText}>Bạn chưa có sân nào.</Text>
+          <TouchableOpacity
+            style={styles.registerButton}
+            onPress={() => router.push("/owner/register-field")}
+          >
+            <Text style={styles.registerButtonText}>Đăng ký sân mới</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          refreshControl={
+            <RefreshControl refreshing={loading} onRefresh={refreshFields} />
+          }
+        >
+          {fields.map((field) => (
+            <TouchableOpacity
+              key={field.field_id}
+              style={styles.fieldCard}
+              onPress={() => router.push({
+                pathname: "/owner/schedule-details",
+                params: { fieldId: field.field_id }
+              })}
+            >
+              <Image source={{ uri: field.image_url }} style={styles.fieldImage} />
+              <View style={styles.fieldInfo}>
+                <Text style={styles.fieldName}>{field.name}</Text>
+                <Text style={styles.fieldType}>{getFieldTypeText(field.sport_type)}</Text>
+                <View style={styles.ratingContainer}>
+                  <Ionicons name="star" size={16} color="#FFD700" />
+                  <Text style={styles.ratingText}>{field.rating}</Text>
+                  <View style={styles.statusBadge}>
+                    <Text style={[
+                      styles.statusText,
+                      field.status === 'available' ? styles.availableStatus : styles.unavailableStatus
+                    ]}>
+                      {field.status === 'available' ? 'Trống' : 'Đã đặt'}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.price}>{formatPrice(field.price_per_hour)}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
       {/* Bottom Tabs */}
       <OwnerBottomTabs />
@@ -82,6 +138,62 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: '#3F51B5',
+    borderRadius: 5,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
+  registerButton: {
+    marginTop: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: '#3F51B5',
+    borderRadius: 5,
+  },
+  registerButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   fieldCard: {
     flexDirection: "row",
@@ -124,11 +236,27 @@ const styles = StyleSheet.create({
     marginLeft: 5,
     fontSize: 14,
     color: "#000",
+    marginRight: 10,
   },
   price: {
     fontSize: 14,
     fontWeight: "bold",
     color: "#3F51B5",
     marginTop: 5,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  availableStatus: {
+    color: "#4CAF50",
+  },
+  unavailableStatus: {
+    color: "#F44336",
   },
 });

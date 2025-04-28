@@ -1,9 +1,8 @@
-export const API_URL = "http://192.168.1.113:5000";
+export const API_URL = "http://192.168.100.248:5000";
 
 
 export const GITHUB_REPO = "https://api.github.com/repos/Jaye29dphy/Fibo";
 export const FIELD_IMAGE_BASE_URL = `${API_URL}/fields`;
-// Đảm bảo đường dẫn khớp với cấu hình express.static trong backend
 export const AVATAR_BASE_URL = `${API_URL}/avatars`;
 
 export const API_ENDPOINTS = {
@@ -19,6 +18,7 @@ export const API_ENDPOINTS = {
   UPLOAD_AVATAR: `${API_URL}/upload-avatar`,
   GET_ALL_USERS: `${API_URL}/api/users`,
   DEACTIVATE_WITH_PASSWORD: `${API_URL}/api/users/deactivate`,
-  REGISTER_FIELD: `${API_URL}/api/fields/register`, 
-  GET_ORDER: `${API_URL}/courts/bookings`, 
+  REGISTER_FIELD: `${API_URL}/api/fields/register`,
+  GET_ORDER: `${API_URL}/courts/bookings`,
+  GET_OWNER_FIELDS: `${API_URL}/api/fields/owner`,
 };

@@ -15,10 +15,25 @@ import imageMiddleware from "./middleware/imageMiddleware";
 dotenv.config();
 const app = express();
 
-app.use(cors({ origin: "*" }));
+// Cấu hình CORS nâng cao để cho phép các thiết bị mobile truy cập API
+app.use(cors({
+  origin: "*",
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+}));
+
 app.use(helmet());
 app.use(morgan("dev"));
 app.use(express.json());
+
+// Thêm endpoint kiểm tra sức khỏe
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    message: 'API server is running properly'
+  });
+});
 
 // Sử dụng middleware để xử lý route /fields
 app.use("/fields", imageMiddleware, express.static("D:\\img\\field"));

@@ -3,6 +3,7 @@ import pool from '../config/database';
 import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
+import jwt from 'jsonwebtoken';
 
 // Promisify fs.writeFile để sử dụng async/await
 const writeFileAsync = promisify(fs.writeFile);
@@ -20,10 +21,39 @@ if (!fs.existsSync(UPLOAD_DIR)) {
   }
 }
 
+// Hàm trích xuất user_id từ token
+const getUserIdFromToken = (req: Request): number | null => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('No Bearer token found');
+      return null;
+    }
+
+    const token = authHeader.split(' ')[1];
+    console.log('Found token:', token.substring(0, 15) + '...');
+
+    const decoded: any = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+    console.log('Token decoded successfully:', decoded);
+
+    return decoded.id;
+  } catch (error) {
+    console.error('Error extracting user ID from token:', error);
+    return null;
+  }
+};
+
 export const registerField = async (req: Request, res: Response): Promise<void> => {
   try {
+    console.log('=== REGISTER FIELD API CALLED ===');
     console.log('Received request body:', req.body);
     console.log('Received files:', req.files);
+
+    // Log headers để debug
+    console.log('Request headers:', {
+      contentType: req.headers['content-type'],
+      authorization: req.headers.authorization ? 'Present (masked)' : 'Missing'
+    });
 
     const { name, location, type, description, price } = req.body;
     const images = req.files as Express.Multer.File[] | undefined;
@@ -51,16 +81,29 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // Giả định owner_id (có thể lấy từ session hoặc token của chủ sân)
-    const ownerId = 1; // Thay bằng logic xác thực thực tế
-    console.log('Using owner_id:', ownerId);
-
-    // Kiểm tra owner_id có tồn tại trong bảng owners không
-    const [ownerCheck] = await pool.execute('SELECT owner_id FROM fibo.owners WHERE owner_id = ?', [ownerId]);
-    if (!Array.isArray(ownerCheck) || ownerCheck.length === 0) {
-      console.log('Owner ID does not exist:', ownerId);
-      res.status(400).json({ message: 'Owner ID does not exist' });
+    // Lấy owner_id từ token JWT
+    const userId = getUserIdFromToken(req);
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized or invalid token' });
       return;
+    }
+    console.log('Authenticated user ID:', userId);
+
+    // Kiểm tra xem user có phải owner không
+    const [ownerCheck] = await pool.execute('SELECT owner_id FROM fibo.owners WHERE user_id = ?', [userId]);
+    let ownerId: number;
+
+    if (!Array.isArray(ownerCheck) || ownerCheck.length === 0) {
+      console.log('User is not an owner, creating owner record');
+
+      // Thêm mới vào bảng owners nếu chưa tồn tại
+      const [insertResult]: any = await pool.execute('INSERT INTO fibo.owners (user_id) VALUES (?)', [userId]);
+      ownerId = insertResult.insertId;
+      console.log('Created new owner with ID:', ownerId);
+    } else {
+      // Cast the result to access owner_id property
+      ownerId = (ownerCheck[0] as any).owner_id;
+      console.log('Found existing owner with ID:', ownerId);
     }
 
     // Lưu dữ liệu sân vào bảng fields
@@ -89,48 +132,131 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
     } else {
       console.log('Processing images:', images.length);
       for (const [index, image] of images.entries()) {
+        console.log(`Processing image ${index}:`, {
+          fieldname: image.fieldname,
+          originalname: image.originalname,
+          mimetype: image.mimetype,
+          size: image.size,
+          bufferExists: !!image.buffer
+        });
+
         if (!image.buffer) {
           console.log('Image buffer is missing for image:', index);
-          throw new Error('Image buffer is missing');
+          continue; // Skip this image instead of failing the whole request
         }
 
-        const fileExtension = path.extname(image.originalname || '.jpg');
+        // Lấy extension từ tên file gốc hoặc từ mimetype
+        let fileExtension = path.extname(image.originalname || '');
+        if (!fileExtension && image.mimetype) {
+          const mimeExt = image.mimetype.split('/')[1];
+          fileExtension = mimeExt ? `.${mimeExt}` : '.jpg';
+        }
+        if (!fileExtension) fileExtension = '.jpg';
+
         const imageName = `${fieldId}_${index}${fileExtension}`;
         const imagePath = path.join(UPLOAD_DIR, imageName);
 
-        console.log('Saving image:', imageName, 'to:', imagePath);
-        // Lưu file ảnh vào thư mục
-        await writeFileAsync(imagePath, image.buffer);
+        try {
+          console.log('Saving image:', imageName, 'to:', imagePath);
+          // Lưu file ảnh vào thư mục
+          await writeFileAsync(imagePath, image.buffer);
 
-        // Kiểm tra xem file đã được lưu thành công chưa
-        if (!fs.existsSync(imagePath)) {
-          console.log('Failed to save image:', imagePath);
-          throw new Error('Failed to save image to disk');
+          // Kiểm tra xem file đã được lưu thành công chưa
+          if (!fs.existsSync(imagePath)) {
+            console.log('Failed to save image:', imagePath);
+            continue; // Skip to next image
+          }
+          console.log('Image saved successfully:', imagePath);
+
+          // Xác định image_type (main cho ảnh đầu tiên, sub cho các ảnh còn lại)
+          const imageType = index === 0 ? 'main' : 'sub';
+
+          // Lưu thông tin ảnh vào bảng field_images
+          const insertImageQuery = `
+            INSERT INTO fibo.field_images (field_id, image_name, image_type, upload_date)
+            VALUES (?, ?, ?, ?)
+          `;
+          const imageValues = [
+            fieldId,
+            imageName,
+            imageType,
+            new Date().toISOString().slice(0, 19).replace('T', ' '),
+          ];
+          console.log('Inserting image with values:', imageValues);
+          await pool.execute(insertImageQuery, imageValues);
+        } catch (imgError) {
+          console.error(`Error processing image ${index}:`, imgError);
+          // Continue with next image
         }
-        console.log('Image saved successfully:', imagePath);
-
-        // Xác định image_type (main cho ảnh đầu tiên, sub cho các ảnh còn lại)
-        const imageType = index === 0 ? 'main' : 'sub';
-
-        // Lưu thông tin ảnh vào bảng field_images
-        const insertImageQuery = `
-          INSERT INTO fibo.field_images (field_id, image_name, image_type, upload_date)
-          VALUES (?, ?, ?, ?)
-        `;
-        const imageValues = [
-          fieldId,
-          imageName,
-          imageType,
-          new Date().toISOString().slice(0, 19).replace('T', ' '),
-        ];
-        console.log('Inserting image with values:', imageValues);
-        await pool.execute(insertImageQuery, imageValues);
       }
     }
 
-    res.status(200).json({ message: 'Đăng ký sân thành công!' });
+    res.status(200).json({ message: 'Đăng ký sân thành công!', fieldId });
   } catch (error: any) {
     console.error('Error in registerField:', error.message, error.stack);
+    res.status(500).json({ message: 'Đã có lỗi xảy ra.', error: error.message });
+  }
+};
+
+export const getOwnerFields = async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log('=== GET OWNER FIELDS API CALLED ===');
+
+    // Lấy user_id từ token JWT
+    const userId = getUserIdFromToken(req);
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized or invalid token' });
+      return;
+    }
+    console.log('Authenticated user ID:', userId);
+
+    // Lấy owner_id từ user_id
+    const [ownerResults] = await pool.execute('SELECT owner_id FROM fibo.owners WHERE user_id = ?', [userId]);
+
+    if (!Array.isArray(ownerResults) || ownerResults.length === 0) {
+      console.log('User is not an owner');
+      res.status(404).json({ message: 'User is not an owner' });
+      return;
+    }
+
+    const ownerId = (ownerResults[0] as any).owner_id;
+    console.log('Found owner with ID:', ownerId);
+
+    // Truy vấn lấy danh sách sân của chủ sân
+    const query = `
+      SELECT 
+        f.field_id,
+        f.name,
+        f.location,
+        f.sport_type,
+        f.price_per_hour,
+        f.status,
+        f.description,
+        CONCAT(fi.image_name) AS image_name
+      FROM 
+        fibo.fields f
+      LEFT JOIN 
+        (SELECT field_id, image_name FROM fibo.field_images WHERE image_type = 'main') fi 
+        ON f.field_id = fi.field_id
+      WHERE 
+        f.owner_id = ?
+      ORDER BY 
+        f.name ASC
+    `;
+
+    const [fields] = await pool.execute(query, [ownerId]);
+
+    if (!Array.isArray(fields) || fields.length === 0) {
+      console.log('No fields found for owner:', ownerId);
+      res.status(200).json({ fields: [] });
+      return;
+    }
+
+    console.log(`Found ${fields.length} fields for owner:`, ownerId);
+    res.status(200).json({ fields });
+
+  } catch (error: any) {
+    console.error('Error in getOwnerFields:', error.message, error.stack);
     res.status(500).json({ message: 'Đã có lỗi xảy ra.', error: error.message });
   }
 };

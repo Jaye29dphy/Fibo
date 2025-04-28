@@ -2,6 +2,8 @@ import { useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
 import { API_ENDPOINTS } from '../constants/apiConfig';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system';
 
 interface FieldData {
   name: string;
@@ -65,6 +67,21 @@ const useRegister = () => {
 
   const submitField = async (onSuccess: () => void): Promise<RegisterResponse> => {
     setIsSubmitting(true);
+    console.log('Starting field submission process...');
+
+    // Kiểm tra kết nối mạng cơ bản
+    try {
+      console.log('Checking basic network connectivity...');
+      await fetch('https://www.google.com', { method: 'HEAD', mode: 'no-cors' });
+      console.log('Basic connectivity test passed');
+    } catch (error) {
+      console.error('Basic connectivity test failed:', error);
+      setModalMessage('Không thể kết nối mạng. Vui lòng kiểm tra kết nối internet.');
+      setModalSuccess(false);
+      setModalVisible(true);
+      setIsSubmitting(false);
+      return { success: false, message: 'Lỗi kết nối mạng.' };
+    }
 
     const formData = new FormData();
     formData.append('name', fieldData.name);
@@ -73,43 +90,52 @@ const useRegister = () => {
     formData.append('description', fieldData.description);
     formData.append('price', fieldData.price);
 
-    // Chuyển đổi URI ảnh thành Blob để gửi dưới dạng file
+    // Cách xử lý hình ảnh tương thích với React Native
     for (const [index, imageUri] of fieldData.images.entries()) {
-      // Nếu URI là base64, chuyển đổi thành Blob
-      if (imageUri.startsWith('data:image')) {
-        const base64Data = imageUri.split(',')[1];
-        const byteString = atob(base64Data);
-        const arrayBuffer = new ArrayBuffer(byteString.length);
-        const uint8Array = new Uint8Array(arrayBuffer);
-        for (let i = 0; i < byteString.length; i++) {
-          uint8Array[i] = byteString.charCodeAt(i);
-        }
-        const blob = new Blob([uint8Array], { type: 'image/jpeg' });
-        formData.append('images', blob, `image_${index}.jpg`);
-      } else {
-        // Nếu URI là file (ví dụ trên thiết bị), chuyển thành Blob
-        const response = await fetch(imageUri);
-        const blob = await response.blob();
-        formData.append('images', blob, `image_${index}.jpg`);
+      try {
+        // Lấy thông tin file để xác định tên và loại
+        const fileInfo = await FileSystem.getInfoAsync(imageUri);
+        console.log(`Processing image ${index}:`, fileInfo);
+
+        // Lấy tên file từ URI
+        const filename = imageUri.split('/').pop() || `image_${index}.jpg`;
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+        console.log(`Adding image to FormData: ${filename}, type: ${type}`);
+
+        // React Native FormData cần format đặc biệt này
+        // @ts-ignore - FormData trong React Native khác với FormData web tiêu chuẩn
+        formData.append('images', {
+          uri: imageUri,
+          name: filename,
+          type
+        });
+      } catch (error) {
+        console.error(`Error processing image ${index}:`, error);
       }
     }
 
-    console.log('Sending formData:', {
-      name: fieldData.name,
-      location: fieldData.location,
-      type: fieldData.type,
-      description: fieldData.description,
-      price: fieldData.price,
-      images: fieldData.images,
-    });
+    // Lấy token xác thực
+    const token = await AsyncStorage.getItem('token');
+    console.log('Token available:', !!token);
+
+    console.log('Sending request to:', API_ENDPOINTS.REGISTER_FIELD);
 
     try {
       const response = await fetch(API_ENDPOINTS.REGISTER_FIELD, {
         method: 'POST',
+        headers: {
+          // Không đặt Content-Type khi gửi multipart/form-data
+          // FormData sẽ tự động thiết lập boundary
+          'Accept': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
         body: formData,
       });
 
       console.log('Response status:', response.status);
+
       if (response.ok) {
         setModalMessage('Đăng ký sân thành công!');
         setModalSuccess(true);
@@ -120,19 +146,26 @@ const useRegister = () => {
         }, 2000);
         return { success: true, message: 'Đăng ký sân thành công!' };
       } else {
-        const errorData = await response.json();
-        console.log('Error response:', errorData);
-        setModalMessage(errorData.message || 'Đăng ký sân thất bại. Vui lòng thử lại.');
+        let errorMessage = 'Đăng ký sân thất bại. Vui lòng thử lại.';
+        try {
+          const errorData = await response.json();
+          console.log('Error response:', errorData);
+          errorMessage = errorData.message || errorMessage;
+        } catch (e) {
+          console.error('Error parsing response:', e);
+        }
+
+        setModalMessage(errorMessage);
         setModalSuccess(false);
         setModalVisible(true);
-        return { success: false, message: errorData.message || 'Đăng ký sân thất bại.' };
+        return { success: false, message: errorMessage };
       }
     } catch (error: any) {
-      console.error('Error in submitField:', error.message);
-      setModalMessage('Đã có lỗi xảy ra. Vui lòng thử lại.');
+      console.error('Network error in submitField:', error);
+      setModalMessage('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.');
       setModalSuccess(false);
       setModalVisible(true);
-      return { success: false, message: 'Đã có lỗi xảy ra.' };
+      return { success: false, message: 'Lỗi kết nối.' };
     } finally {
       setIsSubmitting(false);
     }
