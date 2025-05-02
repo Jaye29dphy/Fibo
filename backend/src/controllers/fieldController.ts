@@ -43,6 +43,23 @@ const getUserIdFromToken = (req: Request): number | null => {
   }
 };
 
+// Endpoint để lấy danh sách khung giờ
+export const getTimeSlots = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const query = `SELECT slot_id, start_time, end_time FROM fibo.slots ORDER BY 
+      CASE 
+        WHEN start_time >= '05:00:00' THEN start_time 
+        ELSE CONCAT('24', start_time) 
+      END`;
+    const [slots] = await pool.execute(query);
+
+    res.status(200).json(slots);
+  } catch (error: any) {
+    console.error('Error fetching time slots:', error.message);
+    res.status(500).json({ message: 'Đã có lỗi xảy ra khi lấy danh sách khung giờ.' });
+  }
+};
+
 export const registerField = async (req: Request, res: Response): Promise<void> => {
   try {
     console.log('=== REGISTER FIELD API CALLED ===');
@@ -55,7 +72,7 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
       authorization: req.headers.authorization ? 'Present (masked)' : 'Missing'
     });
 
-    const { name, location, type, description, price } = req.body;
+    const { name, location, type, description, price, subFieldCount, services, timeSlots } = req.body;
     const images = req.files as Express.Multer.File[] | undefined;
 
     // Kiểm tra dữ liệu đầu vào
@@ -71,6 +88,45 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
       console.log('Invalid price format:', price);
       res.status(400).json({ message: 'Invalid price format' });
       return;
+    }
+
+    // Kiểm tra số lượng sân con
+    const parsedSubFieldCount = parseInt(subFieldCount) || 1; // Mặc định là 1 nếu không có giá trị
+    if (isNaN(parsedSubFieldCount) || parsedSubFieldCount < 1 || parsedSubFieldCount > 99) {
+      console.log('Invalid subFieldCount:', subFieldCount);
+      res.status(400).json({ message: 'Invalid sub field count. Must be between 1 and 99.' });
+      return;
+    }
+    console.log('Sub field count:', parsedSubFieldCount);
+
+    // Parse services nếu là chuỗi JSON
+    let serviceArray: Array<{ name: string, price: string, description: string }> = [];
+    if (services) {
+      try {
+        if (typeof services === 'string') {
+          serviceArray = JSON.parse(services);
+        } else {
+          serviceArray = services;
+        }
+        console.log('Parsed services:', serviceArray);
+      } catch (e) {
+        console.error('Error parsing services:', e);
+      }
+    }
+
+    // Parse timeSlots nếu là chuỗi JSON
+    let timeSlotArray: Array<{ slot_id: number, start_time: string, end_time: string, price: string }> = [];
+    if (timeSlots) {
+      try {
+        if (typeof timeSlots === 'string') {
+          timeSlotArray = JSON.parse(timeSlots);
+        } else {
+          timeSlotArray = timeSlots;
+        }
+        console.log('Parsed time slots:', timeSlotArray);
+      } catch (e) {
+        console.error('Error parsing time slots:', e);
+      }
     }
 
     // Kiểm tra sport_type hợp lệ
@@ -125,6 +181,72 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
     const [fieldResult] = await pool.execute(insertFieldQuery, fieldValues);
     const fieldId = (fieldResult as any).insertId; // Lấy field_id vừa tạo
     console.log('Inserted field with field_id:', fieldId);
+
+    // Tạo các sân con trong bảng subfields
+    console.log(`Creating ${parsedSubFieldCount} sub-fields for field ID ${fieldId}`);
+    for (let i = 1; i <= parsedSubFieldCount; i++) {
+      const subFieldName = `Sân ${i}`;
+      const insertSubFieldQuery = `
+        INSERT INTO fibo.subfields (field_id, name)
+        VALUES (?, ?)
+      `;
+      await pool.execute(insertSubFieldQuery, [fieldId, subFieldName]);
+      console.log(`Created sub-field "${subFieldName}" for field ID ${fieldId}`);
+    }
+
+    // Thêm các dịch vụ thêm vào bảng services
+    if (serviceArray && serviceArray.length > 0) {
+      console.log(`Adding ${serviceArray.length} services for field ID ${fieldId}`);
+
+      for (const service of serviceArray) {
+        // Bỏ qua dịch vụ không có tên
+        if (!service.name) continue;
+
+        // Parse giá dịch vụ
+        const servicePrice = parseFloat(service.price) || 0;
+
+        const insertServiceQuery = `
+          INSERT INTO fibo.services (field_id, name, price, description, status)
+          VALUES (?, ?, ?, ?, ?)
+        `;
+
+        await pool.execute(insertServiceQuery, [
+          fieldId,
+          service.name,
+          servicePrice,
+          service.description || '',
+          'available'  // Sửa từ 'active' thành 'available'
+        ]);
+
+        console.log(`Added service "${service.name}" for field ID ${fieldId}`);
+      }
+    }
+
+    // Thêm giá theo khung giờ vào bảng field_prices
+    if (timeSlotArray && timeSlotArray.length > 0) {
+      console.log(`Adding ${timeSlotArray.length} time slot prices for field ID ${fieldId}`);
+
+      for (const slot of timeSlotArray) {
+        // Bỏ qua slot không có giá hoặc không được chọn
+        if (!slot.price) continue;
+
+        // Parse giá slot
+        const slotPrice = parseFloat(slot.price) || parsedPrice; // Mặc định sử dụng giá của sân nếu không có giá riêng
+
+        const insertSlotPriceQuery = `
+          INSERT INTO fibo.field_prices (field_id, slot_id, price)
+          VALUES (?, ?, ?)
+        `;
+
+        await pool.execute(insertSlotPriceQuery, [
+          fieldId,
+          slot.slot_id,
+          slotPrice
+        ]);
+
+        console.log(`Added price ${slotPrice} for slot ID ${slot.slot_id} of field ID ${fieldId}`);
+      }
+    }
 
     // Lưu ảnh vào thư mục và bảng field_images
     if (!images || images.length === 0) {
@@ -191,7 +313,13 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
       }
     }
 
-    res.status(200).json({ message: 'Đăng ký sân thành công!', fieldId });
+    res.status(200).json({
+      message: 'Đăng ký sân thành công!',
+      fieldId,
+      subFields: parsedSubFieldCount,
+      services: serviceArray.length,
+      timeSlotPrices: timeSlotArray.length
+    });
   } catch (error: any) {
     console.error('Error in registerField:', error.message, error.stack);
     res.status(500).json({ message: 'Đã có lỗi xảy ra.', error: error.message });

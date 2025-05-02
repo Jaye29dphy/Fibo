@@ -112,23 +112,23 @@ const BookingScreen = () => {
 
       <Text style={styles.fieldPrice}>Giá sân: {priceString ? formatCurrency(priceString) : "Giá không khả dụng"}</Text>
 
-      <Text style={styles.sectionTitle}>Chọn loại sân</Text>
-      <View style={styles.gridContainer}>
-        {subFields.map((field) => (
-          <TouchableOpacity
-            key={field.sub_field_id}
-            style={[
-              styles.optionItem,
-              selectedFieldType === field.name && styles.selectedOption,
-            ]}
-            onPress={() => setSelectedFieldType(field.name)}
-          >
-            <Text style={styles.optionText}>{field.name}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 120 }}>
+        <Text style={styles.sectionTitle}>Chọn loại sân</Text>
+        <View style={styles.gridContainer}>
+          {subFields.map((field) => (
+            <TouchableOpacity
+              key={field.sub_field_id}
+              style={[
+                styles.optionItem,
+                selectedFieldType === field.name && styles.selectedOption,
+              ]}
+              onPress={() => setSelectedFieldType(field.name)}
+            >
+              <Text style={styles.optionText}>{field.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         <Text style={styles.sectionTitle}>Chọn ngày</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
           {dates.map((item, index) => (

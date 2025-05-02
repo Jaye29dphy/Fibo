@@ -1,4 +1,4 @@
-export const API_URL = "http://192.168.2.4:5000";
+export const API_URL = "http://192.168.1.14:5000";
 
 
 export const GITHUB_REPO = "https://api.github.com/repos/Jaye29dphy/Fibo";
@@ -23,4 +23,5 @@ export const API_ENDPOINTS = {
   GET_OWNER_FIELDS: `${API_URL}/api/fields/owner`,
   GET_NOTIFICATIONS: `${API_URL}/api/auth/notifications`,
   GET_NOTIFICATION: `${API_URL}/api/notifications/notifications`,
+  GET_TIME_SLOTS: `${API_URL}/api/fields/time-slots`, // API để lấy danh sách khung giờ
 };

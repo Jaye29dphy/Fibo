@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -10,19 +10,43 @@ import {
   FlatList,
   Platform,
   ScrollView,
+  Switch,
+  ActivityIndicator,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import useRegister from '../../hooks/useRegister';
 
+// Helper function để format thời gian
+const formatTime = (timeString: string) => {
+  const hour = parseInt(timeString.substring(0, 2));
+  const minute = timeString.substring(3, 5);
+
+  // Chuyển đổi giờ 24:00 thành 00:00
+  if (hour === 24) {
+    return `00:${minute}`;
+  }
+
+  return `${hour.toString().padStart(2, '0')}:${minute}`;
+};
+
 export default function RegisterField() {
   const router = useRouter();
   const {
     fieldData,
+    loading,
+    syncPrices,
     updateFieldData,
+    updateDefaultPrice,
+    updateTimeSlotPrice,
+    toggleTimeSlotSelection,
+    toggleSyncPrices,
     pickImage,
     removeImage,
+    addService,
+    updateService,
+    removeService,
     submitField,
     isSubmitting,
     modalVisible,
@@ -48,98 +72,289 @@ export default function RegisterField() {
         </TouchableOpacity>
 
         {/* Title */}
-        <Text style={styles.title}>Đăng ký sân cho thuê</Text>
+        <Text style={styles.title}>Đăng ký sân tập</Text>
 
         {/* Form Fields */}
         <View style={styles.formContainer}>
           {/* Field Name */}
-          <Text style={styles.label}>Tên sân</Text>
-          <TextInput
-            style={styles.input}
-            value={fieldData.name}
-            onChangeText={(text) => updateFieldData('name', text)}
-            placeholder="Nhập tên sân"
-            placeholderTextColor="#9CA3AF"
-          />
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Tên sân</Text>
+            <View style={styles.sectionContent}>
+              <TextInput
+                style={styles.input}
+                value={fieldData.name}
+                onChangeText={(text) => updateFieldData('name', text)}
+                placeholder="Nhập tên sân"
+                placeholderTextColor="#9CA3AF"
+              />
+            </View>
+          </View>
 
           {/* Location */}
-          <Text style={styles.label}>Vị trí</Text>
-          <TextInput
-            style={styles.input}
-            value={fieldData.location}
-            onChangeText={(text) => updateFieldData('location', text)}
-            placeholder="Nhập vị trí"
-            placeholderTextColor="#9CA3AF"
-          />
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Vị trí</Text>
+            <View style={styles.sectionContent}>
+              <TextInput
+                style={styles.input}
+                value={fieldData.location}
+                onChangeText={(text) => updateFieldData('location', text)}
+                placeholder="Nhập vị trí"
+                placeholderTextColor="#9CA3AF"
+              />
+            </View>
+          </View>
 
           {/* Field Type */}
-          <Text style={styles.label}>Loại sân</Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={fieldData.type}
-              style={styles.picker}
-              onValueChange={(itemValue) => updateFieldData('type', itemValue)}
-              dropdownIconColor="#6B7280"
-            >
-              <Picker.Item label="Bóng đá" value="football" />
-              <Picker.Item label="Bóng rổ" value="basketball" />
-              <Picker.Item label="Cầu lông" value="badminton" />
-              <Picker.Item label="Tennis" value="tennis" />
-            </Picker>
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Loại sân</Text>
+            <View style={styles.sectionContent}>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={fieldData.type}
+                  style={styles.picker}
+                  onValueChange={(itemValue) => updateFieldData('type', itemValue)}
+                  dropdownIconColor="#6B7280"
+                >
+                  <Picker.Item label="Bóng đá" value="football" />
+                  <Picker.Item label="Bóng rổ" value="basketball" />
+                  <Picker.Item label="Cầu lông" value="badminton" />
+                  <Picker.Item label="Tennis" value="tennis" />
+                </Picker>
+              </View>
+            </View>
           </View>
 
           {/* Description */}
-          <Text style={styles.label}>Đặc điểm sân</Text>
-          <TextInput
-            style={[styles.input, styles.multilineInput]}
-            value={fieldData.description}
-            onChangeText={(text) => updateFieldData('description', text)}
-            placeholder="Mô tả đặc điểm sân"
-            placeholderTextColor="#9CA3AF"
-            multiline
-            numberOfLines={4}
-          />
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Đặc điểm sân</Text>
+            <View style={styles.sectionContent}>
+              <TextInput
+                style={[styles.input, styles.multilineInput]}
+                value={fieldData.description}
+                onChangeText={(text) => updateFieldData('description', text)}
+                placeholder="Mô tả đặc điểm sân"
+                placeholderTextColor="#9CA3AF"
+                multiline
+                numberOfLines={4}
+              />
+            </View>
+          </View>
 
-          {/* Price */}
-          <Text style={styles.label}>Giá sân (theo giờ)</Text>
+          {/* Sub Field Count */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Số lượng sân</Text>
+            <View style={styles.sectionContent}>
+              <View style={styles.countContainer}>
+                <TouchableOpacity
+                  style={styles.countButton}
+                  onPress={() => {
+                    const currentCount = parseInt(fieldData.subFieldCount || '1');
+                    if (currentCount > 1) {
+                      updateFieldData('subFieldCount', (currentCount - 1).toString());
+                    }
+                  }}
+                  disabled={fieldData.subFieldCount === '1'}
+                >
+                  <Text style={[styles.countButtonText, fieldData.subFieldCount === '1' && styles.disabledText]}>−</Text>
+                </TouchableOpacity>
+
+                <TextInput
+                  style={styles.countInput}
+                  value={fieldData.subFieldCount}
+                  onChangeText={(text) => {
+                    // Chỉ cho phép nhập số và đảm bảo giá trị tối thiểu là 1
+                    const numericValue = text.replace(/[^0-9]/g, '');
+                    const finalValue = numericValue === '' ? '1' : numericValue;
+                    updateFieldData('subFieldCount', finalValue);
+                  }}
+                  keyboardType="numeric"
+                  maxLength={2}
+                />
+
+                <TouchableOpacity
+                  style={styles.countButton}
+                  onPress={() => {
+                    const currentCount = parseInt(fieldData.subFieldCount || '1');
+                    if (currentCount < 99) {
+                      updateFieldData('subFieldCount', (currentCount + 1).toString());
+                    }
+                  }}
+                  disabled={fieldData.subFieldCount === '99'}
+                >
+                  <Text style={[styles.countButtonText, fieldData.subFieldCount === '99' && styles.disabledText]}>+</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+
+          {/* Additional Services */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Dịch vụ thêm</Text>
+            <View style={styles.sectionContent}>
+              {/* Danh sách dịch vụ */}
+              {fieldData.services.map((service, index) => (
+                <View key={index} style={styles.serviceContainer}>
+                  <TextInput
+                    style={styles.serviceInput}
+                    value={service.name}
+                    onChangeText={(text) => updateService(index, 'name', text)}
+                    placeholder="Tên dịch vụ"
+                    placeholderTextColor="#9CA3AF"
+                  />
+                  <TextInput
+                    style={[styles.serviceInput, styles.descriptionInput]}
+                    value={service.description}
+                    onChangeText={(text) => updateService(index, 'description', text)}
+                    placeholder="Mô tả dịch vụ"
+                    placeholderTextColor="#9CA3AF"
+                    multiline
+                  />
+                  <TextInput
+                    style={styles.serviceInput}
+                    value={service.price}
+                    onChangeText={(text) => updateService(index, 'price', text)}
+                    placeholder="Giá dịch vụ (VNĐ)"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="numeric"
+                  />
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => removeService(index)}
+                  >
+                    <Text style={styles.removeButtonText}>×</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+
+              {/* Button thêm dịch vụ */}
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={() => addService()}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.addButtonText}>Thêm dịch vụ mới</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Time Slots and Prices */}
+          <Text style={styles.label}>Nhập khung giờ & giá sân</Text>
           <TextInput
             style={styles.input}
             value={fieldData.price}
-            onChangeText={(text) => updateFieldData('price', text)}
+            onChangeText={(text) => updateDefaultPrice(text)}
             placeholder="Nhập giá (VD: 250000)"
             placeholderTextColor="#9CA3AF"
             keyboardType="numeric"
           />
 
-          {/* Image Upload */}
-          <Text style={styles.label}>Ảnh sân</Text>
+          {/* Sync Prices Checkbox - Sử dụng TouchableOpacity và custom checkbox thay vì react-native-paper */}
           <TouchableOpacity
-            style={styles.uploadButton}
-            onPress={pickImage}
+            style={styles.checkboxContainer}
+            onPress={() => toggleSyncPrices(!syncPrices)}
             activeOpacity={0.7}
           >
-            <Text style={styles.uploadText}>Tải ảnh lên</Text>
+            <View style={[styles.customCheckbox, syncPrices && styles.customCheckboxChecked]}>
+              {syncPrices && (
+                <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+              )}
+            </View>
+            <Text style={styles.checkboxLabel}>Đồng bộ giá sân giữa các khung giờ</Text>
           </TouchableOpacity>
 
-          {/* Image List */}
-          <FlatList
-            data={fieldData.images}
-            horizontal
-            renderItem={({ item, index }) => (
-              <View style={styles.imageContainer}>
-                <Image source={{ uri: item }} style={styles.image} />
-                <TouchableOpacity
-                  style={styles.removeButton}
-                  onPress={() => removeImage(index)}
-                >
-                  <Text style={styles.removeButtonText}>×</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            keyExtractor={(item, index) => index.toString()}
-            style={styles.imageList}
-            showsHorizontalScrollIndicator={false}
-          />
+          {/* Time Slots List */}
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#3B82F6" />
+              <Text style={styles.loadingText}>Đang tải danh sách khung giờ...</Text>
+            </View>
+          ) : (
+            <View style={styles.timeSlotsContainer}>
+              {fieldData.timeSlots.map((slot) => (
+                <View key={slot.slot_id} style={styles.timeSlotWrapper}>
+                  <View style={styles.timeSlotBox}>
+                    {/* Checkbox và thông tin khung giờ */}
+                    <TouchableOpacity
+                      style={styles.timeSlotCheckbox}
+                      onPress={() => toggleTimeSlotSelection(slot.slot_id)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[
+                        styles.customCheckbox,
+                        slot.selected && styles.customCheckboxChecked
+                      ]}>
+                        {slot.selected && (
+                          <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                        )}
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* Hiển thị khung giờ */}
+                    <View style={[
+                      styles.timeSlotRow,
+                      slot.selected && styles.selectedTimeSlot
+                    ]}>
+                      <View style={styles.timeSlotInfo}>
+                        <Text style={[
+                          styles.timeSlotText,
+                          slot.selected && styles.selectedTimeSlotText
+                        ]}>
+                          {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Phần nhập giá sân theo giờ */}
+                  {slot.selected && (
+                    <TextInput
+                      style={styles.timeSlotPriceInput}
+                      value={slot.price}
+                      onChangeText={(text) => updateTimeSlotPrice(slot.slot_id, text)}
+                      placeholder="Giá sân theo giờ"
+                      placeholderTextColor="#9CA3AF"
+                      keyboardType="numeric"
+                      textAlign="left"
+                    />
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Image Upload */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Ảnh sân</Text>
+            <View style={styles.sectionContent}>
+              <TouchableOpacity
+                style={styles.uploadButton}
+                onPress={pickImage}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.uploadText}>Tải ảnh lên</Text>
+              </TouchableOpacity>
+
+              {/* Image List */}
+              <FlatList
+                data={fieldData.images}
+                horizontal
+                renderItem={({ item, index }) => (
+                  <View style={styles.imageContainer}>
+                    <Image source={{ uri: item }} style={styles.image} />
+                    <TouchableOpacity
+                      style={styles.removeButton}
+                      onPress={() => removeImage(index)}
+                    >
+                      <Text style={styles.removeButtonText}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                keyExtractor={(item, index) => index.toString()}
+                style={styles.imageList}
+                showsHorizontalScrollIndicator={false}
+              />
+            </View>
+          </View>
         </View>
 
         {/* Submit Button */}
@@ -226,6 +441,21 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  sectionContainer: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#3B82F6',
+    marginBottom: 16,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  sectionContent: {
+    paddingHorizontal: 4,
+  },
   label: {
     fontSize: 14,
     fontWeight: '600',
@@ -255,13 +485,139 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     marginBottom: 20,
     overflow: 'hidden',
-    minHeight: 60, // Đảm bảo chiều cao tối thiểu
+    minHeight: 60,
   },
   picker: {
     fontSize: 16,
     color: '#1E293B',
-    height: 60, // Tăng chiều cao để trông cân đối
-    paddingVertical: 10, // Thêm padding để text không bị chèn
+    height: 60,
+    paddingVertical: 10,
+  },
+  countContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  countButton: {
+    backgroundColor: '#3B82F6',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countButtonText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  disabledText: {
+    color: '#9CA3AF',
+  },
+  countInput: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: '#1E293B',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    textAlign: 'center',
+    width: 80,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  customCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  customCheckboxChecked: {
+    backgroundColor: '#3B82F6',
+  },
+  checkboxLabel: {
+    fontSize: 16,
+    color: '#1E293B',
+    marginLeft: 8,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  timeSlotsContainer: {
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  timeSlotWrapper: {
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  timeSlotBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingBottom: 8,
+  },
+  timeSlotCheckbox: {
+    marginRight: 10,
+  },
+  timeSlotRow: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 10,
+    borderRadius: 6,
+  },
+  selectedTimeSlot: {
+    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+  },
+  timeSlotInfo: {
+    flex: 1,
+  },
+  timeSlotText: {
+    fontSize: 16,
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  selectedTimeSlotText: {
+    fontWeight: 'bold',
+    color: '#3B82F6',
+  },
+  timeSlotPriceInput: {
+    marginTop: 4,
+    padding: 12,
+    height: 48,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'left',
   },
   uploadButton: {
     backgroundColor: '#3B82F6',
@@ -368,5 +724,40 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  serviceContainer: {
+    backgroundColor: '#F8FAFC',
+    padding: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    position: 'relative',
+  },
+  serviceInput: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#1E293B',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 12,
+  },
+  descriptionInput: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  addButton: {
+    backgroundColor: '#3B82F6',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  addButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 16,
   },
 });

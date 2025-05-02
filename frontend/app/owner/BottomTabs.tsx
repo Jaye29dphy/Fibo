@@ -1,6 +1,7 @@
 // BottomTabs.tsx
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 export default function BottomTabs() {
@@ -8,24 +9,49 @@ export default function BottomTabs() {
 
   return (
     <View style={styles.container}>
-      <TabButton icon="calendar-outline" label="Quản lý lịch" onPress={() => router.push("/owner/manage-schedule")} />
-      <TabButton icon="information-outline" label="Thông tin sân" onPress={() => router.push("/owner/field-info")} />
-      <TabButton icon="notifications-outline" label="Thông báo" onPress={() => router.push("/owner/notifications")} />
-      <TabButton icon="person-outline" label="Hồ sơ" onPress={() => router.push("/owner/profile")} />
+      <TabButton
+        icon="soccer-field"
+        iconType="MaterialCommunity"
+        label="Quản lý sân"
+        onPress={() => router.push("/owner/dashboard")}
+      />
+      <TabButton
+        icon="information-outline"
+        iconType="Ionicons"
+        label="Thông tin sân"
+        onPress={() => router.push("/owner/field-info")}
+      />
+      <TabButton
+        icon="notifications-outline"
+        iconType="Ionicons"
+        label="Thông báo"
+        onPress={() => router.push("/owner/notifications")}
+      />
+      <TabButton
+        icon="person-outline"
+        iconType="Ionicons"
+        label="Hồ sơ"
+        onPress={() => router.push("/owner/profile")}
+      />
     </View>
   );
 }
 
 type TabButtonProps = {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: string;
+  iconType: "Ionicons" | "MaterialCommunity";
   label: string;
   onPress: () => void;
 };
 
-function TabButton({ icon, label, onPress }: TabButtonProps) {
+function TabButton({ icon, iconType, label, onPress }: TabButtonProps) {
   return (
     <TouchableOpacity style={styles.tabButton} onPress={onPress}>
-      <Ionicons name={icon} size={24} color="#3F51B5" />
+      {iconType === "Ionicons" ? (
+        <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={24} color="#3F51B5" />
+      ) : (
+        <MaterialCommunityIcons name={icon as keyof typeof MaterialCommunityIcons.glyphMap} size={24} color="#3F51B5" />
+      )}
       <Text style={styles.tabLabel}>{label}</Text>
     </TouchableOpacity>
   );

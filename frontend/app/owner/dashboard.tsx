@@ -12,19 +12,12 @@ export default function OwnerDashboard() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>FIBO</Text>
-        <Text style={styles.subtitle}>Chủ nhân muốn làm gì?</Text>
+        <Text style={styles.subtitle}>Bạn muốn làm gì?</Text>
       </View>
 
       {/* Action Buttons */}
       <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => router.push("/owner/update-field-info")}
-        >
-          <Ionicons name="cloud-upload-outline" size={24} color="#000" />
-          <Text style={styles.buttonText}>Cập nhật thông tin sân</Text>
-        </TouchableOpacity>
-        {/* New Register Field Button */}
+        {/* 1. Đăng ký sân */}
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => router.push("/owner/register-field")}
@@ -32,16 +25,33 @@ export default function OwnerDashboard() {
           <Ionicons name="add-circle-outline" size={24} color="#000" />
           <Text style={styles.buttonText}>Đăng ký sân</Text>
         </TouchableOpacity>
+
+        {/* 2. Cập nhật thông tin sân */}
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => router.push("/owner/update-field-info")}
+        >
+          <Ionicons name="cloud-upload-outline" size={24} color="#000" />
+          <Text style={styles.buttonText}>Cập nhật thông tin sân</Text>
+        </TouchableOpacity>
+
+        {/* 3. Quản lý lịch */}
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => router.push("/owner/manage-schedule")}
+        >
+          <Ionicons name="calendar-outline" size={24} color="#000" />
+          <Text style={styles.buttonText}>Quản lý lịch</Text>
+        </TouchableOpacity>
+
+        {/* 4. Xử lý yêu cầu khiếu nại */}
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => router.push("/owner/handle-requests")}
         >
           <Ionicons name="mail-outline" size={24} color="#000" />
-          <Text style={styles.buttonText}>Xử lý yêu cầu nại</Text>
+          <Text style={styles.buttonText}>Xử lý yêu cầu khiếu nại</Text>
         </TouchableOpacity>
-
-
-
       </View>
 
       {/* Bottom Tabs */}

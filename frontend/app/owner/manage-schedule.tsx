@@ -38,8 +38,17 @@ export default function ManageSchedule() {
         <Ionicons name="calendar-outline" size={24} color="#000" />
       </View>
 
-      {/* Subtitle */}
-      <Text style={styles.subtitle}>Chọn sân bạn muốn quản lý lịch đặt</Text>
+      {/* Subtitle and Refresh Button Row */}
+      <View style={styles.subtitleRow}>
+        <Text style={styles.subtitle}>Chọn sân bạn muốn quản lý lịch đặt</Text>
+        <TouchableOpacity
+          style={styles.refreshButton}
+          onPress={refreshFields}
+          disabled={loading}
+        >
+          <Ionicons name="refresh" size={24} color="#3F51B5" />
+        </TouchableOpacity>
+      </View>
 
       {/* Field List */}
       {loading ? (
@@ -58,13 +67,7 @@ export default function ManageSchedule() {
       ) : fields.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="information-circle-outline" size={50} color="#3F51B5" />
-          <Text style={styles.emptyText}>Bạn chưa có sân nào.</Text>
-          <TouchableOpacity
-            style={styles.registerButton}
-            onPress={() => router.push("/owner/register-field")}
-          >
-            <Text style={styles.registerButtonText}>Đăng ký sân mới</Text>
-          </TouchableOpacity>
+          <Text style={styles.emptyText}>Bạn chưa sở hữu sân nào.</Text>
         </View>
       ) : (
         <ScrollView
@@ -129,12 +132,21 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#3F51B5",
   },
+  subtitleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 15,
+    marginBottom: 10,
+  },
   subtitle: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#3F51B5",
-    paddingHorizontal: 15,
-    marginBottom: 10,
+    flex: 1,
+  },
+  refreshButton: {
+    padding: 5,
   },
   scrollView: {
     flex: 1,
@@ -183,17 +195,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
-  },
-  registerButton: {
-    marginTop: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: '#3F51B5',
-    borderRadius: 5,
-  },
-  registerButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
   },
   fieldCard: {
     flexDirection: "row",
