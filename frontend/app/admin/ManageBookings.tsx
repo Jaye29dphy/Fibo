@@ -7,6 +7,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
+  Modal,
 } from "react-native";
 import { API_ENDPOINTS } from "@/constants/apiConfig";
 
@@ -28,6 +29,7 @@ const ManageBookings = () => {
   const [searchKeyword, setSearchKeyword] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [showStats, setShowStats] = useState<boolean>(false); // State để hiển thị thống kê
 
   const fetchBookings = async () => {
     setLoading(true);
@@ -102,6 +104,45 @@ const ManageBookings = () => {
     { label: "Hoàn thành", value: "completed" },
   ];
 
+  // Hàm tính thống kê
+  const getStatistics = () => {
+    const totalBookings = bookings.length;
+    const totalPending = bookings.filter((booking) => booking.status === "pending").length;
+    const totalConfirmed = bookings.filter((booking) => booking.status === "confirmed").length;
+    const totalCancelled = bookings.filter((booking) => booking.status === "cancelled").length;
+    const totalCompleted = bookings.filter((booking) => booking.status === "completed").length;
+
+    // Tính top 3 sân được đặt nhiều nhất
+    const fieldCounts = bookings.reduce((acc, booking) => {
+      acc[booking.field_name] = (acc[booking.field_name] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    const topFields = Object.entries(fieldCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name, count]) => ({ name, count }));
+
+    // Tính top 3 người dùng đặt sân nhiều nhất
+    const customerCounts = bookings.reduce((acc, booking) => {
+      acc[booking.customer_name] = (acc[booking.customer_name] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    const topCustomers = Object.entries(customerCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name, count]) => ({ name, count }));
+
+    return {
+      totalBookings,
+      totalPending,
+      totalConfirmed,
+      totalCancelled,
+      totalCompleted,
+      topFields,
+      topCustomers,
+    };
+  };
+
   if (loading) {
     return <ActivityIndicator size="large" color="#4CAF50" style={styles.loading} />;
   }
@@ -114,9 +155,19 @@ const ManageBookings = () => {
     );
   }
 
+  const stats = getStatistics();
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Danh sách đặt sân</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Danh sách đặt sân</Text>
+        <TouchableOpacity
+          style={styles.statsButton}
+          onPress={() => setShowStats(true)}
+        >
+          <Text style={styles.statsButtonText}>Thống kê</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Thanh tìm kiếm */}
       <TextInput
@@ -159,11 +210,57 @@ const ManageBookings = () => {
           <Text style={styles.emptyText}>Không tìm thấy đặt sân nào.</Text>
         }
       />
+
+      {/* Modal hiển thị thống kê */}
+      <Modal
+        visible={showStats}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowStats(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Thống kê đặt sân</Text>
+            <View style={styles.statsContainer}>
+              <Text style={styles.modalText}>Tổng số đơn đặt sân: {stats.totalBookings}</Text>
+              <Text style={styles.modalText}>Đơn đang chờ: {stats.totalPending}</Text>
+              <Text style={styles.modalText}>Đơn đã xác nhận: {stats.totalConfirmed}</Text>
+              <Text style={styles.modalText}>Đơn đã hủy: {stats.totalCancelled}</Text>
+              <Text style={styles.modalText}>Đơn hoàn thành: {stats.totalCompleted}</Text>
+              <Text style={styles.modalSubTitle}>Top 3 sân được đặt nhiều nhất:</Text>
+              {stats.topFields.length > 0 ? (
+                stats.topFields.map((field, index) => (
+                  <Text key={index} style={styles.modalText}>
+                    {index + 1}. {field.name}: {field.count} lần
+                  </Text>
+                ))
+              ) : (
+                <Text style={styles.modalText}>Chưa có dữ liệu</Text>
+              )}
+              <Text style={styles.modalSubTitle}>Top 3 người dùng đặt sân nhiều nhất:</Text>
+              {stats.topCustomers.length > 0 ? (
+                stats.topCustomers.map((customer, index) => (
+                  <Text key={index} style={styles.modalText}>
+                    {index + 1}. {customer.name}: {customer.count} lần
+                  </Text>
+                ))
+              ) : (
+                <Text style={styles.modalText}>Chưa có dữ liệu</Text>
+              )}
+            </View>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowStats(false)}
+            >
+              <Text style={styles.closeButtonText}>Đóng</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
 
-export default ManageBookings;
 
 const styles = StyleSheet.create({
   container: {
@@ -171,11 +268,27 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: "#fff",
   },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
   title: {
     fontSize: 22,
     fontWeight: "bold",
-    marginBottom: 12,
     textAlign: "center",
+  },
+  statsButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  statsButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 14,
   },
   searchInput: {
     borderWidth: 1,
@@ -245,4 +358,52 @@ const styles = StyleSheet.create({
     color: "#999",
     fontSize: 16,
   },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 12,
+    width: "80%",
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 16,
+  },
+  modalSubTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginTop: 12,
+    marginBottom: 8,
+    color: "#333",
+  },
+  statsContainer: {
+    marginBottom: 20,
+    alignItems: "flex-start",
+    width: "100%",
+  },
+  modalText: {
+    fontSize: 16,
+    marginBottom: 8,
+    color: "#333",
+  },
+  closeButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+  },
+  closeButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 16,
+  },
 });
+
+export default ManageBookings;

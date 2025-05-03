@@ -7,6 +7,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
+  Modal,
 } from "react-native";
 import { getAllUsers } from "@/constants/apiService";
 
@@ -27,6 +28,7 @@ const ManageUsers = () => {
   const [searchKeyword, setSearchKeyword] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [showStats, setShowStats] = useState<boolean>(false); // State để hiển thị thống kê
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -86,6 +88,25 @@ const ManageUsers = () => {
     { label: "Owner", value: "owner" },
   ];
 
+  // Hàm tính thống kê
+  const getStatistics = () => {
+    const totalUsers = users.length;
+    const totalCustomers = users.filter((user) => user.role === "customer").length;
+    const totalOwners = users.filter((user) => user.role === "owner").length;
+    const totalActive = users.filter((user) => user.status === "active").length;
+    const totalInactive = users.filter((user) => user.status === "inactive").length;
+    const totalBanned = users.filter((user) => user.status === "banned").length;
+
+    return {
+      totalUsers,
+      totalCustomers,
+      totalOwners,
+      totalActive,
+      totalInactive,
+      totalBanned,
+    };
+  };
+
   if (loading) {
     return <ActivityIndicator size="large" color="#4CAF50" style={styles.loading} />;
   }
@@ -98,9 +119,19 @@ const ManageUsers = () => {
     );
   }
 
+  const stats = getStatistics();
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Danh sách người dùng</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Danh sách người dùng</Text>
+        <TouchableOpacity
+          style={styles.statsButton}
+          onPress={() => setShowStats(true)}
+        >
+          <Text style={styles.statsButtonText}>Thống kê</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Thanh tìm kiếm */}
       <TextInput
@@ -143,6 +174,34 @@ const ManageUsers = () => {
           <Text style={styles.emptyText}>Không tìm thấy người dùng nào.</Text>
         }
       />
+
+      {/* Modal hiển thị thống kê */}
+      <Modal
+        visible={showStats}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowStats(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Thống kê người dùng</Text>
+            <View style={styles.statsContainer}>
+              <Text style={styles.modalText}>Tổng số người dùng: {stats.totalUsers}</Text>
+              <Text style={styles.modalText}>Tổng số khách hàng: {stats.totalCustomers}</Text>
+              <Text style={styles.modalText}>Tổng số owner: {stats.totalOwners}</Text>
+              <Text style={styles.modalText}>Số người dùng active: {stats.totalActive}</Text>
+              <Text style={styles.modalText}>Số người dùng inactive: {stats.totalInactive}</Text>
+              <Text style={styles.modalText}>Số người dùng banned: {stats.totalBanned}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowStats(false)}
+            >
+              <Text style={styles.closeButtonText}>Đóng</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -155,11 +214,27 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: "#fff",
   },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
   title: {
     fontSize: 22,
     fontWeight: "bold",
-    marginBottom: 12,
     textAlign: "center",
+  },
+  statsButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  statsButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 14,
   },
   searchInput: {
     borderWidth: 1,
@@ -229,6 +304,45 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 20,
     color: "#999",
+    fontSize: 16,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 12,
+    width: "80%",
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 16,
+  },
+  statsContainer: {
+    marginBottom: 20,
+    alignItems: "flex-start",
+    width: "100%",
+  },
+  modalText: {
+    fontSize: 16,
+    marginBottom: 8,
+    color: "#333",
+  },
+  closeButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+  },
+  closeButtonText: {
+    color: "#fff",
+    fontWeight: "600",
     fontSize: 16,
   },
 });

@@ -7,8 +7,10 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
+  Modal,
+  Alert,
 } from "react-native";
-import { getNotification } from "@/constants/apiService"; // Import từ apiService
+import { getNotification, sendNotificationToAllUsers } from "@/constants/apiService"; // Import hàm mới
 
 interface Notification {
   notification_id: number;
@@ -26,11 +28,14 @@ const ManageNotifications = () => {
   const [searchKeyword, setSearchKeyword] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [showStats, setShowStats] = useState<boolean>(false);
+  const [showSendNotification, setShowSendNotification] = useState<boolean>(false); // State cho modal gửi thông báo
+  const [notificationMessage, setNotificationMessage] = useState<string>(""); // State cho nội dung thông báo
 
   const fetchNotifications = async () => {
     setLoading(true);
     try {
-      const data = await getNotification(); // Sử dụng hàm từ apiService
+      const data = await getNotification();
       console.log("Dữ liệu nhận được:", data);
 
       if (!Array.isArray(data)) {
@@ -67,6 +72,27 @@ const ManageNotifications = () => {
     console.log("Dữ liệu sau lọc:", filtered);
   };
 
+  const handleSendNotification = async () => {
+    if (!notificationMessage.trim()) {
+      Alert.alert("Lỗi", "Vui lòng nhập nội dung thông báo.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await sendNotificationToAllUsers(notificationMessage);
+      Alert.alert("Thành công", "Thông báo đã được gửi đến tất cả người dùng.");
+      setNotificationMessage("");
+      setShowSendNotification(false);
+      await fetchNotifications(); // Làm mới danh sách thông báo
+    } catch (err: any) {
+      console.error("Lỗi khi gửi thông báo:", err.message, err.stack);
+      Alert.alert("Lỗi", "Không thể gửi thông báo: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchNotifications();
   }, []);
@@ -95,6 +121,18 @@ const ManageNotifications = () => {
     { label: "Chưa đọc", value: "unread" },
   ];
 
+  const getStatistics = () => {
+    const totalNotifications = notifications.length;
+    const totalRead = notifications.filter((notification) => notification.is_read === "read").length;
+    const totalUnread = notifications.filter((notification) => notification.is_read === "unread").length;
+
+    return {
+      totalNotifications,
+      totalRead,
+      totalUnread,
+    };
+  };
+
   if (loading) {
     return <ActivityIndicator size="large" color="#4CAF50" style={styles.loading} />;
   }
@@ -107,11 +145,28 @@ const ManageNotifications = () => {
     );
   }
 
+  const stats = getStatistics();
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Danh sách thông báo</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Danh sách thông báo</Text>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            style={[styles.statsButton, { marginRight: 8 }]}
+            onPress={() => setShowStats(true)}
+          >
+            <Text style={styles.statsButtonText}>Thống kê</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.statsButton}
+            onPress={() => setShowSendNotification(true)}
+          >
+            <Text style={styles.statsButtonText}>Gửi thông báo</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
-      {/* Thanh tìm kiếm */}
       <TextInput
         placeholder="Tìm theo nội dung hoặc người nhận..."
         style={styles.searchInput}
@@ -119,7 +174,6 @@ const ManageNotifications = () => {
         onChangeText={setSearchKeyword}
       />
 
-      {/* Bộ lọc trạng thái */}
       <View style={styles.filterContainer}>
         {statuses.map((status) => (
           <TouchableOpacity
@@ -142,7 +196,6 @@ const ManageNotifications = () => {
         ))}
       </View>
 
-      {/* Danh sách thông báo */}
       <FlatList
         data={filteredNotifications}
         keyExtractor={(item) => item.notification_id.toString()}
@@ -152,11 +205,67 @@ const ManageNotifications = () => {
           <Text style={styles.emptyText}>Không tìm thấy thông báo nào.</Text>
         }
       />
+
+      <Modal
+        visible={showStats}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowStats(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Thống kê thông báo</Text>
+            <View style={styles.statsContainer}>
+              <Text style={styles.modalText}>Tổng số thông báo: {stats.totalNotifications}</Text>
+              <Text style={styles.modalText}>Thông báo đã đọc: {stats.totalRead}</Text>
+              <Text style={styles.modalText}>Thông báo chưa đọc: {stats.totalUnread}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowStats(false)}
+            >
+              <Text style={styles.closeButtonText}>Đóng</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showSendNotification}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowSendNotification(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Gửi thông báo đến tất cả người dùng</Text>
+            <TextInput
+              placeholder="Nhập nội dung thông báo..."
+              style={[styles.searchInput, { marginBottom: 16 }]}
+              value={notificationMessage}
+              onChangeText={setNotificationMessage}
+              multiline
+            />
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity
+                style={[styles.closeButton, { backgroundColor: "#E0E0E0", marginRight: 8 }]}
+                onPress={() => setShowSendNotification(false)}
+              >
+                <Text style={[styles.closeButtonText, { color: "#000" }]}>Hủy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={handleSendNotification}
+              >
+                <Text style={styles.closeButtonText}>Gửi</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
-
-export default ManageNotifications;
 
 const styles = StyleSheet.create({
   container: {
@@ -164,11 +273,31 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: "#fff",
   },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  headerButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   title: {
     fontSize: 22,
     fontWeight: "bold",
-    marginBottom: 12,
     textAlign: "center",
+  },
+  statsButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  statsButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 14,
   },
   searchInput: {
     borderWidth: 1,
@@ -240,4 +369,50 @@ const styles = StyleSheet.create({
     color: "#999",
     fontSize: 16,
   },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 12,
+    width: "80%",
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 16,
+  },
+  statsContainer: {
+    marginBottom: 20,
+    alignItems: "flex-start",
+    width: "100%",
+  },
+  modalText: {
+    fontSize: 16,
+    marginBottom: 8,
+    color: "#333",
+  },
+  modalButtonContainer: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    width: "100%",
+  },
+  closeButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+  },
+  closeButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 16,
+  },
 });
+
+export default ManageNotifications;

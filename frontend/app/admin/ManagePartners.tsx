@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   TextInput,
   Image,
+  Modal,
 } from "react-native";
 import { getFields, formatCurrency } from "@/constants/apiService";
 import { FIELD_IMAGE_BASE_URL } from "@/constants/apiConfig";
@@ -32,6 +33,7 @@ const ManageSportsFields = () => {
   const [searchKeyword, setSearchKeyword] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [showStats, setShowStats] = useState<boolean>(false); // State để hiển thị thống kê
 
   const fetchFields = async () => {
     setLoading(true);
@@ -124,6 +126,29 @@ const ManageSportsFields = () => {
     { label: "Pickleball", value: "pickleball" },
   ];
 
+  // Hàm tính thống kê
+  const getStatistics = () => {
+    const totalFields = fields.length;
+    const totalFootball = fields.filter((field) => field.sport_type === "football").length;
+    const totalBadminton = fields.filter((field) => field.sport_type === "badminton").length;
+    const totalTennis = fields.filter((field) => field.sport_type === "tennis").length;
+    const totalBasketball = fields.filter((field) => field.sport_type === "basketball").length;
+    const totalPickleball = fields.filter((field) => field.sport_type === "pickleball").length;
+    const totalAvailable = fields.filter((field) => field.status === "available").length;
+    const totalUnavailable = fields.filter((field) => field.status === "unavailable").length;
+
+    return {
+      totalFields,
+      totalFootball,
+      totalBadminton,
+      totalTennis,
+      totalBasketball,
+      totalPickleball,
+      totalAvailable,
+      totalUnavailable,
+    };
+  };
+
   if (loading) {
     return <ActivityIndicator size="large" color="#4CAF50" style={styles.loading} />;
   }
@@ -136,9 +161,19 @@ const ManageSportsFields = () => {
     );
   }
 
+  const stats = getStatistics();
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Danh sách sân thể thao</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Danh sách sân thể thao</Text>
+        <TouchableOpacity
+          style={styles.statsButton}
+          onPress={() => setShowStats(true)}
+        >
+          <Text style={styles.statsButtonText}>Thống kê</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Thanh tìm kiếm */}
       <TextInput
@@ -204,6 +239,36 @@ const ManageSportsFields = () => {
           <Text style={styles.emptyText}>Không tìm thấy sân thể thao nào.</Text>
         }
       />
+
+      {/* Modal hiển thị thống kê */}
+      <Modal
+        visible={showStats}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowStats(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Thống kê sân thể thao</Text>
+            <View style={styles.statsContainer}>
+              <Text style={styles.modalText}>Tổng số sân đã đăng ký: {stats.totalFields}</Text>
+              <Text style={styles.modalText}>Sân bóng đá: {stats.totalFootball}</Text>
+              <Text style={styles.modalText}>Sân cầu lông: {stats.totalBadminton}</Text>
+              <Text style={styles.modalText}>Sân quần vợt: {stats.totalTennis}</Text>
+              <Text style={styles.modalText}>Sân bóng rổ: {stats.totalBasketball}</Text>
+              <Text style={styles.modalText}>Sân pickleball: {stats.totalPickleball}</Text>
+              <Text style={styles.modalText}>Sân có sẵn: {stats.totalAvailable}</Text>
+              <Text style={styles.modalText}>Sân không có sẵn: {stats.totalUnavailable}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowStats(false)}
+            >
+              <Text style={styles.closeButtonText}>Đóng</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -216,11 +281,27 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: "#fff",
   },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
   title: {
     fontSize: 22,
     fontWeight: "bold",
-    marginBottom: 12,
     textAlign: "center",
+  },
+  statsButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  statsButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 14,
   },
   searchInput: {
     borderWidth: 1,
@@ -306,6 +387,45 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 20,
     color: "#999",
+    fontSize: 16,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 12,
+    width: "80%",
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 16,
+  },
+  statsContainer: {
+    marginBottom: 20,
+    alignItems: "flex-start",
+    width: "100%",
+  },
+  modalText: {
+    fontSize: 16,
+    marginBottom: 8,
+    color: "#333",
+  },
+  closeButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+  },
+  closeButtonText: {
+    color: "#fff",
+    fontWeight: "600",
     fontSize: 16,
   },
 });

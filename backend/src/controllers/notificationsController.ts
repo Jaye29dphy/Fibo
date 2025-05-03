@@ -19,7 +19,7 @@ interface NotificationRow {
   created_at: string | Date;
 }
 
-export const getNotification = async (_req: Request, res: Response) => {
+export const getNotification = async (_req: Request, res: Response): Promise<void> => {
   try {
     // Kiểm tra kết nối database
     await db.query('SELECT 1');
@@ -60,7 +60,41 @@ export const getNotification = async (_req: Request, res: Response) => {
     console.log("Dữ liệu trả về:", notifications);
     res.json(notifications);
   } catch (error: any) {
-    console.error("Lỗi khi lấy danh sách thông báo:", error.message, error.stack);
+    console.error('error', "Lỗi khi lấy danh sách thông báo:", error.message, error.stack);
+    res.status(500).json({ message: "Lỗi server", error: error.message });
+  }
+};
+
+export const sendNotificationToAllUsers = async (req: Request, res: Response): Promise<void> => {
+  const { message } = req.body;
+
+  if (!message || typeof message !== 'string' || message.trim() === '') {
+    res.status(400).json({ message: "Nội dung thông báo không hợp lệ" });
+    return;
+  }
+
+  try {
+    // Lấy danh sách tất cả người dùng
+    const [users] = await db.execute('SELECT user_id FROM users') as [{ user_id: number }[], any];
+
+    if (!users.length) {
+      res.status(404).json({ message: "Không tìm thấy người dùng nào" });
+      return;
+    }
+
+    // Tạo thông báo cho từng người dùng
+    const values = users.map(user => [user.user_id, message, 0, new Date()]);
+    const query = `
+      INSERT INTO notifications (user_id, message, is_read, created_at)
+      VALUES ?;
+    `;
+
+    await db.query(query, [values]);
+    console.log(`Đã gửi thông báo đến ${users.length} người dùng`);
+
+    res.status(200).json({ message: "Thông báo đã được gửi đến tất cả người dùng" });
+  } catch (error: any) {
+    console.error("Lỗi khi gửi thông báo:", error.message, error.stack);
     res.status(500).json({ message: "Lỗi server", error: error.message });
   }
 };

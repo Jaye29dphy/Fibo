@@ -243,3 +243,9 @@ export const getNotifications = async () => {
 export const getNotification = async () => {
   return fetchAPI(API_ENDPOINTS.GET_NOTIFICATION, "GET");
 }
+
+
+export const sendNotificationToAllUsers = async (message: string) => {
+  const url = `${API_URL}/api/notifications/send-all`;
+  return fetchAPI(url, "POST", { message });
+};

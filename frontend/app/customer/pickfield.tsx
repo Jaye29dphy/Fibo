@@ -22,7 +22,9 @@ const PickField: React.FC = () => {
         console.log("Fields data in pickField:", fieldsData);
         if (Array.isArray(fieldsData)) {
           setFields(fieldsData);
-          setFilteredFields(fieldsData);
+          // Chỉ giữ các sân có status là 'available' trong filteredFields
+          const availableFields = fieldsData.filter((field) => field.status === "available");
+          setFilteredFields(availableFields);
         } else {
           console.error("Fields data is not an array:", fieldsData);
           setFields([]);
@@ -40,10 +42,13 @@ const PickField: React.FC = () => {
   const handleSearch = (query: string) => {
     setSearchQuery(query);
     if (query.trim() === "") {
-      setFilteredFields(fields);
+      // Khi không có query, chỉ hiển thị sân available
+      setFilteredFields(fields.filter((field) => field.status === "available"));
     } else {
-      const filtered = fields.filter((field) =>
-        field.name.toLowerCase().includes(query.toLowerCase())
+      const filtered = fields.filter(
+        (field) =>
+          field.name.toLowerCase().includes(query.toLowerCase()) &&
+          field.status === "available"
       );
       setFilteredFields(filtered);
     }
@@ -73,49 +78,71 @@ const PickField: React.FC = () => {
       <ScrollView style={styles.content}>
         <Text style={styles.sectionTitle}>Tất cả các sân</Text>
         <View style={styles.fieldsList}>
-          {filteredFields.length === 0 ? (
+          {fields.length === 0 ? (
             <Text>Không có sân nào được tìm thấy.</Text>
           ) : (
-            filteredFields.map((field) => {
-              // Đảm bảo chỉ hiển thị ảnh main (image_name từ API đã là ảnh main)
+            fields.map((field) => {
               const imageUrl = field.image_name
                 ? `${FIELD_IMAGE_BASE_URL}/${field.image_name}?t=${Date.now()}`
                 : "https://via.placeholder.com/150";
               console.log(`Main image URL for field ${field.field_id}:`, imageUrl);
 
+              const isAvailable = field.status === "available";
+
               return (
                 <TouchableOpacity
                   key={field.field_id}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/customer/field_detail",
-                      params: {
-                        field_id: field.field_id,
-                        name: field.name,
-                        price: field.price_per_hour,
-                        location: field.location,
-                        image: field.image_name, // Truyền image_name (ảnh main)
-                        description: field.description,
-                      },
-                    })
+                  disabled={!isAvailable} // Vô hiệu hóa nhấn nếu sân không available
+                  onPress={
+                    isAvailable
+                      ? () =>
+                          router.push({
+                            pathname: "/customer/field_detail",
+                            params: {
+                              field_id: field.field_id,
+                              name: field.name,
+                              price: field.price_per_hour,
+                              location: field.location,
+                              image: field.image_name,
+                              description: field.description,
+                            },
+                          })
+                      : undefined
                   }
                 >
-                  <View style={styles.fieldCard}>
+                  <View
+                    style={[
+                      styles.fieldCard,
+                      !isAvailable && styles.unavailableCard, // Áp dụng style cho sân unavailable
+                    ]}
+                  >
                     <View style={styles.imageContainer}>
                       <Image
                         source={{ uri: imageUrl }}
                         style={styles.fieldImage}
                         onError={(error) => {
-                          console.log(`Main image load error for field ${field.field_id}:`, error.nativeEvent);
+                          console.log(
+                            `Main image load error for field ${field.field_id}:`,
+                            error.nativeEvent
+                          );
                           console.log(`Failed URL:`, imageUrl);
                         }}
-                        onLoad={() => console.log(`Main image loaded for field ${field.field_id}:`, imageUrl)}
-                        onLoadEnd={() => console.log(`Main image load ended for field ${field.field_id}`)}
+                        onLoad={() =>
+                          console.log(`Main image loaded for field ${field.field_id}:`, imageUrl)
+                        }
+                        onLoadEnd={() =>
+                          console.log(`Main image load ended for field ${field.field_id}`)
+                        }
                       />
                     </View>
                     <Text style={styles.fieldName}>{field.name}</Text>
                     <Text style={styles.fieldLocation}>{`Loại sân: ${field.sport_type}`}</Text>
-                    <Text style={styles.fieldPrice}>{`Giá: ${formatCurrency(field.price_per_hour)}`}</Text>
+                    <Text style={styles.fieldPrice}>
+                      {`Giá: ${formatCurrency(field.price_per_hour)}`}
+                    </Text>
+                    {!isAvailable && (
+                      <Text style={styles.unavailableText}>Không khả dụng</Text>
+                    )}
                   </View>
                 </TouchableOpacity>
               );
@@ -185,6 +212,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 16,
   },
+  unavailableCard: {
+    opacity: 0.6, // Làm mờ thẻ sân không khả dụng
+    backgroundColor: "#F1F1F1", // Màu nền nhạt hơn
+  },
   imageContainer: {
     width: "100%",
     height: 150,
@@ -205,6 +236,11 @@ const styles = StyleSheet.create({
   },
   fieldPrice: {
     color: "#16A34A",
+    fontWeight: "bold",
+    marginTop: 4,
+  },
+  unavailableText: {
+    color: "#EF4444",
     fontWeight: "bold",
     marginTop: 4,
   },
