@@ -21,7 +21,8 @@ const FieldDetail: React.FC = () => {
   const [showAddReview, setShowAddReview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fieldAvgRating, setFieldAvgRating] = useState<number>(0);
-  const [showAllReviews, setShowAllReviews] = useState(false); // Thêm state để hiển thị tất cả đánh giá
+  const [showAllReviews, setShowAllReviews] = useState(false);
+  const [canReview, setCanReview] = useState(false); // Thêm state để kiểm tra xem người dùng đã đặt sân chưa
 
   useEffect(() => {
     const fetchFieldImages = async () => {
@@ -66,9 +67,65 @@ const FieldDetail: React.FC = () => {
       }
     };
 
+    // Kiểm tra xem người dùng đã đặt sân này chưa
+    const checkIfUserCanReview = async () => {
+      try {
+        const token = await AsyncStorage.getItem('token');
+        if (!token) {
+          setCanReview(false);
+          return;
+        }
+        
+        // Gọi API để kiểm tra xem người dùng đã đặt sân này chưa
+        const response = await fetch(`${API_URL}/api/calendar/user-bookings/${field_id}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (!response.ok) {
+          console.error("Error response from API:", response.status);
+          setCanReview(false);
+          return;
+        }
+        
+        const data = await response.json();
+        console.log("User booking check response:", data);
+        
+        // Kiểm tra nếu người dùng có đặt sân thành công
+        if (data && Array.isArray(data) && data.length > 0) {
+          // Sửa logic: Cho phép đánh giá nếu có bất kỳ đặt sân nào đã được xác nhận hoặc hoàn thành
+          const hasValidBooking = data.some(booking => 
+            booking.status === 'completed' || booking.status === 'confirmed'
+          );
+          
+          console.log("Can review:", hasValidBooking);
+          setCanReview(hasValidBooking);
+          
+          // Nếu vẫn không thể đánh giá, hãy kiểm tra chi tiết từng đặt sân
+          if (!hasValidBooking) {
+            console.log("Booking details that didn't qualify:", 
+              data.map(b => ({
+                status: b.status
+              }))
+            );
+          }
+        } else {
+          console.log("No bookings found for this field");
+          setCanReview(false);
+        }
+      } catch (error) {
+        console.error("Error checking if user can review:", error);
+        setCanReview(false);
+      }
+    };
+
     if (field_id) {
       fetchFieldImages();
       fetchReviews();
+      checkIfUserCanReview();
     }
   }, [field_id]);
 
@@ -303,7 +360,9 @@ const FieldDetail: React.FC = () => {
                         {new Date(item.created_at).toLocaleDateString('vi-VN', { 
                           day: '2-digit', 
                           month: '2-digit', 
-                          year: 'numeric'
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
                         })}
                       </Text>
                     </View>
@@ -346,10 +405,20 @@ const FieldDetail: React.FC = () => {
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity style={styles.addReviewButtonAlt} onPress={() => setShowAddReview(!showAddReview)}>
-            <Ionicons name={showAddReview ? "close-circle" : "create"} size={20} color="#fff" style={styles.addReviewIcon} />
-            <Text style={styles.addReviewText}>{showAddReview ? "Hủy đánh giá" : "Thêm đánh giá"}</Text>
-          </TouchableOpacity>
+          {canReview && (
+            <TouchableOpacity style={styles.addReviewButtonAlt} onPress={() => setShowAddReview(!showAddReview)}>
+              <Ionicons name={showAddReview ? "close-circle" : "create"} size={20} color="#fff" style={styles.addReviewIcon} />
+              <Text style={styles.addReviewText}>{showAddReview ? "Hủy đánh giá" : "Thêm đánh giá"}</Text>
+            </TouchableOpacity>
+          )}
+          
+          {!canReview && (
+            <View style={styles.reviewNoteContainer}>
+              <Text style={styles.reviewNoteText}>
+                <Ionicons name="information-circle" size={16} color="#666" /> Bạn cần đặt và sử dụng sân trước khi đánh giá
+              </Text>
+            </View>
+          )}
         </View>
 
         {showAddReview && (
@@ -739,5 +808,20 @@ const styles = StyleSheet.create({
   },
   reviewActionContainer: {
     marginTop: 20,
+  },
+  reviewNoteContainer: {
+    backgroundColor: "#f9f9f9",
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 10,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    alignItems: "center",
+  },
+  reviewNoteText: {
+    color: "#666",
+    fontSize: 14,
+    textAlign: "center",
   },
 });

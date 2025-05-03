@@ -46,7 +46,7 @@ app.use("/avatars", express.static("D:\\img\\ava"));
 // API Routes
 app.use("/api/auth", authRoutes);
 app.use("/courts", courtRoutes);
-app.use("/bookings", calendarRoutes);
+app.use("/api/calendar", calendarRoutes); // Sửa đường dẫn từ /bookings thành /api/calendar
 app.use("/upload-avatar", uploadRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/fields", fieldRoutes);

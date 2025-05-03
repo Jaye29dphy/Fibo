@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import db from '../config/database';
+import pool from '../config/database';
+import { RequestWithUser } from '../type/review';
 
 interface Booking {
   id: number;
@@ -117,5 +119,38 @@ export const getCalendarData = async (_req: Request, res: Response): Promise<voi
   } catch (error) {
     console.error("Error fetching bookings:", error);
     res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Hàm lấy lịch sử đặt sân của người dùng cho một sân cụ thể
+export const getUserBookingsForField = async (req: RequestWithUser, res: Response): Promise<void> => {
+  try {
+    const fieldId = parseInt(req.params.field_id);
+    const userId = req.user?.id;
+
+    if (!fieldId || isNaN(fieldId)) {
+      res.status(400).json({ message: 'Invalid field ID' });
+      return;
+    }
+
+    if (!userId) {
+      res.status(401).json({ message: 'User not authenticated' });
+      return;
+    }
+
+    // Lấy lịch sử đặt sân của người dùng cho sân cụ thể
+    const [rows] = await pool.query(
+      `SELECT b.*, f.name as field_name 
+       FROM bookings b 
+       JOIN fields f ON b.field_id = f.field_id 
+       WHERE b.field_id = ? AND b.user_id = ? 
+       ORDER BY b.start_time DESC`,
+      [fieldId, userId]
+    );
+
+    res.status(200).json(rows);
+  } catch (error) {
+    console.error('Error fetching user bookings for field:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
