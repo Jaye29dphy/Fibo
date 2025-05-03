@@ -188,6 +188,15 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.push("/owner/dashboard"); // fallback nếu người dùng đi thẳng vào
+    }
+  };
+  
+
   const handleEditUser = () => {
     setUser(editedUser);
     setEditModalVisible(false);
@@ -206,9 +215,10 @@ export default function ProfileScreen() {
     <ScrollView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <AntDesign name="arrowleft" size={24} color="white" />
-        </TouchableOpacity>
+      <TouchableOpacity onPress={handleBack}>
+  <AntDesign name="arrowleft" size={24} color="white" />
+</TouchableOpacity>
+
         <Text style={styles.title}>Hồ Sơ</Text>
       </View>
 
