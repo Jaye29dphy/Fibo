@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { registerField, getOwnerFields, getTimeSlots } from '../controllers/fieldController';
+import { registerField, getOwnerFields, getTimeSlots, getAllFields, getFieldById } from '../controllers/fieldController';
 import multer from 'multer';
 
 // Cấu hình multer để xử lý file upload
@@ -16,5 +16,11 @@ router.post('/register', upload.array('images'), registerField);
 
 // Route để lấy danh sách sân của chủ sân
 router.get('/owner', getOwnerFields);
+
+// Route để lấy tất cả các sân
+router.get('/all', getAllFields);
+
+// Route để lấy thông tin chi tiết của một sân
+router.get('/:id', getFieldById);
 
 export default router;

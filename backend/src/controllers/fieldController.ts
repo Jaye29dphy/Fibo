@@ -388,3 +388,105 @@ export const getOwnerFields = async (req: Request, res: Response): Promise<void>
     res.status(500).json({ message: 'Đã có lỗi xảy ra.', error: error.message });
   }
 };
+
+export const getAllFields = async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log('=== GET ALL FIELDS API CALLED ===');
+    
+    // Truy vấn lấy danh sách tất cả các sân với rating
+    const query = `
+      SELECT 
+        f.field_id,
+        f.name,
+        f.location,
+        f.sport_type,
+        f.price_per_hour,
+        f.status,
+        f.description,
+        f.rating,
+        CONCAT(fi.image_name) AS image_name
+      FROM 
+        fibo.fields f
+      LEFT JOIN 
+        (SELECT field_id, image_name FROM fibo.field_images WHERE image_type = 'main') fi 
+        ON f.field_id = fi.field_id
+      WHERE 
+        f.status = 'available'
+      ORDER BY 
+        f.rating DESC, f.name ASC
+    `;
+
+    const [fields] = await pool.execute(query);
+
+    if (!Array.isArray(fields) || fields.length === 0) {
+      console.log('No fields found');
+      res.status(200).json({ fields: [] });
+      return;
+    }
+
+    console.log(`Found ${fields.length} fields`);
+    res.status(200).json({ fields });
+
+  } catch (error: any) {
+    console.error('Error in getAllFields:', error.message, error.stack);
+    res.status(500).json({ message: 'Đã có lỗi xảy ra.', error: error.message });
+  }
+};
+
+export const getFieldById = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const fieldId = parseInt(req.params.id);
+    
+    if (isNaN(fieldId)) {
+      res.status(400).json({ message: 'Invalid field ID' });
+      return;
+    }
+    
+    // Truy vấn để lấy thông tin chi tiết của sân
+    const query = `
+      SELECT 
+        f.field_id,
+        f.name,
+        f.location,
+        f.sport_type,
+        f.price_per_hour,
+        f.status,
+        f.description,
+        f.rating
+      FROM 
+        fibo.fields f
+      WHERE 
+        f.field_id = ?
+    `;
+    
+    const [result] = await pool.execute(query, [fieldId]);
+    const fields = result as any[];
+    
+    if (fields.length === 0) {
+      res.status(404).json({ message: 'Field not found' });
+      return;
+    }
+    
+    const field = fields[0];
+    
+    // Lấy danh sách ảnh của sân
+    const imageQuery = `
+      SELECT image_name, image_type 
+      FROM fibo.field_images 
+      WHERE field_id = ?
+    `;
+    
+    const [imageResult] = await pool.execute(imageQuery, [fieldId]);
+    const images = imageResult as any[];
+    
+    // Kết hợp thông tin và trả về
+    res.status(200).json({
+      ...field,
+      images
+    });
+    
+  } catch (error: any) {
+    console.error('Error in getFieldById:', error.message, error.stack);
+    res.status(500).json({ message: 'Đã có lỗi xảy ra.', error: error.message });
+  }
+};

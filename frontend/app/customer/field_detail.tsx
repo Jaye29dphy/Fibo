@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Modal, Dimensions } from "react-native";
+import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Modal, Dimensions, TextInput, Alert, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import BottomTabs from "./BottomTabs";
 import { formatCurrency, getStringParam } from "@/constants/apiService";
-import { API_ENDPOINTS, FIELD_IMAGE_BASE_URL } from "@/constants/apiConfig";
+import { API_ENDPOINTS, FIELD_IMAGE_BASE_URL, API_URL, AVATAR_BASE_URL } from "@/constants/apiConfig";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width, height } = Dimensions.get("window");
 
@@ -14,17 +15,22 @@ const FieldDetail: React.FC = () => {
   const [fieldImages, setFieldImages] = useState<any[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [rating, setRating] = useState<number>(0);
+  const [comment, setComment] = useState<string>("");
+  const [showAddReview, setShowAddReview] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fieldAvgRating, setFieldAvgRating] = useState<number>(0);
+  const [showAllReviews, setShowAllReviews] = useState(false); // Thêm state để hiển thị tất cả đánh giá
 
   useEffect(() => {
     const fetchFieldImages = async () => {
       try {
         const response = await fetch(`${API_ENDPOINTS.GET_FIELDS}/${field_id}/images`);
         const data = await response.json();
-        console.log("Field images data:", data);
         if (Array.isArray(data)) {
           setFieldImages(data);
         } else {
-          console.error("Field images data is not an array:", data);
           setFieldImages([]);
         }
       } catch (error) {
@@ -33,21 +39,49 @@ const FieldDetail: React.FC = () => {
       }
     };
 
-    if (field_id) fetchFieldImages();
+    const fetchReviews = async () => {
+      try {
+        // Sửa đường dẫn API để khớp với cấu trúc backend mới
+        const response = await fetch(`${API_URL}/api/reviews/fields/${field_id}`);
+        console.log("Fetching reviews from:", `${API_URL}/api/reviews/fields/${field_id}`);
+        const data = await response.json();
+        console.log("Reviews API response:", data);
+        
+        if (Array.isArray(data)) {
+          setReviews(data);
+          console.log("Reviews set to:", data);
+          
+          // Calculate average rating
+          if (data.length > 0) {
+            const sum = data.reduce((total, item) => total + item.rating, 0);
+            setFieldAvgRating(sum / data.length);
+          }
+        } else {
+          console.log("Reviews data is not an array:", data);
+          setReviews([]);
+        }
+      } catch (error) {
+        console.error("Error fetching reviews:", error);
+        setReviews([]);
+      }
+    };
+
+    if (field_id) {
+      fetchFieldImages();
+      fetchReviews();
+    }
   }, [field_id]);
 
   const priceString = getStringParam(price);
   const displayPrice = priceString ? formatCurrency(priceString) : "Giá không khả dụng";
   const imageString = getStringParam(image);
 
-  // Tìm ảnh main từ danh sách fieldImages (nếu API trả về cả main và sub)
   const mainImage = fieldImages.find((img) => img.image_type === "main");
   const mainImageUrl = mainImage?.image_name
     ? `${FIELD_IMAGE_BASE_URL}/${mainImage.image_name}?t=${Date.now()}`
     : imageString
     ? `${FIELD_IMAGE_BASE_URL}/${imageString}?t=${Date.now()}`
     : "https://via.placeholder.com/150";
-  console.log(`Main image URL for field ${field_id}:`, mainImageUrl);
 
   const openImageModal = (imageName: string) => {
     const imageUrl = imageName
@@ -62,6 +96,96 @@ const FieldDetail: React.FC = () => {
     setSelectedImage(null);
   };
 
+  const handleSubmitReview = async () => {
+    if (rating === 0) {
+      Alert.alert("Lỗi", "Vui lòng chọn số sao đánh giá");
+      return;
+    }
+    
+    if (!comment.trim()) {
+      Alert.alert("Lỗi", "Vui lòng nhập nội dung đánh giá");
+      return;
+    }
+    
+    try {
+      setIsSubmitting(true);
+      
+      // Get authentication token
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        Alert.alert("Thông báo", "Bạn cần đăng nhập để đánh giá", [
+          { text: "Hủy", style: "cancel" },
+          { text: "Đăng nhập", onPress: () => router.push("/customer") }
+        ]);
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Sửa đường dẫn API để gửi đánh giá đến endpoint đúng
+      console.log("Sending review to:", `${API_URL}/api/reviews/fields`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ rating, comment, field_id })
+      });
+      
+      const response = await fetch(`${API_URL}/api/reviews/fields/${field_id}`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ rating, comment, field_id }),
+      });
+      
+      console.log("Response status:", response.status);
+      
+      const data = await response.json();
+      console.log("Review submission response:", data);
+      
+      if (response.ok) {
+        // Add the new review to the list
+        const newReview = {
+          ...data,
+          full_name: data.full_name || "Khách hàng" 
+        };
+        setReviews([newReview, ...reviews]);
+        
+        // Tính lại đánh giá trung bình với đánh giá mới
+        const newReviews = [newReview, ...reviews];
+        const sum = newReviews.reduce((total, item) => total + parseFloat(item.rating), 0);
+        const newAvgRating = sum / newReviews.length;
+        
+        console.log("New calculated average rating:", newAvgRating);
+        
+        // Ưu tiên dùng đánh giá từ server nếu có, nếu không dùng giá trị tính toán
+        if (data.fieldRating) {
+          console.log("Using server rating:", data.fieldRating);
+          setFieldAvgRating(parseFloat(data.fieldRating));
+        } else {
+          console.log("Using calculated rating:", newAvgRating);
+          setFieldAvgRating(newAvgRating);
+        }
+        
+        // Reset form
+        setRating(0);
+        setComment("");
+        setShowAddReview(false);
+        
+        Alert.alert("Thành công", "Đánh giá của bạn đã được gửi thành công!");
+      } else {
+        Alert.alert("Lỗi", data.message || "Không thể gửi đánh giá. Vui lòng thử lại sau.");
+      }
+    } catch (error) {
+      console.error("Error submitting review:", error);
+      Alert.alert("Lỗi", "Có lỗi xảy ra khi gửi đánh giá. Vui lòng thử lại sau.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -71,18 +195,14 @@ const FieldDetail: React.FC = () => {
         <Text style={styles.title}>Chi tiết sân bóng</Text>
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 200 }}>
         <View style={styles.imageContainer}>
           <TouchableOpacity onPress={() => openImageModal(mainImage?.image_name || imageString)}>
             <Image
               source={{ uri: mainImageUrl }}
               style={styles.image}
-              onError={(error) => {
-                console.log(`Main image load error for field ${field_id}:`, error.nativeEvent);
-                console.log(`Failed URL:`, mainImageUrl);
-              }}
+              onError={(error) => console.log(`Main image load error for field ${field_id}:`, error.nativeEvent)}
               onLoad={() => console.log(`Main image loaded for field ${field_id}:`, mainImageUrl)}
-              onLoadEnd={() => console.log(`Main image load ended for field ${field_id}`)}
             />
           </TouchableOpacity>
         </View>
@@ -117,24 +237,15 @@ const FieldDetail: React.FC = () => {
               const subImageUrl = fieldImage.image_name
                 ? `${FIELD_IMAGE_BASE_URL}/${fieldImage.image_name}?t=${Date.now()}`
                 : "https://via.placeholder.com/150";
-              console.log(`Sub image URL ${index + 1} for field ${field_id}:`, subImageUrl);
-
               return (
-                <TouchableOpacity
-                  key={index}
-                  onPress={() => openImageModal(fieldImage.image_name)}
-                >
+                <TouchableOpacity key={index} onPress={() => openImageModal(fieldImage.image_name)}>
                   <View style={styles.styleprev}>
                     <View style={styles.subImageContainer}>
                       <Image
                         source={{ uri: subImageUrl }}
                         style={styles.previmg}
-                        onError={(error) => {
-                          console.log(`Sub image load error ${index + 1} for field ${field_id}:`, error.nativeEvent);
-                          console.log(`Failed URL:`, subImageUrl);
-                        }}
+                        onError={(error) => console.log(`Sub image load error ${index + 1} for field ${field_id}:`, error.nativeEvent)}
                         onLoad={() => console.log(`Sub image loaded ${index + 1} for field ${field_id}:`, subImageUrl)}
-                        onLoadEnd={() => console.log(`Sub image load ended ${index + 1} for field ${field_id}`)}
                       />
                     </View>
                     <Text>{`Ảnh ${index + 1}`}</Text>
@@ -143,6 +254,138 @@ const FieldDetail: React.FC = () => {
               );
             })}
         </ScrollView>
+
+        <View style={styles.ratingSection}>
+          <Text style={styles.descriptionTitle}>Đánh giá tổng thể</Text>
+          <View style={styles.overallRating}>
+            <Text style={styles.ratingScore}>
+              {typeof fieldAvgRating === 'number' ? fieldAvgRating.toFixed(1) : '0.0'}
+            </Text>
+            <View style={styles.starsContainer}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Ionicons 
+                  key={star} 
+                  name={fieldAvgRating >= star - 0.5 ? "star" : "star-outline"} 
+                  size={20}
+                  color="#FFD700" 
+                />
+              ))}
+            </View>
+            <Text style={styles.reviewCount}>({reviews.length} đánh giá)</Text>
+          </View>
+        </View>
+
+        <Text style={styles.descriptionTitle}>Đánh giá khách hàng</Text>
+        
+        {reviews.length > 0 ? (
+          <View style={styles.reviewsList}>
+            {(showAllReviews ? reviews : reviews.slice(0, 5)).map((item, index) => (
+              <View key={`${item.id || item.review_id || index}`} style={styles.reviewContainer}>
+                <View style={styles.reviewHeader}>
+                  <View style={styles.userInfo}>
+                    <Image
+                      source={{ 
+                        uri: item.avatar 
+                          ? `${AVATAR_BASE_URL}/${item.avatar}?t=${Date.now()}` 
+                          : `${AVATAR_BASE_URL}/default-ava.jpg` 
+                      }}
+                      style={styles.avatar}
+                      onError={(e) => {
+                        console.log("Avatar load error, falling back to default");
+                        if ((e.nativeEvent as any).error && !item.avatar) {
+                          console.log("Default avatar also failed to load");
+                        }
+                      }}
+                    />
+                    <View style={styles.nameAndDate}>
+                      <Text style={styles.reviewerName}>{item.full_name || "Khách hàng"}</Text>
+                      <Text style={styles.reviewDate}>
+                        {new Date(item.created_at).toLocaleDateString('vi-VN', { 
+                          day: '2-digit', 
+                          month: '2-digit', 
+                          year: 'numeric'
+                        })}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.reviewRating}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Ionicons 
+                        key={star} 
+                        name={item.rating >= star ? "star" : "star-outline"} 
+                        size={16}
+                        color="#FFD700" 
+                      />
+                    ))}
+                  </View>
+                </View>
+                <Text style={styles.reviewText}>{item.comment}</Text>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.reviewContainer}>
+            <Text style={styles.reviewText}>Chưa có đánh giá nào</Text>
+          </View>
+        )}
+
+        <View style={styles.reviewActionContainer}>
+          {reviews.length > 5 && (
+            <TouchableOpacity style={styles.viewAllReviewsButton} onPress={() => setShowAllReviews(!showAllReviews)}>
+              <Text style={styles.viewAllReviewsText}>
+                {showAllReviews ? (
+                  <>
+                    <Ionicons name="chevron-up" size={16} color="#16A34A" /> Ẩn bớt
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name="chevron-down" size={16} color="#16A34A" /> Xem tất cả đánh giá ({reviews.length})
+                  </>
+                )}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity style={styles.addReviewButtonAlt} onPress={() => setShowAddReview(!showAddReview)}>
+            <Ionicons name={showAddReview ? "close-circle" : "create"} size={20} color="#fff" style={styles.addReviewIcon} />
+            <Text style={styles.addReviewText}>{showAddReview ? "Hủy đánh giá" : "Thêm đánh giá"}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {showAddReview && (
+          <View style={styles.addReviewContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder="Nhập đánh giá của bạn"
+              value={comment}
+              onChangeText={setComment}
+              multiline={true}
+              numberOfLines={4}
+            />
+            <View style={styles.ratingContainer}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity key={star} onPress={() => setRating(star)}>
+                  <Ionicons
+                    name={star <= rating ? "star" : "star-outline"}
+                    size={24}
+                    color="#FFD700"
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity 
+              style={[styles.submitButton, isSubmitting && styles.disabledButton]} 
+              onPress={handleSubmitReview}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Text style={styles.submitText}>Gửi đánh giá</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
 
       <Modal
@@ -163,7 +406,6 @@ const FieldDetail: React.FC = () => {
                 style={styles.modalImage}
                 resizeMode="contain"
                 onError={(error) => console.log("Modal image load error:", error.nativeEvent)}
-                onLoad={() => console.log("Modal image loaded:", selectedImage)}
               />
             )}
             <TouchableOpacity style={styles.closeButton} onPress={closeImageModal}>
@@ -179,13 +421,7 @@ const FieldDetail: React.FC = () => {
           onPress={() =>
             router.push({
               pathname: "/customer/payment",
-              params: {
-                field_id,
-                name,
-                price,
-                location,
-                image: imageString,
-              },
+              params: { field_id, name, price, location, image: imageString },
             })
           }
         >
@@ -334,5 +570,174 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 10,
     right: 10,
+  },
+  reviewContainer: {
+    backgroundColor: "#fff",
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: "#16A34A",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  reviewText: {
+    fontSize: 14,
+    color: "#333",
+  },
+  reviewDate: {
+    fontSize: 12,
+    color: "#666",
+  },
+  addReviewContainer: {
+    backgroundColor: "#fff",
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 15,
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  ratingContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginBottom: 15,
+  },
+  submitButton: {
+    backgroundColor: "#16A34A",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  disabledButton: {
+    backgroundColor: "#95d5a6",
+  },
+  submitText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  addReviewButton: {
+    backgroundColor: "#16A34A",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginBottom: 20,
+    marginTop: 10,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  addReviewButtonAlt: {
+    flexDirection: "row",
+    backgroundColor: "#FF6B00",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+    marginTop: 10,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  addReviewIcon: {
+    marginRight: 8,
+  },
+  addReviewText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  overallRating: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 10,
+    backgroundColor: "#fff",
+    padding: 10,
+    borderRadius: 8,
+  },
+  ratingScore: {
+    fontSize: 28,
+    fontWeight: "bold",
+    marginRight: 12,
+    color: "#16A34A",
+  },
+  starsContainer: {
+    flexDirection: "row",
+    marginRight: 10,
+  },
+  reviewCount: {
+    color: "#666",
+    fontSize: 14,
+  },
+  ratingSection: {
+    marginVertical: 10,
+  },
+  reviewHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 5,
+  },
+  userInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  nameAndDate: {
+    marginLeft: 8,
+  },
+  reviewerName: {
+    fontWeight: "bold",
+    fontSize: 14,
+    color: "#333",
+  },
+  reviewRating: {
+    flexDirection: "row",
+  },
+  reviewsList: {
+    marginBottom: 20, // Tăng margin bên dưới để tạo thêm khoảng cách
+  },
+  reviewsListContainer: {
+    paddingBottom: 10,
+  },
+  viewAllReviewsButton: {
+    backgroundColor: "#fff",
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    marginVertical: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+  },
+  viewAllReviewsText: {
+    color: "#16A34A",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  avatarContainer: {
+    marginRight: 8,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  reviewActionContainer: {
+    marginTop: 20,
   },
 });
