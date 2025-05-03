@@ -26,9 +26,19 @@ interface BookingRow {
 export const getCalendarBookings = async (_req: Request, res: Response) => {
   try {
     const query = `
-      SELECT booking_id, booking_code, user_id, field_id, start_time, end_time, status, total_cost
-      FROM bookings
-      ORDER BY start_time ASC;
+      SELECT 
+        b.booking_id,
+        b.booking_code,
+        b.user_id,
+        b.field_id,
+        b.start_time,
+        b.end_time,
+        b.status,
+        b.total_cost,
+        f.name AS field_name
+      FROM bookings b
+      JOIN fields f ON b.field_id = f.field_id
+      ORDER BY b.start_time ASC;
     `;
     const [rows] = await db.execute(query) as [any[], any];
     const bookings: Booking[] = rows.map((row) => {
@@ -50,7 +60,8 @@ export const getCalendarBookings = async (_req: Request, res: Response) => {
         end_time: formatDate(row.end_time),
         status: row.status,
         total_cost: row.total_cost,
-        field_name: '', // Không sử dụng trong endpoint này
+        field_name: row.field_name,
+        field_id: row.field_id,
         customer_name: '', // Không sử dụng trong endpoint này
       };
     });

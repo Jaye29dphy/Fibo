@@ -52,7 +52,7 @@ export default function Calendar3() {
                     <Text style={styles.title}>Thông tin đặt sân</Text>
                     <View style={styles.detailRow}>
                         <Text style={styles.label}>Sân:</Text>
-                        <Text style={styles.value}>{booking.field_id}</Text>
+                        <Text style={styles.value}>{booking.fieldName || booking.field_id}</Text>
                     </View>
                     <View style={styles.detailRow}>
                         <Text style={styles.label}>Thời gian bắt đầu:</Text>

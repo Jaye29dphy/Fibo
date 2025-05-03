@@ -13,6 +13,7 @@ export interface Booking {
   field_id: string;
   total_cost?: number; // Thêm optional để tránh lỗi nếu không có
   payment_method?: string; // Thêm optional để tránh lỗi nếu không có
+  field_name?: string; // Thêm trường từ API
 }
 
 // Định nghĩa kiểu trả về của hook
@@ -30,6 +31,7 @@ export interface RawBooking {
   end_time: string;
   status: "confirmed" | "pending" | "cancelled" | "completed";
   field_id: number;
+  field_name?: string;  // Thêm trường từ API
   total_cost?: number; // Thêm optional
   payment_method?: string; // Thêm optional
 }
@@ -59,7 +61,7 @@ export const useCalendar = (): UseCalendarReturn => {
         field_id: String(item.field_id),
         total_cost: item.total_cost ?? undefined,
         payment_method: item.payment_method ?? undefined,
-        fieldName: item.field_id,
+        fieldName: item.field_name || String(item.field_id), // Sử dụng field_name nếu có, nếu không dùng field_id
         customerName: item.booking_code,
       }));
 

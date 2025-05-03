@@ -96,7 +96,7 @@ export default function CusCalendar() {
                   style={[styles.card, { backgroundColor: statusColors[booking.status] || "#FFFFFF" }]}
                 >
                   <View style={styles.info}>
-                    <Text style={styles.fieldName}>Sân: {booking.field_id}</Text>
+                    <Text style={styles.fieldName}>Sân: {booking.fieldName || booking.field_id}</Text>
                     <Text style={styles.status}>
                       Trạng thái: {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                     </Text>
