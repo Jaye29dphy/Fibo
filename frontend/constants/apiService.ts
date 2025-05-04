@@ -229,7 +229,6 @@ export const getAllUsers = async () => {
   return fetchAPI(API_ENDPOINTS.GET_ALL_USERS);
 };
 
-// Xác thực mật khẩu
 export const deactivateAccountWithPassword = async (password: string) => {
   return fetchAPI(API_ENDPOINTS.DEACTIVATE_WITH_PASSWORD, "POST", { password });
 };
@@ -249,3 +248,43 @@ export const sendNotificationToAllUsers = async (message: string) => {
   const url = `${API_URL}/api/notifications/send-all`;
   return fetchAPI(url, "POST", { message });
 };
+
+export const createPendingOrder = async (
+  fieldId: string,
+  userId: string,
+  bookingCode: string,
+  date: string,
+  timeSlots: { startTime: string; endTime: string }[],
+  totalCost: number,
+  services: { serviceId: number; quantity: number }[],
+  paymentMethod: string
+) => {
+  const body = {
+    field_id: fieldId,
+    user_id: userId,
+    booking_code: bookingCode,
+    date,
+    time_slots: timeSlots,
+    total_cost: totalCost,
+    services,
+    payment_method: paymentMethod,
+  };
+
+  return fetchAPI(API_ENDPOINTS.CREATE_PENDING_ORDER, "POST", body);
+};
+
+export const getOrderStatus = async (bookingCode: string) => {
+  const url = `${API_ENDPOINTS.GET_ORDER_STATUS}/${bookingCode}`;
+  return fetchAPI(url, "GET");
+};
+
+export const updateOrderStatus = async (bookingCode: string, status: string) => {
+  const url = `${API_ENDPOINTS.UPDATE_ORDER_STATUS}/${bookingCode}`;
+  return fetchAPI(url, "POST", { status });
+};
+
+export const deletePendingOrder = async (bookingCode: string) => {
+  const url = `${API_ENDPOINTS.DELETE_PENDING_ORDER}/${bookingCode}`;
+  return fetchAPI(url, "DELETE");
+};
+

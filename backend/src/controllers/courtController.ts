@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import pool from "../config/database";
-import { AuthRequest } from "../middleware/authMiddleware"; // Import kiểu mở rộng
+import { AuthRequest } from "../middleware/authMiddleware"; 
+import moment from "moment";
 
 interface Field {
   field_id: number;
@@ -237,4 +238,169 @@ export const getFieldImages = async (req: Request, res: Response): Promise<void>
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
+export const createPendingOrder = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const {
+      field_id,
+      user_id,
+      booking_code,
+      date,
+      time_slots,
+      total_cost,
+      services,
+      payment_method,
+    } = req.body;
+
+    if (!user_id || !booking_code || !field_id || !total_cost) {
+      res.status(400).json({ error: "Thiếu thông tin đơn hàng." });
+      return;
+    }
+
+    const formattedDate = moment(date, "DD/MM").format("YYYY-MM-DD");
+
+    await pool.execute(
+      `INSERT INTO PendingOrders (user_id, field_id, booking_code, date, time_slots, total_cost, services, payment_method, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+      [
+        user_id,
+        field_id,
+        booking_code,
+        formattedDate, // ✅ đã đúng định dạng YYYY-MM-DD
+        JSON.stringify(time_slots),
+        total_cost,
+        JSON.stringify(services),
+        payment_method,
+      ]
+    );
+    
+
+    res.status(201).json({ message: "Tạo đơn pending thành công" });
+  } catch (error) {
+    console.error("Lỗi tạo đơn hàng pending:", error);
+    res.status(500).json({ error: "Lỗi server" });
+  }
+};
+
+export const sepayWebhookHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { amount, description } = req.body;
+
+    if (!description || !amount) {
+      res.status(400).send("Thiếu dữ liệu");
+      return;
+    }
+
+    const [rows]: any = await pool.execute(
+      "SELECT * FROM PendingOrders WHERE booking_code = ? AND status = 'pending'",
+      [description.trim()]
+    );
+
+    if (!rows.length) {
+      res.status(404).send("Không tìm thấy đơn hàng phù hợp");
+      return;
+    }
+
+    const order = rows[0];
+    if (Number(order.total_cost) !== Number(amount)) {
+      res.status(400).send("Sai số tiền chuyển khoản");
+      return;
+    }
+
+    const timeSlots = JSON.parse(order.time_slots);
+    const services = JSON.parse(order.services);
+
+    for (const slot of timeSlots) {
+      await pool.execute(
+        `INSERT INTO Bookings (user_id, field_id, start_time, end_time, total_cost, booking_code, payment_method, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmed')`,
+        [
+          order.user_id,
+          order.field_id,
+          slot.startTime,
+          slot.endTime,
+          order.total_cost / timeSlots.length,
+          order.booking_code,
+          order.payment_method,
+        ]
+      );
+    }
+
+    await pool.execute(
+      "UPDATE PendingOrders SET status = 'paid' WHERE booking_code = ?",
+      [order.booking_code]
+    );
+
+    res.status(200).send("Đã xác nhận thanh toán thành công");
+  } catch (error) {
+    console.error("Webhook error:", error);
+    res.status(500).send("Lỗi xử lý webhook");
+  }
+};
+
+export const getOrderStatus = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { booking_code } = req.params;
+
+    const [rows]: any = await pool.execute(
+      "SELECT status FROM PendingOrders WHERE booking_code = ?",
+      [booking_code]
+    );
+
+    if (!rows.length) {
+      res.status(404).json({ error: "Không tìm thấy đơn hàng." });
+      return;
+    }
+
+    res.status(200).json({ status: rows[0].status });
+  } catch (error) {
+    console.error("Lỗi khi lấy trạng thái đơn hàng:", error);
+    res.status(500).json({ error: "Lỗi server" });
+  }
+};
+
+export const updateOrderStatus = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { booking_code } = req.params;
+    const { status } = req.body;
+
+    if (!status) {
+      res.status(400).json({ error: "Thiếu trạng thái để cập nhật." });
+      return;
+    }
+
+    const [result]: any = await pool.execute(
+      "UPDATE PendingOrders SET status = ? WHERE booking_code = ?",
+      [status, booking_code]
+    );
+
+    if (result.affectedRows === 0) {
+      res.status(404).json({ error: "Không tìm thấy đơn hàng để cập nhật." });
+      return;
+    }
+
+    res.status(200).json({ message: "Cập nhật trạng thái thành công." });
+  } catch (error) {
+    console.error("Lỗi khi cập nhật trạng thái đơn hàng:", error);
+    res.status(500).json({ error: "Lỗi server" });
+  }
+};
+
+export const cancelPendingOrder = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { booking_code } = req.params;
+
+    const [result] = await pool.execute(
+      "DELETE FROM PendingOrders WHERE booking_code = ?",
+      [booking_code]
+    );
+
+    res.status(200).json({ message: "Đã xoá đơn pending." });
+  } catch (error) {
+    console.error("❌ Lỗi khi xoá đơn pending:", error);
+    res.status(500).json({ error: "Không thể xoá đơn pending." });
+  }
+  
+};
+
 
