@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getFieldReviews, addFieldReview } from '../controllers/reviewController';
+import { getFieldReviews, addFieldReview, getAllReviews, deleteReview } from '../controllers/reviewController';
 import { authenticate } from '../middleware/authMiddleware';
 
 const router = Router();
@@ -11,5 +11,7 @@ router.post('/fields/:field_id', authenticate, addFieldReview);
 // Các route này được sử dụng để lấy đánh giá tổng quan hoặc các thao tác khác
 router.get('/fields', getFieldReviews);
 router.post('/fields', authenticate, addFieldReview);
+router.get("/", authenticate, getAllReviews);
+router.delete("/:reviewId", authenticate, deleteReview);
 
 export default router;

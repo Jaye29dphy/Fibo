@@ -1,22 +1,24 @@
-// notifications.tsx
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, Image, TouchableOpacity, FlatList } from "react-native";
+import { View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal } from "react-native";
 import { useRouter } from "expo-router";
 import BottomTabs from "./BottomTabs";
 import { AntDesign } from "@expo/vector-icons";
-import { getNotifications } from "../../constants/apiService"; 
+import { getNotifications, markNotificationAsRead } from "../../constants/apiService";
 
 interface Notification {
   notification_id: number;
   message: string;
   is_read: boolean;
   created_at: string;
+  user_name: string;
 }
 
 export default function NotificationScreen() {
   const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   // Lấy danh sách thông báo khi component mount
   useEffect(() => {
@@ -34,6 +36,26 @@ export default function NotificationScreen() {
     fetchNotifications();
   }, []);
 
+  // Hàm xử lý khi click vào thông báo
+  const handleNotificationPress = async (notification: Notification) => {
+    setSelectedNotification(notification);
+    setModalVisible(true);
+
+    // Đánh dấu thông báo là đã đọc nếu chưa đọc
+    if (!notification.is_read) {
+      try {
+        await markNotificationAsRead(notification.notification_id);
+        setNotifications((prev) =>
+          prev.map((n) =>
+            n.notification_id === notification.notification_id ? { ...n, is_read: true } : n
+          )
+        );
+      } catch (error) {
+        console.error("Lỗi khi đánh dấu thông báo là đã đọc:", error);
+      }
+    }
+  };
+
   // Hàm xử lý sự kiện quay lại màn hình Dashboard
   const handleBack = () => {
     router.push("/customer/dashboard");
@@ -41,9 +63,12 @@ export default function NotificationScreen() {
 
   // Render mỗi thông báo
   const renderNotification = ({ item }: { item: Notification }) => (
-    <View style={styles.notificationContent}>
+    <TouchableOpacity
+      style={[styles.notificationContent, item.is_read ? styles.read : styles.unread]}
+      onPress={() => handleNotificationPress(item)}
+    >
       <Image
-        source={{ uri: "https://example  avatar.jpg" }} // Có thể thay đổi để lấy avatar động từ backend
+        source={{ uri: "https://example.com/avatar.jpg" }} // Có thể thay đổi để lấy avatar động từ backend
         style={styles.avatar}
       />
       <View style={styles.notificationTextContainer}>
@@ -52,7 +77,7 @@ export default function NotificationScreen() {
           {new Date(item.created_at).toLocaleString()}
         </Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
@@ -80,6 +105,38 @@ export default function NotificationScreen() {
           />
         )}
       </View>
+
+      {/* Modal hiển thị chi tiết thông báo */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {selectedNotification && (
+              <>
+                <Text style={styles.modalTitle}>Chi tiết thông báo</Text>
+                <Text style={styles.modalLabel}>Người nhận: {selectedNotification.user_name}</Text>
+                <Text style={styles.modalLabel}>Nội dung: {selectedNotification.message}</Text>
+                <Text style={styles.modalLabel}>
+                  Thời gian: {new Date(selectedNotification.created_at).toLocaleString()}
+                </Text>
+                <Text style={styles.modalLabel}>
+                  Trạng thái: {selectedNotification.is_read ? "Đã đọc" : "Chưa đọc"}
+                </Text>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <Text style={styles.closeButtonText}>Đóng</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Hiển thị Bottom Tab */}
       <BottomTabs />
@@ -124,6 +181,12 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 3,
   },
+  read: {
+    backgroundColor: "#e0e0e0",
+  },
+  unread: {
+    backgroundColor: "white",
+  },
   avatar: {
     width: 50,
     height: 50,
@@ -141,5 +204,41 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#666",
     marginTop: 5,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  modalContent: {
+    width: "80%",
+    backgroundColor: "white",
+    borderRadius: 10,
+    padding: 20,
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  modalLabel: {
+    fontSize: 16,
+    color: "#333",
+    marginBottom: 10,
+    textAlign: "left",
+    width: "100%",
+  },
+  closeButton: {
+    backgroundColor: "#37ff00",
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 10,
+  },
+  closeButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import pool from '../config/database';
 import { Review, RequestWithUser } from '../type/review';
+import { AuthRequest } from '../middleware/authMiddleware';
 
 export const getFieldReviews = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -148,5 +149,67 @@ export const recalculateFieldRating = async (fieldId: number): Promise<number> =
   } catch (error) {
     console.error('Error recalculating field rating:', error);
     throw error;
+  }
+};
+
+
+
+export const getAllReviews = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'admin') {
+      res.status(403).json({ error: "Chỉ admin mới có quyền xem danh sách phản hồi" });
+      return;
+    }
+
+    const [rows]: any = await pool.execute(`
+      SELECT r.review_id, r.user_id, r.field_id, r.rating, r.comment, r.created_at,
+             u.full_name AS user_name, u.email AS user_email,
+             f.name AS field_name, f.sport_type
+      FROM reviews r
+      JOIN users u ON r.user_id = u.user_id
+      JOIN fields f ON r.field_id = f.field_id
+      ORDER BY r.created_at DESC
+    `);
+
+    res.status(200).json(rows);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách phản hồi:", error);
+    res.status(500).json({ error: "Lỗi server" });
+  }
+};
+
+
+export const deleteReview = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user || req.user.role !== 'admin') {
+      res.status(403).json({ error: "Chỉ admin mới có quyền xóa đánh giá" });
+      return;
+    }
+
+    const { reviewId } = req.params;
+
+    // Lấy field_id trước khi xóa
+    const [review] = await pool.query('SELECT field_id FROM reviews WHERE review_id = ?', [reviewId]);
+    const fieldId = (review as any)[0]?.field_id;
+
+    const [result]: any = await pool.execute(
+      'DELETE FROM reviews WHERE review_id = ?',
+      [reviewId]
+    );
+
+    if (result.affectedRows === 0) {
+      res.status(404).json({ error: "Không tìm thấy đánh giá" });
+      return;
+    }
+
+    // Cập nhật rating sân
+    if (fieldId) {
+      await recalculateFieldRating(fieldId);
+    }
+
+    res.status(200).json({ message: "Xóa đánh giá thành công" });
+  } catch (error) {
+    console.error("Lỗi khi xóa đánh giá:", error);
+    res.status(500).json({ error: "Lỗi server" });
   }
 };

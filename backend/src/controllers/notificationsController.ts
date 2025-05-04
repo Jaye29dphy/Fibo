@@ -98,3 +98,32 @@ export const sendNotificationToAllUsers = async (req: Request, res: Response): P
     res.status(500).json({ message: "Lỗi server", error: error.message });
   }
 };
+
+export const markNotificationAsRead = async (req: Request, res: Response): Promise<void> => {
+  const { notification_id } = req.params;
+
+  if (!notification_id || isNaN(Number(notification_id))) {
+    res.status(400).json({ message: "ID thông báo không hợp lệ" });
+    return;
+  }
+
+  try {
+    const query = `
+      UPDATE notifications
+      SET is_read = 1
+      WHERE notification_id = ?;
+    `;
+    const [result] = await db.execute(query, [notification_id]) as [{ affectedRows: number }, any];
+
+    if (result.affectedRows === 0) {
+      res.status(404).json({ message: "Không tìm thấy thông báo" });
+      return;
+    }
+
+    console.log(`Đã đánh dấu thông báo ${notification_id} là đã đọc`);
+    res.status(200).json({ message: "Thông báo đã được đánh dấu là đã đọc" });
+  } catch (error: any) {
+    console.error("Lỗi khi cập nhật trạng thái thông báo:", error.message, error.stack);
+    res.status(500).json({ message: "Lỗi server", error: error.message });
+  }
+};

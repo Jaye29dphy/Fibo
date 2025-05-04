@@ -298,3 +298,20 @@ export const updateUserStatus = async (userId: string, status: 'active' | 'inact
   const url = `${API_URL}/api/users/${userId}/status`;
   return fetchAPI(url, "PUT", { status });
 };
+
+export const markNotificationAsRead = async (notificationId: number) => {
+  const url = `${API_URL}/api/notifications/notifications/${notificationId}/read`;
+  return fetchAPI(url, "PUT");
+};
+
+
+export const getAllReviews = async () => {
+  const url = `${API_URL}/api/reviews`;
+  return fetchAPI(url, "GET");
+};
+
+
+export const deleteReview = async (reviewId: number) => {
+  const url = `${API_URL}/api/reviews/${reviewId}`;
+  return fetchAPI(url, "DELETE");
+};
