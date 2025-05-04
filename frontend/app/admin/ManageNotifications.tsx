@@ -306,6 +306,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginBottom: 12,
+    width: "80%",
   },
   filterContainer: {
     flexDirection: "row",

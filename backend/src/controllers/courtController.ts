@@ -404,3 +404,34 @@ export const cancelPendingOrder = async (req: Request, res: Response): Promise<v
 };
 
 
+export const updateFieldStatus = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { fieldId } = req.params;
+    const { status } = req.body;
+
+    if (!['available', 'unavailable'].includes(status)) {
+      res.status(400).json({ error: "Trạng thái không hợp lệ" });
+      return;
+    }
+
+    if (!req.user || req.user.role !== 'admin') {
+      res.status(403).json({ error: "Chỉ admin mới có quyền cập nhật trạng thái sân" });
+      return;
+    }
+
+    const [result]: any = await pool.execute(
+      "UPDATE fields SET status = ? WHERE field_id = ?",
+      [status, fieldId]
+    );
+
+    if (result.affectedRows === 0) {
+      res.status(404).json({ error: "Không tìm thấy sân" });
+      return;
+    }
+
+    res.status(200).json({ message: "Cập nhật trạng thái sân thành công" });
+  } catch (error) {
+    console.error("Lỗi khi cập nhật trạng thái sân:", error);
+    res.status(500).json({ error: "Lỗi server" });
+  }
+};

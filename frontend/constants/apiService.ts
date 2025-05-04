@@ -288,3 +288,13 @@ export const deletePendingOrder = async (bookingCode: string) => {
   return fetchAPI(url, "DELETE");
 };
 
+export const updateFieldStatus = async (fieldId: string, status: 'available' | 'unavailable') => {
+  const url = `${API_URL}/api/fields/${fieldId}/status`;
+  return fetchAPI(url, "PUT", { status });
+};
+
+
+export const updateUserStatus = async (userId: string, status: 'active' | 'inactive' | 'banned') => {
+  const url = `${API_URL}/api/users/${userId}/status`;
+  return fetchAPI(url, "PUT", { status });
+};

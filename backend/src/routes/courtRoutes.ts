@@ -1,5 +1,5 @@
 import express from "express";
-import { createBooking, createCourt, getFieldImages, getFields, getServices, getSubFields, getTimeSlots, createPendingOrder, sepayWebhookHandler, getOrderStatus, cancelPendingOrder, updateOrderStatus} from "../controllers/courtController";
+import { createBooking, createCourt, getFieldImages, getFields, getServices, getSubFields, getTimeSlots, createPendingOrder, sepayWebhookHandler, getOrderStatus, cancelPendingOrder, updateOrderStatus, updateFieldStatus } from "../controllers/courtController";
 import { authenticate } from "../middleware/authMiddleware";
 import { getFieldDetail } from "../controllers/courtController";
 
@@ -18,6 +18,6 @@ router.post("/sepay-webhook", sepayWebhookHandler);
 router.get("/orders/status/:booking_code", getOrderStatus);
 router.post("/orders/update-status/:booking_code", updateOrderStatus);
 router.delete("/orders/delete-pending/:booking_code", cancelPendingOrder);
-
+router.put("/:fieldId/status", authenticate, updateFieldStatus);
 
 export default router;

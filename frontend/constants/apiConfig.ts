@@ -1,5 +1,4 @@
-export const API_URL = "http://192.168.1.28:5000";
-
+export const API_URL = "http://192.168.2.4:5000";
 
 export const GITHUB_REPO = "https://api.github.com/repos/Jaye29dphy/Fibo";
 export const FIELD_IMAGE_BASE_URL = `${API_URL}/fields`;
@@ -13,7 +12,7 @@ export const API_ENDPOINTS = {
   CHANGE_PASSWORD: `${API_URL}/api/auth/change-password`,
   GET_FIELDS: `${API_URL}/courts`,
   GET_FIELD_DETAIL: `${API_URL}/courts`,
-  GET_CALENDAR: `${API_URL}/bookings`,
+  GET_CALENDAR: `${API_URL}/api/calendar`,
   GET_VERSION: `${GITHUB_REPO}/releases/latest`,
   UPLOAD_AVATAR: `${API_URL}/upload-avatar`,
   GET_ALL_USERS: `${API_URL}/api/users`,
@@ -30,4 +29,5 @@ export const API_ENDPOINTS = {
   DELETE_PENDING_ORDER: `${API_URL}/courts/orders/delete-pending`,
   GET_ORDER_STATUS: `${API_URL}/courts/orders/status`,
   UPDATE_ORDER_STATUS: `${API_URL}/courts/orders/update-status`,
+  UPDATE_FIELD_STATUS: `${API_URL}/courts/:fieldId/status`,
 };

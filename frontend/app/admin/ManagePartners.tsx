@@ -9,8 +9,9 @@ import {
   TextInput,
   Image,
   Modal,
+  Alert,
 } from "react-native";
-import { getFields, formatCurrency } from "@/constants/apiService";
+import { getFields, formatCurrency, updateFieldStatus } from "@/constants/apiService";
 import { FIELD_IMAGE_BASE_URL } from "@/constants/apiConfig";
 
 interface SportsField {
@@ -33,14 +34,14 @@ const ManageSportsFields = () => {
   const [searchKeyword, setSearchKeyword] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [showStats, setShowStats] = useState<boolean>(false); // State để hiển thị thống kê
+  const [showStats, setShowStats] = useState<boolean>(false);
 
   const fetchFields = async () => {
     setLoading(true);
     try {
       const sportType = selectedSportType === "all" ? "" : selectedSportType;
       const data = await getFields(sportType);
-      console.log("Fetched fields:", data); // Debug log
+      console.log("Fetched fields:", data);
       setFields(data);
       filterFields(data, selectedStatus, searchKeyword);
     } catch (err: any) {
@@ -69,7 +70,26 @@ const ManageSportsFields = () => {
     }
 
     setFilteredFields(filtered);
-    console.log("Filtered fields:", filtered); // Debug log
+    console.log("Filtered fields:", filtered);
+  };
+
+  const toggleFieldStatus = async (field: SportsField) => {
+    try {
+      const newStatus = field.status === "available" ? "unavailable" : "available";
+      await updateFieldStatus(field.field_id.toString(), newStatus);
+      
+      // Cập nhật danh sách sân
+      setFields((prevFields) =>
+        prevFields.map((f) =>
+          f.field_id === field.field_id ? { ...f, status: newStatus } : f
+        )
+      );
+      filterFields(fields, selectedStatus, searchKeyword);
+      Alert.alert("Thành công", `Đã chuyển trạng thái sân thành ${newStatus === "available" ? "Có sẵn" : "Không có sẵn"}`);
+    } catch (error: any) {
+      console.error("Lỗi khi cập nhật trạng thái sân:", error);
+      Alert.alert("Lỗi", error.message || "Không thể cập nhật trạng thái sân");
+    }
   };
 
   useEffect(() => {
@@ -106,6 +126,17 @@ const ManageSportsFields = () => {
           </Text>
           <Text style={styles.info}>Giá: {formatCurrency(item.price_per_hour)}</Text>
           <Text style={styles.info}>Mô tả: {item.description || "Không có mô tả"}</Text>
+          <TouchableOpacity
+            style={[
+              styles.toggleButton,
+              item.status === "available" ? styles.toggleButtonAvailable : styles.toggleButtonUnavailable,
+            ]}
+            onPress={() => toggleFieldStatus(item)}
+          >
+            <Text style={styles.toggleButtonText}>
+              Chuyển sang {item.status === "available" ? "Không có sẵn" : "Có sẵn"}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -126,7 +157,6 @@ const ManageSportsFields = () => {
     { label: "Pickleball", value: "pickleball" },
   ];
 
-  // Hàm tính thống kê
   const getStatistics = () => {
     const totalFields = fields.length;
     const totalFootball = fields.filter((field) => field.sport_type === "football").length;
@@ -175,7 +205,6 @@ const ManageSportsFields = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Thanh tìm kiếm */}
       <TextInput
         placeholder="Tìm theo tên, địa điểm hoặc mô tả..."
         style={styles.searchInput}
@@ -183,7 +212,6 @@ const ManageSportsFields = () => {
         onChangeText={setSearchKeyword}
       />
 
-      {/* Bộ lọc trạng thái */}
       <View style={styles.filterContainer}>
         {statuses.map((status) => (
           <TouchableOpacity
@@ -206,7 +234,6 @@ const ManageSportsFields = () => {
         ))}
       </View>
 
-      {/* Bộ lọc loại sân */}
       <View style={styles.filterContainer}>
         {sportTypes.map((sport) => (
           <TouchableOpacity
@@ -229,7 +256,6 @@ const ManageSportsFields = () => {
         ))}
       </View>
 
-      {/* Danh sách sân thể thao */}
       <FlatList
         data={filteredFields}
         keyExtractor={(item) => item.field_id.toString()}
@@ -240,7 +266,6 @@ const ManageSportsFields = () => {
         }
       />
 
-      {/* Modal hiển thị thống kê */}
       <Modal
         visible={showStats}
         transparent={true}
@@ -273,8 +298,6 @@ const ManageSportsFields = () => {
   );
 };
 
-export default ManageSportsFields;
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -304,6 +327,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   searchInput: {
+    flex: 1,
     borderWidth: 1,
     borderColor: "#ccc",
     borderRadius: 12,
@@ -367,6 +391,23 @@ const styles = StyleSheet.create({
     color: "#888",
     marginBottom: 4,
   },
+  toggleButton: {
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  toggleButtonAvailable: {
+    backgroundColor: "#FF4D4F",
+  },
+  toggleButtonUnavailable: {
+    backgroundColor: "#4CAF50",
+  },
+  toggleButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
   loading: {
     flex: 1,
     justifyContent: "center",
@@ -429,3 +470,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
+
+export default ManageSportsFields;

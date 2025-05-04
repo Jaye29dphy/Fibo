@@ -1,12 +1,13 @@
 import { Router, RequestHandler } from "express";
 import bcrypt from "bcryptjs";
 import pool from "../config/database";
-import { getAllUsers } from "../controllers/userController";
+import { getAllUsers, updateUserStatus } from "../controllers/userController";
 import { authenticate, AuthRequest } from "../middleware/authMiddleware";
 
 const router = Router();
 
 router.get("/", getAllUsers);
+router.put("/:userId/status", authenticate, updateUserStatus);
 
 // ✅ Hợp nhất xác thực mật khẩu và vô hiệu hóa tài khoản
 const deactivateWithPasswordHandler: RequestHandler = async (req, res) => {

@@ -8,8 +8,9 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
+  Alert,
 } from "react-native";
-import { getAllUsers } from "@/constants/apiService";
+import { getAllUsers, updateUserStatus } from "@/constants/apiService";
 
 interface User {
   user_id: number;
@@ -28,7 +29,7 @@ const ManageUsers = () => {
   const [searchKeyword, setSearchKeyword] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [showStats, setShowStats] = useState<boolean>(false); // State để hiển thị thống kê
+  const [showStats, setShowStats] = useState<boolean>(false);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -62,13 +63,40 @@ const ManageUsers = () => {
     setFilteredUsers(filtered);
   };
 
+  const toggleUserStatus = async (user: User) => {
+    try {
+      let newStatus: 'active' | 'inactive' | 'banned';
+      if (user.status === 'active') {
+        newStatus = 'inactive';
+      } else if (user.status === 'inactive') {
+        newStatus = 'banned';
+      } else {
+        newStatus = 'active';
+      }
+
+      await updateUserStatus(user.user_id.toString(), newStatus);
+
+      // Cập nhật danh sách người dùng
+      setUsers((prevUsers) =>
+        prevUsers.map((u) =>
+          u.user_id === user.user_id ? { ...u, status: newStatus } : u
+        )
+      );
+      filterUsers(users, selectedRole, searchKeyword);
+      Alert.alert("Thành công", `Đã chuyển trạng thái người dùng thành ${newStatus}`);
+    } catch (error: any) {
+      console.error("Lỗi khi cập nhật trạng thái người dùng:", error);
+      Alert.alert("Lỗi", error.message || "Không thể cập nhật trạng thái người dùng");
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
   }, []);
 
   useEffect(() => {
     filterUsers(users, selectedRole, searchKeyword);
-  }, [selectedRole, searchKeyword]);
+  }, [selectedRole, searchKeyword, users]);
 
   const renderUserItem = ({ item }: { item: User }) => (
     <View style={styles.userItem}>
@@ -78,6 +106,19 @@ const ManageUsers = () => {
       <Text style={styles.info}>Quyền: {item.role}</Text>
       <Text style={styles.info}>Trạng thái: {item.status}</Text>
       <Text style={styles.info}>Tạo lúc: {new Date(item.created_at).toLocaleString()}</Text>
+      <TouchableOpacity
+        style={[
+          styles.toggleButton,
+          item.status === "active" ? styles.toggleButtonActive :
+          item.status === "inactive" ? styles.toggleButtonInactive :
+          styles.toggleButtonBanned,
+        ]}
+        onPress={() => toggleUserStatus(item)}
+      >
+        <Text style={styles.toggleButtonText}>
+          Chuyển sang {item.status === "active" ? "Không hoạt động" : item.status === "inactive" ? "Bị cấm" : "Hoạt động"}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -88,7 +129,6 @@ const ManageUsers = () => {
     { label: "Owner", value: "owner" },
   ];
 
-  // Hàm tính thống kê
   const getStatistics = () => {
     const totalUsers = users.length;
     const totalCustomers = users.filter((user) => user.role === "customer").length;
@@ -133,7 +173,6 @@ const ManageUsers = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Thanh tìm kiếm */}
       <TextInput
         placeholder="Tìm theo tên hoặc email..."
         style={styles.searchInput}
@@ -141,7 +180,6 @@ const ManageUsers = () => {
         onChangeText={setSearchKeyword}
       />
 
-      {/* Bộ lọc vai trò */}
       <View style={styles.roleFilterContainer}>
         {roles.map((role) => (
           <TouchableOpacity
@@ -164,7 +202,6 @@ const ManageUsers = () => {
         ))}
       </View>
 
-      {/* Danh sách người dùng */}
       <FlatList
         data={filteredUsers}
         keyExtractor={(item) => item.user_id.toString()}
@@ -175,7 +212,6 @@ const ManageUsers = () => {
         }
       />
 
-      {/* Modal hiển thị thống kê */}
       <Modal
         visible={showStats}
         transparent={true}
@@ -205,8 +241,6 @@ const ManageUsers = () => {
     </View>
   );
 };
-
-export default ManageUsers;
 
 const styles = StyleSheet.create({
   container: {
@@ -284,6 +318,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#888",
   },
+  toggleButton: {
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  toggleButtonActive: {
+    backgroundColor: "#FF4D4F",
+  },
+  toggleButtonInactive: {
+    backgroundColor: "#FFA500",
+  },
+  toggleButtonBanned: {
+    backgroundColor: "#4CAF50",
+  },
+  toggleButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
   loading: {
     flex: 1,
     justifyContent: "center",
@@ -346,3 +400,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
+
+export default ManageUsers;
