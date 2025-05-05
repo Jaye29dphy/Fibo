@@ -304,6 +304,46 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+export const updateUser = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      res.status(401).json({ error: "Unauthorized: No token provided" });
+      return;
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded: any = jwt.verify(token, process.env.JWT_SECRET || "secret");
+
+    const userId = parseInt(req.params.id);
+    if (decoded.id !== userId) {
+      res.status(403).json({ error: "Forbidden: Bạn không thể sửa người khác" });
+      return;
+    }
+
+    const { full_name, email, phone } = req.body;
+    if (!full_name || !email || !phone) {
+      res.status(400).json({ error: "Thiếu thông tin cần thiết" });
+      return;
+    }
+
+    const [result]: any = await pool.execute(
+      "UPDATE users SET full_name = ?, email = ?, phone = ? WHERE user_id = ?",
+      [full_name, email, phone, userId]
+    );
+
+    if (result.affectedRows === 0) {
+      res.status(404).json({ error: "Không tìm thấy người dùng" });
+      return;
+    }
+
+    res.status(200).json({ message: "Cập nhật thành công" });
+  } catch (error) {
+    console.error("Lỗi khi cập nhật:", error);
+    res.status(500).json({ error: "Lỗi server" });
+  }
+};
+
 
 // authController.ts
 export const getNotifications = async (req: AuthRequest, res: Response): Promise<void> => {

@@ -315,3 +315,10 @@ export const deleteReview = async (reviewId: number) => {
   const url = `${API_URL}/api/reviews/${reviewId}`;
   return fetchAPI(url, "DELETE");
 };
+
+export const updateUserInfo = async (
+  userId: number,
+  updatedData: { full_name: string; email: string; phone: string }
+) => {
+  return fetchAPI(API_ENDPOINTS.UPDATE_USER_INFO(userId), "PUT", updatedData);
+};

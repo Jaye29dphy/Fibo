@@ -1,4 +1,4 @@
-export const API_URL = "http://192.168.2.4:5000";
+export const API_URL = "http://192.168.1.5:5000";
 
 export const GITHUB_REPO = "https://api.github.com/repos/Jaye29dphy/Fibo";
 export const FIELD_IMAGE_BASE_URL = `${API_URL}/fields`;
@@ -30,4 +30,5 @@ export const API_ENDPOINTS = {
   GET_ORDER_STATUS: `${API_URL}/courts/orders/status`,
   UPDATE_ORDER_STATUS: `${API_URL}/courts/orders/update-status`,
   UPDATE_FIELD_STATUS: `${API_URL}/courts/:fieldId/status`,
+  UPDATE_USER_INFO: (userId: number | string) => `${API_URL}/api/auth/${userId}`,
 };

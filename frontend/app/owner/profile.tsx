@@ -18,7 +18,7 @@ import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { AntDesign, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
-import { getUserInfo, uploadAvatar, fetchLatestRelease } from "@/constants/apiService";
+import { getUserInfo, uploadAvatar, fetchLatestRelease , updateUserInfo } from "@/constants/apiService";
 import { AVATAR_BASE_URL } from "@/constants/apiConfig";
 
 type User = {
@@ -197,11 +197,25 @@ export default function ProfileScreen() {
   };
   
 
-  const handleEditUser = () => {
-    setUser(editedUser);
-    setEditModalVisible(false);
-    Alert.alert("Thành công", "Thông tin cá nhân đã được cập nhật!");
-  };
+  const handleEditUser = async () => {
+      if (!editedUser) return;
+    
+      try {
+        await updateUserInfo(editedUser.user_id, {
+          full_name: editedUser.full_name,
+          email: editedUser.email,
+          phone: editedUser.phone,
+        });
+    
+        const freshUser = await getUserInfo(); // gọi lại API để lấy dữ liệu mới nhất
+        setUser(freshUser); // cập nhật lại giao diện
+        Alert.alert("Thành công", "Thông tin đã được cập nhật!");
+        setEditModalVisible(false);
+      } catch (error) {
+        console.error("Lỗi khi cập nhật:", error);
+        Alert.alert("Lỗi", "Không thể cập nhật thông tin.");
+      }
+    };
 
   if (loading) {
     return (
