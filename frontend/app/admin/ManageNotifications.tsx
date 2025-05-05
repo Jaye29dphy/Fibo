@@ -9,8 +9,10 @@ import {
   TextInput,
   Modal,
   Alert,
+  Dimensions,
 } from "react-native";
-import { getNotification, sendNotificationToAllUsers } from "@/constants/apiService"; // Import hàm mới
+import { PieChart } from "react-native-chart-kit";
+import { getNotification, sendNotificationToAllUsers } from "@/constants/apiService";
 
 interface Notification {
   notification_id: number;
@@ -29,8 +31,8 @@ const ManageNotifications = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [showStats, setShowStats] = useState<boolean>(false);
-  const [showSendNotification, setShowSendNotification] = useState<boolean>(false); // State cho modal gửi thông báo
-  const [notificationMessage, setNotificationMessage] = useState<string>(""); // State cho nội dung thông báo
+  const [showSendNotification, setShowSendNotification] = useState<boolean>(false);
+  const [notificationMessage, setNotificationMessage] = useState<string>("");
 
   const fetchNotifications = async () => {
     setLoading(true);
@@ -84,7 +86,7 @@ const ManageNotifications = () => {
       Alert.alert("Thành công", "Thông báo đã được gửi đến tất cả người dùng.");
       setNotificationMessage("");
       setShowSendNotification(false);
-      await fetchNotifications(); // Làm mới danh sách thông báo
+      await fetchNotifications();
     } catch (err: any) {
       console.error("Lỗi khi gửi thông báo:", err.message, err.stack);
       Alert.alert("Lỗi", "Không thể gửi thông báo: " + err.message);
@@ -146,6 +148,25 @@ const ManageNotifications = () => {
   }
 
   const stats = getStatistics();
+
+  const chartData = [
+    {
+      name: "Đã đọc",
+      population: stats.totalRead,
+      color: "#4CAF50",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+    {
+      name: "Chưa đọc",
+      population: stats.totalUnread,
+      color: "#F44336",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+  ].filter((item) => item.population > 0); // Remove segments with zero population
+
+  const screenWidth = Dimensions.get("window").width;
 
   return (
     <View style={styles.container}>
@@ -217,8 +238,24 @@ const ManageNotifications = () => {
             <Text style={styles.modalTitle}>Thống kê thông báo</Text>
             <View style={styles.statsContainer}>
               <Text style={styles.modalText}>Tổng số thông báo: {stats.totalNotifications}</Text>
-              <Text style={styles.modalText}>Thông báo đã đọc: {stats.totalRead}</Text>
-              <Text style={styles.modalText}>Thông báo chưa đọc: {stats.totalUnread}</Text>
+              {chartData.length > 0 ? (
+                <PieChart
+                  data={chartData}
+                  width={screenWidth * 0.7} // Responsive width
+                  height={220}
+                  chartConfig={{
+                    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                    labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                  }}
+                  accessor="population"
+                  backgroundColor="transparent"
+                  paddingLeft="15"
+                  absolute
+                  style={styles.chart}
+                />
+              ) : (
+                <Text style={styles.noDataText}>Không có dữ liệu để hiển thị biểu đồ.</Text>
+              )}
             </View>
             <TouchableOpacity
               style={styles.closeButton}
@@ -380,7 +417,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     padding: 20,
     borderRadius: 12,
-    width: "80%",
+    width: "95%",
     alignItems: "center",
   },
   modalTitle: {
@@ -390,13 +427,23 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     marginBottom: 20,
-    alignItems: "flex-start",
+    alignItems: "center",
     width: "100%",
   },
   modalText: {
     fontSize: 16,
     marginBottom: 8,
     color: "#333",
+  },
+  chart: {
+    marginVertical: 8,
+    borderRadius: 16,
+  },
+  noDataText: {
+    fontSize: 16,
+    color: "#999",
+    textAlign: "center",
+    marginVertical: 20,
   },
   modalButtonContainer: {
     flexDirection: "row",
