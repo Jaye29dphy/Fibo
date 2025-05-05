@@ -322,3 +322,43 @@ export const updateUserInfo = async (
 ) => {
   return fetchAPI(API_ENDPOINTS.UPDATE_USER_INFO(userId), "PUT", updatedData);
 };
+
+// Subscription related functions
+export const getOwnerSubscription = async () => {
+  try {
+    const response = await fetchAPI(API_ENDPOINTS.GET_OWNER_SUBSCRIPTION, "GET");
+    // Transform dates to proper format if needed
+    if (response.start_date) {
+      response.start_date = new Date(response.start_date).toISOString();
+    }
+    if (response.end_date) {
+      response.end_date = new Date(response.end_date).toISOString();
+    }
+    return response;
+  } catch (error) {
+    console.error("Error fetching subscription:", error);
+    // Return Basic plan if no subscription found
+    return {
+      subscription_id: 0,
+      owner_id: 0,
+      plan_id: 1, 
+      plan_name: "Basic",
+      price: 0,
+      max_fields: 1,
+      start_date: null,
+      end_date: null,
+      status: "active",
+      description: "Basic plan for small field owners"
+    };
+  }
+};
+
+export const purchaseSubscription = async (plan: string, months: number) => {
+  const response = await fetchAPI(API_ENDPOINTS.PURCHASE_SUBSCRIPTION, "POST", {
+    plan,
+    months
+  });
+  
+  // Return the subscription data from the response
+  return response.subscription || response;
+};

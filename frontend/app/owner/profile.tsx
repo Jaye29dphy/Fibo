@@ -17,8 +17,8 @@ import {
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
-import { AntDesign, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
-import { getUserInfo, uploadAvatar, fetchLatestRelease , updateUserInfo } from "@/constants/apiService";
+import { AntDesign, FontAwesome5, MaterialIcons, MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
+import { getUserInfo, uploadAvatar, fetchLatestRelease, updateUserInfo, getOwnerSubscription, purchaseSubscription } from "@/constants/apiService";
 import { AVATAR_BASE_URL } from "@/constants/apiConfig";
 
 type User = {
@@ -39,6 +39,19 @@ interface GitHubRelease {
   body?: string;
 }
 
+interface Subscription {
+  subscription_id: number;
+  owner_id: number;
+  plan_id: number;
+  plan_name: string;
+  price: number;
+  max_fields: number;
+  start_date: string;
+  end_date: string;
+  status: "active" | "expired";
+  description?: string;
+}
+
 export default function ProfileScreen() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -50,6 +63,11 @@ export default function ProfileScreen() {
   const [release, setRelease] = useState<GitHubRelease | null>(null);
   const [releaseLoading, setReleaseLoading] = useState(true);
   const [tempAvatar, setTempAvatar] = useState<string | null>(null);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
+  const [membershipModalVisible, setMembershipModalVisible] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<"classic" | "pro">("classic");
+  const [selectedMonths, setSelectedMonths] = useState(1);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -78,8 +96,21 @@ export default function ProfileScreen() {
       setReleaseLoading(false);
     };
 
+    const fetchSubscription = async () => {
+      setSubscriptionLoading(true);
+      try {
+        const data = await getOwnerSubscription();
+        setSubscription(data);
+      } catch (error) {
+        console.error("Error fetching subscription:", error);
+      } finally {
+        setSubscriptionLoading(false);
+      }
+    };
+
     checkAuth();
     getRelease();
+    fetchSubscription();
   }, []);
 
   const uploadAvatarToServer = useCallback(async (imageUri: string) => {
@@ -320,6 +351,69 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      {/* Thông tin hội viên */}
+      <View style={styles.infoBox}>
+        <View style={styles.infoHeader}>
+          <Text style={styles.infoTitle}>THÔNG TIN HỘI VIÊN</Text>
+          <TouchableOpacity onPress={() => setMembershipModalVisible(true)}>
+            <MaterialIcons name="card-membership" size={20} color="#42ba96" />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.divider} />
+        {subscriptionLoading ? (
+          <ActivityIndicator size="small" color="#42ba96" />
+        ) : subscription ? (
+          <>
+            <View style={styles.infoRow}>
+              <MaterialCommunityIcons name="account-check" size={20} color="#333" />
+              <Text style={styles.label}>Bậc hội viên:</Text>
+              <Text style={[
+                styles.value,
+                subscription.plan_name === "VIP Pro" ? styles.proPlan : 
+                subscription.plan_name === "Classic" ? styles.classicPlan : 
+                styles.nonePlan
+              ]}>
+                {subscription.plan_name}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Ionicons name="calendar-outline" size={20} color="#333" />
+              <Text style={styles.label}>Ngày bắt đầu:</Text>
+              <Text style={styles.value}>
+                {subscription.start_date ? new Date(subscription.start_date).toLocaleDateString("vi-VN") : "N/A"}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Ionicons name="calendar" size={20} color="#333" />
+              <Text style={styles.label}>Ngày kết thúc:</Text>
+              <Text style={styles.value}>
+                {subscription.end_date ? new Date(subscription.end_date).toLocaleDateString("vi-VN") : "N/A"}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Ionicons name="checkmark-circle" size={20} color={subscription.status === "active" ? "#42ba96" : "#ff4d4d"} />
+              <Text style={styles.label}>Trạng thái:</Text>
+              <Text style={[
+                styles.value, 
+                subscription.status === "active" ? styles.activeStatus : styles.expiredStatus
+              ]}>
+                {subscription.status === "active" ? "Còn hạn" : "Hết hạn"}
+              </Text>
+            </View>
+          </>
+        ) : (
+          <View style={styles.noSubscriptionContainer}>
+            <Text style={styles.noSubscriptionText}>Bạn chưa có gói hội viên nào</Text>
+            <TouchableOpacity
+              style={styles.purchaseButton}
+              onPress={() => setMembershipModalVisible(true)}
+            >
+              <Text style={styles.purchaseButtonText}>Mua gói hội viên</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
       {/* Thông tin phiên bản */}
       <View style={styles.infoBox}>
         <View style={styles.infoHeader}>
@@ -440,6 +534,124 @@ export default function ProfileScreen() {
             <TouchableOpacity
               style={[styles.modalClose, { alignSelf: "center" }]}
               onPress={() => setEditModalVisible(false)}
+            >
+              <Text style={styles.modalCloseText}>Hủy</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Membership Purchase */}
+      <Modal visible={membershipModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, styles.membershipModalContent]}>
+            <Text style={[styles.modalTitle, { alignSelf: "center" }]}>
+              Mua gói hội viên
+            </Text>
+
+            {/* Plan Selection */}
+            <Text style={styles.modalSubtitle}>Chọn gói hội viên:</Text>
+            <View style={styles.plansContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.planOption,
+                  selectedPlan === "classic" && styles.selectedPlan
+                ]}
+                onPress={() => setSelectedPlan("classic")}
+              >
+                <Text style={[
+                  styles.planName,
+                  selectedPlan === "classic" && styles.selectedPlanText
+                ]}>Standard</Text>
+                <Text style={styles.planPrice}>250.000đ/tháng</Text>
+                <Text style={styles.planDescription}>
+                  - Giảm 10% phí dịch vụ{"\n"}
+                  - Tối đa 3 sân{"\n"}
+                  - Hỗ trợ 16/7
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.planOption,
+                  selectedPlan === "pro" && styles.selectedPlan
+                ]}
+                onPress={() => setSelectedPlan("pro")}
+              >
+                <Text style={[
+                  styles.planName,
+                  selectedPlan === "pro" && styles.selectedPlanText
+                ]}>Premium</Text>
+                <Text style={styles.planPrice}>1.000.000đ/tháng</Text>
+                <Text style={styles.planDescription}>
+                  - Giảm 15% phí dịch vụ{"\n"}
+                  - Tối đa 5 sân{"\n"}
+                  - Hỗ trợ 24/7
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Duration Selection */}
+            <Text style={styles.modalSubtitle}>Thời hạn đăng ký:</Text>
+            <View style={styles.durationContainer}>
+              <TouchableOpacity 
+                style={[styles.durationOption, selectedMonths === 1 && styles.selectedDuration]}
+                onPress={() => setSelectedMonths(1)}
+              >
+                <Text style={styles.durationText}>1 tháng</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.durationOption, selectedMonths === 3 && styles.selectedDuration]}
+                onPress={() => setSelectedMonths(3)}
+              >
+                <Text style={styles.durationText}>3 tháng</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.durationOption, selectedMonths === 6 && styles.selectedDuration]}
+                onPress={() => setSelectedMonths(6)}
+              >
+                <Text style={styles.durationText}>6 tháng</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.durationOption, selectedMonths === 12 && styles.selectedDuration]}
+                onPress={() => setSelectedMonths(12)}
+              >
+                <Text style={styles.durationText}>12 tháng</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Total calculation */}
+            <View style={styles.totalContainer}>
+              <Text style={styles.totalLabel}>Tổng thanh toán:</Text>
+              <Text style={styles.totalAmount}>
+                {(selectedPlan === "classic" ? 250000 : 1000000) * selectedMonths} VND
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.purchaseModalButton}
+              onPress={async () => {
+                try {
+                  await purchaseSubscription(selectedPlan, selectedMonths);
+                  
+                  // Refresh subscription data
+                  const data = await getOwnerSubscription();
+                  setSubscription(data);
+                  
+                  Alert.alert("Thành công", "Đã mua gói hội viên thành công!");
+                  setMembershipModalVisible(false);
+                } catch (error) {
+                  console.error("Lỗi khi mua gói hội viên:", error);
+                  Alert.alert("Lỗi", "Không thể mua gói hội viên. Vui lòng thử lại.");
+                }
+              }}
+            >
+              <Text style={styles.purchaseModalButtonText}>Thanh toán</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.modalClose, { alignSelf: "center" }]}
+              onPress={() => setMembershipModalVisible(false)}
             >
               <Text style={styles.modalCloseText}>Hủy</Text>
             </TouchableOpacity>
@@ -660,6 +872,137 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   saveButtonText: {
+    fontSize: 16,
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  noSubscriptionContainer: {
+    alignItems: "center",
+    marginTop: 10,
+  },
+  noSubscriptionText: {
+    fontSize: 14,
+    color: "#555",
+    marginBottom: 10,
+  },
+  purchaseButton: {
+    backgroundColor: "#42ba96",
+    paddingVertical: 10,
+    borderRadius: 5,
+    width: "80%",
+    alignItems: "center",
+  },
+  purchaseButtonText: {
+    fontSize: 16,
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  proPlan: {
+    color: "#42ba96",
+  },
+  classicPlan: {
+    color: "#333",
+  },
+  nonePlan: {
+    color: "#ff4d4d",
+  },
+  activeStatus: {
+    color: "#42ba96",
+  },
+  expiredStatus: {
+    color: "#ff4d4d",
+  },
+  membershipModalContent: {
+    alignItems: "center",
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 10,
+  },
+  plansContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  planOption: {
+    width: "45%",
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    padding: 10,
+    alignItems: "center",
+  },
+  selectedPlan: {
+    borderColor: "#42ba96",
+    backgroundColor: "#e6f7f2",
+  },
+  planName: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 5,
+  },
+  selectedPlanText: {
+    color: "#42ba96",
+  },
+  planPrice: {
+    fontSize: 14,
+    color: "#555",
+    marginBottom: 5,
+  },
+  planDescription: {
+    fontSize: 12,
+    color: "#777",
+    textAlign: "center",
+  },
+  durationContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  durationOption: {
+    width: "22%",
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    padding: 10,
+    alignItems: "center",
+  },
+  selectedDuration: {
+    borderColor: "#42ba96",
+    backgroundColor: "#e6f7f2",
+  },
+  durationText: {
+    fontSize: 14,
+    color: "#333",
+  },
+  totalContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 20,
+    width: "100%",
+  },
+  totalLabel: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  totalAmount: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#42ba96",
+  },
+  purchaseModalButton: {
+    backgroundColor: "#42ba96",
+    paddingVertical: 10,
+    borderRadius: 5,
+    width: "80%",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  purchaseModalButtonText: {
     fontSize: 16,
     color: "#fff",
     fontWeight: "bold",
