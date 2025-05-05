@@ -58,7 +58,7 @@ export default function NotificationScreen() {
 
   // Hàm xử lý sự kiện quay lại màn hình Dashboard
   const handleBack = () => {
-    router.push("/owner/dashboard");
+    router.push("/customer/dashboard");
   };
 
   // Render mỗi thông báo
@@ -68,14 +68,12 @@ export default function NotificationScreen() {
       onPress={() => handleNotificationPress(item)}
     >
       <Image
-        source={{ uri: "https://example.com/avatar.jpg" }} // Có thể thay đổi để lấy avatar động từ backend
+        source={{ uri: "https://gamelandvn.com/wp-content/uploads/anh/2017/03/170325-crazyguy-csgo-01.jpg" }}
         style={styles.avatar}
       />
       <View style={styles.notificationTextContainer}>
         <Text style={styles.notificationText}>{item.message}</Text>
-        <Text style={styles.notificationTime}>
-          {new Date(item.created_at).toLocaleString()}
-        </Text>
+        <Text style={styles.notificationDetailText}>Nhấn vào để xem chi tiết</Text>
       </View>
     </TouchableOpacity>
   );
@@ -118,10 +116,9 @@ export default function NotificationScreen() {
             {selectedNotification && (
               <>
                 <Text style={styles.modalTitle}>Chi tiết thông báo</Text>
-                <Text style={styles.modalLabel}>Người nhận: {selectedNotification.user_name}</Text>
                 <Text style={styles.modalLabel}>Nội dung: {selectedNotification.message}</Text>
                 <Text style={styles.modalLabel}>
-                  Thời gian: {new Date(selectedNotification.created_at).toLocaleString()}
+                  Thời gian gửi: {new Date(selectedNotification.created_at).toLocaleString()}
                 </Text>
                 <Text style={styles.modalLabel}>
                   Trạng thái: {selectedNotification.is_read ? "Đã đọc" : "Chưa đọc"}
@@ -152,10 +149,15 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#3f51b5",
+    backgroundColor: "#37ff00",
     padding: 15,
   },
   backButton: {
+    marginRight: 10,
+  },
+  logo: {
+    width: 30,
+    height: 30,
     marginRight: 10,
   },
   notificationTitle: {
@@ -195,6 +197,12 @@ const styles = StyleSheet.create({
   },
   notificationTextContainer: {
     flex: 1,
+  },
+  notificationDetailText: {
+    fontSize: 12,
+    color: "#37ff00",
+    marginTop: 5,
+    fontStyle: "italic",
   },
   notificationText: {
     fontSize: 16,

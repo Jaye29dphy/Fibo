@@ -9,7 +9,9 @@ import {
   Modal,
   Alert,
   TouchableOpacity,
+  Dimensions,
 } from "react-native";
+import { PieChart } from "react-native-chart-kit";
 import { getAllReviews, deleteReview } from "@/constants/apiService";
 
 interface Review {
@@ -133,7 +135,6 @@ const ManageFeedback = () => {
     </View>
   );
 
-
   const ratingFilters = [
     { label: "Tất cả", value: "all" },
     { label: "1 sao", value: "1" },
@@ -172,6 +173,46 @@ const ManageFeedback = () => {
   }
 
   const stats = getStatistics();
+
+  const chartData = [
+    {
+      name: "5 sao",
+      population: stats.ratingCounts.fiveStar,
+      color: "#4CAF50",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+    {
+      name: "4 sao",
+      population: stats.ratingCounts.fourStar,
+      color: "#FFC107",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+    {
+      name: "3 sao",
+      population: stats.ratingCounts.threeStar,
+      color: "#2196F3",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+    {
+      name: "2 sao",
+      population: stats.ratingCounts.twoStar,
+      color: "#FF9800",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+    {
+      name: "1 sao",
+      population: stats.ratingCounts.oneStar,
+      color: "#F44336",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+  ].filter((item) => item.population > 0); // Remove segments with zero population
+
+  const screenWidth = Dimensions.get("window").width;
 
   return (
     <View style={styles.container}>
@@ -225,7 +266,7 @@ const ManageFeedback = () => {
         }
       />
 
-<Modal
+      <Modal
         visible={showConfirmDialog}
         transparent={true}
         animationType="fade"
@@ -263,14 +304,26 @@ const ManageFeedback = () => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Thống kê phản hồi</Text>
             <View style={styles.statsContainer}>
-              <Text style={styles.modalText}>Tổng số phản hồi: {stats.totalReviews}</Text>
+              <Text style={styles.modalText}>Tổng số đánh giá: {stats.totalReviews}</Text>
               <Text style={styles.modalText}>Điểm đánh giá trung bình: {stats.averageRating}/5</Text>
-              <Text style={styles.modalText}>Số phản hồi theo số sao:</Text>
-              <Text style={styles.modalText}>- 5 sao: {stats.ratingCounts.fiveStar} phản hồi</Text>
-              <Text style={styles.modalText}>- 4 sao: {stats.ratingCounts.fourStar} phản hồi</Text>
-              <Text style={styles.modalText}>- 3 sao: {stats.ratingCounts.threeStar} phản hồi</Text>
-              <Text style={styles.modalText}>- 2 sao: {stats.ratingCounts.twoStar} phản hồi</Text>
-              <Text style={styles.modalText}>- 1 sao: {stats.ratingCounts.oneStar} phản hồi</Text>
+              {chartData.length > 0 ? (
+                <PieChart
+                  data={chartData}
+                  width={screenWidth * 0.7} // Responsive width
+                  height={220}
+                  chartConfig={{
+                    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                    labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                  }}
+                  accessor="population"
+                  backgroundColor="transparent"
+                  paddingLeft="15"
+                  absolute
+                  style={styles.chart}
+                />
+              ) : (
+                <Text style={styles.noDataText}>Không có dữ liệu để hiển thị biểu đồ.</Text>
+              )}
             </View>
             <TouchableOpacity
               style={styles.closeButton}
@@ -427,7 +480,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     padding: 20,
     borderRadius: 12,
-    width: "80%",
+    width: "95%",
     alignItems: "center",
   },
   modalTitle: {
@@ -437,13 +490,23 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     marginBottom: 20,
-    alignItems: "flex-start",
+    alignItems: "center",
     width: "100%",
   },
   modalText: {
     fontSize: 16,
     marginBottom: 8,
     color: "#333",
+  },
+  chart: {
+    marginVertical: 8,
+    borderRadius: 16,
+  },
+  noDataText: {
+    fontSize: 16,
+    color: "#999",
+    textAlign: "center",
+    marginVertical: 20,
   },
   closeButton: {
     backgroundColor: "#4CAF50",

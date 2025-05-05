@@ -8,7 +8,9 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
+  Dimensions,
 } from "react-native";
+import { PieChart } from "react-native-chart-kit";
 import { API_ENDPOINTS } from "@/constants/apiConfig";
 
 interface Booking {
@@ -29,7 +31,7 @@ const ManageBookings = () => {
   const [searchKeyword, setSearchKeyword] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [showStats, setShowStats] = useState<boolean>(false); // State để hiển thị thống kê
+  const [showStats, setShowStats] = useState<boolean>(false);
 
   const fetchBookings = async () => {
     setLoading(true);
@@ -39,7 +41,7 @@ const ManageBookings = () => {
         throw new Error("Lỗi khi lấy danh sách đặt sân.");
       }
       const data: Booking[] = await response.json();
-      console.log("Fetched bookings:", data); // Debug log
+      console.log("Fetched bookings:", data);
       setBookings(data);
       filterBookings(data, selectedStatus, searchKeyword);
     } catch (err: any) {
@@ -68,7 +70,7 @@ const ManageBookings = () => {
     }
 
     setFilteredBookings(filtered);
-    console.log("Filtered bookings:", filtered); // Debug log
+    console.log("Filtered bookings:", filtered);
   };
 
   useEffect(() => {
@@ -104,7 +106,6 @@ const ManageBookings = () => {
     { label: "Hoàn thành", value: "completed" },
   ];
 
-  // Hàm tính thống kê
   const getStatistics = () => {
     const totalBookings = bookings.length;
     const totalPending = bookings.filter((booking) => booking.status === "pending").length;
@@ -112,7 +113,6 @@ const ManageBookings = () => {
     const totalCancelled = bookings.filter((booking) => booking.status === "cancelled").length;
     const totalCompleted = bookings.filter((booking) => booking.status === "completed").length;
 
-    // Tính top 3 sân được đặt nhiều nhất
     const fieldCounts = bookings.reduce((acc, booking) => {
       acc[booking.field_name] = (acc[booking.field_name] || 0) + 1;
       return acc;
@@ -122,7 +122,6 @@ const ManageBookings = () => {
       .slice(0, 3)
       .map(([name, count]) => ({ name, count }));
 
-    // Tính top 3 người dùng đặt sân nhiều nhất
     const customerCounts = bookings.reduce((acc, booking) => {
       acc[booking.customer_name] = (acc[booking.customer_name] || 0) + 1;
       return acc;
@@ -157,6 +156,39 @@ const ManageBookings = () => {
 
   const stats = getStatistics();
 
+  const chartData = [
+    {
+      name: "Đang chờ",
+      population: stats.totalPending,
+      color: "#FFC107",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+    {
+      name: "Đã xác nhận",
+      population: stats.totalConfirmed,
+      color: "#4CAF50",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+    {
+      name: "Đã hủy",
+      population: stats.totalCancelled,
+      color: "#F44336",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+    {
+      name: "Hoàn thành",
+      population: stats.totalCompleted,
+      color: "#2196F3",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+  ].filter((item) => item.population > 0); // Remove segments with zero population
+
+  const screenWidth = Dimensions.get("window").width;
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -169,7 +201,6 @@ const ManageBookings = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Thanh tìm kiếm */}
       <TextInput
         placeholder="Tìm theo mã đặt sân, tên khách hàng, hoặc tên sân..."
         style={styles.searchInput}
@@ -177,7 +208,6 @@ const ManageBookings = () => {
         onChangeText={setSearchKeyword}
       />
 
-      {/* Bộ lọc trạng thái */}
       <View style={styles.statusFilterContainer}>
         {statuses.map((status) => (
           <TouchableOpacity
@@ -200,7 +230,6 @@ const ManageBookings = () => {
         ))}
       </View>
 
-      {/* Danh sách đặt sân */}
       <FlatList
         data={filteredBookings}
         keyExtractor={(item) => item.id.toString()}
@@ -211,7 +240,6 @@ const ManageBookings = () => {
         }
       />
 
-      {/* Modal hiển thị thống kê */}
       <Modal
         visible={showStats}
         transparent={true}
@@ -223,10 +251,24 @@ const ManageBookings = () => {
             <Text style={styles.modalTitle}>Thống kê đặt sân</Text>
             <View style={styles.statsContainer}>
               <Text style={styles.modalText}>Tổng số đơn đặt sân: {stats.totalBookings}</Text>
-              <Text style={styles.modalText}>Đơn đang chờ: {stats.totalPending}</Text>
-              <Text style={styles.modalText}>Đơn đã xác nhận: {stats.totalConfirmed}</Text>
-              <Text style={styles.modalText}>Đơn đã hủy: {stats.totalCancelled}</Text>
-              <Text style={styles.modalText}>Đơn hoàn thành: {stats.totalCompleted}</Text>
+              {chartData.length > 0 ? (
+                <PieChart
+                  data={chartData}
+                  width={screenWidth * 0.7} // Responsive width
+                  height={220}
+                  chartConfig={{
+                    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                    labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                  }}
+                  accessor="population"
+                  backgroundColor="transparent"
+                  paddingLeft="15"
+                  absolute
+                  style={styles.chart}
+                />
+              ) : (
+                <Text style={styles.noDataText}>Không có dữ liệu để hiển thị biểu đồ.</Text>
+              )}
               <Text style={styles.modalSubTitle}>Top 3 sân được đặt nhiều nhất:</Text>
               {stats.topFields.length > 0 ? (
                 stats.topFields.map((field, index) => (
@@ -260,7 +302,6 @@ const ManageBookings = () => {
     </View>
   );
 };
-
 
 const styles = StyleSheet.create({
   container: {
@@ -368,7 +409,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     padding: 20,
     borderRadius: 12,
-    width: "80%",
+    width: "95%",
     alignItems: "center",
   },
   modalTitle: {
@@ -385,13 +426,23 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     marginBottom: 20,
-    alignItems: "flex-start",
+    alignItems: "center",
     width: "100%",
   },
   modalText: {
     fontSize: 16,
     marginBottom: 8,
     color: "#333",
+  },
+  chart: {
+    marginVertical: 8,
+    borderRadius: 16,
+  },
+  noDataText: {
+    fontSize: 16,
+    color: "#999",
+    textAlign: "center",
+    marginVertical: 20,
   },
   closeButton: {
     backgroundColor: "#4CAF50",

@@ -10,7 +10,9 @@ import {
   Image,
   Modal,
   Alert,
+  Dimensions,
 } from "react-native";
+import { PieChart } from "react-native-chart-kit";
 import { getFields, formatCurrency, updateFieldStatus } from "@/constants/apiService";
 import { FIELD_IMAGE_BASE_URL } from "@/constants/apiConfig";
 
@@ -193,6 +195,60 @@ const ManageSportsFields = () => {
 
   const stats = getStatistics();
 
+  const chartData = [
+    {
+      name: "Bóng đá",
+      population: stats.totalFootball,
+      color: "#4CAF50",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+    {
+      name: "Cầu lông",
+      population: stats.totalBadminton,
+      color: "#FF9800",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+    {
+      name: "Quần vợt",
+      population: stats.totalTennis,
+      color: "#2196F3",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+    {
+      name: "Bóng rổ",
+      population: stats.totalBasketball,
+      color: "#F44336",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+    {
+      name: "Pickleball",
+      population: stats.totalPickleball,
+      color: "#9C27B0",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+    {
+      name: "Có sẵn",
+      population: stats.totalAvailable,
+      color: "#FFC107",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+    {
+      name: "Không có sẵn",
+      population: stats.totalUnavailable,
+      color: "#607D8B",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+  ].filter((item) => item.population > 0); // Remove segments with zero population
+
+  const screenWidth = Dimensions.get("window").width;
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -277,13 +333,24 @@ const ManageSportsFields = () => {
             <Text style={styles.modalTitle}>Thống kê sân thể thao</Text>
             <View style={styles.statsContainer}>
               <Text style={styles.modalText}>Tổng số sân đã đăng ký: {stats.totalFields}</Text>
-              <Text style={styles.modalText}>Sân bóng đá: {stats.totalFootball}</Text>
-              <Text style={styles.modalText}>Sân cầu lông: {stats.totalBadminton}</Text>
-              <Text style={styles.modalText}>Sân quần vợt: {stats.totalTennis}</Text>
-              <Text style={styles.modalText}>Sân bóng rổ: {stats.totalBasketball}</Text>
-              <Text style={styles.modalText}>Sân pickleball: {stats.totalPickleball}</Text>
-              <Text style={styles.modalText}>Sân có sẵn: {stats.totalAvailable}</Text>
-              <Text style={styles.modalText}>Sân không có sẵn: {stats.totalUnavailable}</Text>
+              {chartData.length > 0 ? (
+                <PieChart
+                  data={chartData}
+                  width={screenWidth * 0.7} // Responsive width
+                  height={220}
+                  chartConfig={{
+                    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                    labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                  }}
+                  accessor="population"
+                  backgroundColor="transparent"
+                  paddingLeft="15"
+                  absolute
+                  style={styles.chart}
+                />
+              ) : (
+                <Text style={styles.noDataText}>Không có dữ liệu để hiển thị biểu đồ.</Text>
+              )}
             </View>
             <TouchableOpacity
               style={styles.closeButton}
@@ -440,7 +507,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     padding: 20,
     borderRadius: 12,
-    width: "80%",
+    width: "95%",
     alignItems: "center",
   },
   modalTitle: {
@@ -450,13 +517,24 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     marginBottom: 20,
-    alignItems: "flex-start",
+    alignItems: "center",
     width: "100%",
   },
   modalText: {
     fontSize: 16,
-    marginBottom: 8,
+    marginBottom: 12,
     color: "#333",
+    fontWeight: "600",
+  },
+  chart: {
+    marginVertical: 8,
+    borderRadius: 16,
+  },
+  noDataText: {
+    fontSize: 16,
+    color: "#999",
+    textAlign: "center",
+    marginVertical: 20,
   },
   closeButton: {
     backgroundColor: "#4CAF50",

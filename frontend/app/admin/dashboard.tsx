@@ -28,21 +28,19 @@ export default function Dashboard() {
   const [selectedTab, setSelectedTab] = useState("users");
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showMenu, setShowMenu] = useState(false); // Trạng thái toggle menu
   const router = useRouter();
 
   const fetchUserInfo = async () => {
     try {
       const data = await getUserInfo();
-  
-      // Gán avatar mặc định nếu không có
       const processedData = {
         ...data,
         avatar:
           data.avatar && data.avatar.trim() !== ""
             ? data.avatar
-            : "https://www.w3schools.com/howto/img_avatar.png",
+            : "https://gamelandvn.com/wp-content/uploads/anh/2017/03/170325-crazyguy-csgo-01.jpg",
       };
-  
       setUserInfo(processedData);
     } catch (error) {
       console.error("Error fetching user info:", error);
@@ -51,13 +49,13 @@ export default function Dashboard() {
   
   const handleAvatarPress = async () => {
     if (!userInfo) {
-      await fetchUserInfo(); // chỉ gọi khi chưa có user
+      await fetchUserInfo();
     }
-    setShowDropdown((prev) => !prev); // toggle dropdown
+    setShowDropdown((prev) => !prev);
   };
 
   const handleLogout = () => {
-    router.replace("/customer")
+    router.replace("/customer");
   };
 
   const renderContent = () => {
@@ -80,11 +78,11 @@ export default function Dashboard() {
         return null;
     }
   };
+
   return (
     <View style={styles.container}>
       <Taskbar userInfo={userInfo} onAvatarPress={handleAvatarPress} />
 
-      {/* Dropdown nằm ngoài taskbar */}
       {showDropdown && (
         <View style={styles.dropdown}>
           <Text style={styles.dropdownText}>{userInfo?.name}</Text>
@@ -95,8 +93,13 @@ export default function Dashboard() {
         </View>
       )}
 
+      <AdminMenu
+        onSelect={setSelectedTab}
+        onToggle={setShowMenu}
+        isOpen={showMenu}
+      />
+
       <View style={styles.mainContent}>
-        <AdminMenu onSelect={setSelectedTab} />
         <ScrollView style={styles.content}>{renderContent()}</ScrollView>
       </View>
     </View>
@@ -108,8 +111,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   mainContent: {
-    flexDirection: "row",
     flex: 1,
+    marginTop: 100, // Đẩy nội dung xuống dưới menu toggle
   },
   content: {
     flex: 1,

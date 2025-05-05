@@ -9,7 +9,9 @@ import {
   TextInput,
   Modal,
   Alert,
+  Dimensions,
 } from "react-native";
+import { PieChart } from "react-native-chart-kit";
 import { getAllUsers, updateUserStatus } from "@/constants/apiService";
 
 interface User {
@@ -65,24 +67,23 @@ const ManageUsers = () => {
 
   const toggleUserStatus = async (user: User) => {
     try {
-      let newStatus: 'active' | 'inactive' | 'banned';
+      let newStatus: 'active' | 'inactive';
       if (user.status === 'active') {
         newStatus = 'inactive';
-      } else if (user.status === 'inactive') {
-        newStatus = 'banned';
       } else {
         newStatus = 'active';
       }
-
+  
       await updateUserStatus(user.user_id.toString(), newStatus);
-
-      // Cập nhật danh sách người dùng
-      setUsers((prevUsers) =>
-        prevUsers.map((u) =>
-          u.user_id === user.user_id ? { ...u, status: newStatus } : u
-        )
+  
+      const updatedUsers = users.map((u) =>
+        u.user_id === user.user_id ? { ...u, status: newStatus } : u
       );
-      filterUsers(users, selectedRole, searchKeyword);
+  
+      setUsers(updatedUsers);
+  
+      filterUsers(updatedUsers, selectedRole, searchKeyword);
+  
       Alert.alert("Thành công", `Đã chuyển trạng thái người dùng thành ${newStatus}`);
     } catch (error: any) {
       console.error("Lỗi khi cập nhật trạng thái người dùng:", error);
@@ -109,14 +110,12 @@ const ManageUsers = () => {
       <TouchableOpacity
         style={[
           styles.toggleButton,
-          item.status === "active" ? styles.toggleButtonActive :
-          item.status === "inactive" ? styles.toggleButtonInactive :
-          styles.toggleButtonBanned,
+          item.status === "active" ? styles.toggleButtonActive : styles.toggleButtonInactive,
         ]}
         onPress={() => toggleUserStatus(item)}
       >
         <Text style={styles.toggleButtonText}>
-          Chuyển sang {item.status === "active" ? "Không hoạt động" : item.status === "inactive" ? "Bị cấm" : "Hoạt động"}
+          Chuyển sang {item.status === "active" ? "Không hoạt động" : "Hoạt động"}
         </Text>
       </TouchableOpacity>
     </View>
@@ -135,7 +134,6 @@ const ManageUsers = () => {
     const totalOwners = users.filter((user) => user.role === "owner").length;
     const totalActive = users.filter((user) => user.status === "active").length;
     const totalInactive = users.filter((user) => user.status === "inactive").length;
-    const totalBanned = users.filter((user) => user.status === "banned").length;
 
     return {
       totalUsers,
@@ -143,7 +141,6 @@ const ManageUsers = () => {
       totalOwners,
       totalActive,
       totalInactive,
-      totalBanned,
     };
   };
 
@@ -160,6 +157,39 @@ const ManageUsers = () => {
   }
 
   const stats = getStatistics();
+
+  const chartData = [
+    {
+      name: "Khách hàng",
+      population: stats.totalCustomers,
+      color: "#4CAF50",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+    {
+      name: "Owner",
+      population: stats.totalOwners,
+      color: "#FF9800",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+    {
+      name: "Active",
+      population: stats.totalActive,
+      color: "#2196F3",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+    {
+      name: "Inactive",
+      population: stats.totalInactive,
+      color: "#F44336",
+      legendFontColor: "#333",
+      legendFontSize: 14,
+    },
+  ];
+
+  const screenWidth = Dimensions.get("window").width;
 
   return (
     <View style={styles.container}>
@@ -210,6 +240,7 @@ const ManageUsers = () => {
         ListEmptyComponent={
           <Text style={styles.emptyText}>Không tìm thấy người dùng nào.</Text>
         }
+        nestedScrollEnabled={true}
       />
 
       <Modal
@@ -223,11 +254,20 @@ const ManageUsers = () => {
             <Text style={styles.modalTitle}>Thống kê người dùng</Text>
             <View style={styles.statsContainer}>
               <Text style={styles.modalText}>Tổng số người dùng: {stats.totalUsers}</Text>
-              <Text style={styles.modalText}>Tổng số khách hàng: {stats.totalCustomers}</Text>
-              <Text style={styles.modalText}>Tổng số owner: {stats.totalOwners}</Text>
-              <Text style={styles.modalText}>Số người dùng active: {stats.totalActive}</Text>
-              <Text style={styles.modalText}>Số người dùng inactive: {stats.totalInactive}</Text>
-              <Text style={styles.modalText}>Số người dùng banned: {stats.totalBanned}</Text>
+              <PieChart
+                data={chartData}
+                width={screenWidth * 0.7} // Responsive width
+                height={220}
+                chartConfig={{
+                  color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                  labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                }}
+                accessor="population"
+                backgroundColor="transparent"
+                paddingLeft="15"
+                absolute
+                style={styles.chart}
+              />
             </View>
             <TouchableOpacity
               style={styles.closeButton}
@@ -329,9 +369,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FF4D4F",
   },
   toggleButtonInactive: {
-    backgroundColor: "#FFA500",
-  },
-  toggleButtonBanned: {
     backgroundColor: "#4CAF50",
   },
   toggleButtonText: {
@@ -370,7 +407,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     padding: 20,
     borderRadius: 12,
-    width: "80%",
+    width: "95%",
     alignItems: "center",
   },
   modalTitle: {
@@ -380,13 +417,18 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     marginBottom: 20,
-    alignItems: "flex-start",
+    alignItems: "center",
     width: "100%",
   },
   modalText: {
     fontSize: 16,
-    marginBottom: 8,
+    marginBottom: 12,
     color: "#333",
+    fontWeight: "600",
+  },
+  chart: {
+    marginVertical: 8,
+    borderRadius: 16,
   },
   closeButton: {
     backgroundColor: "#4CAF50",
