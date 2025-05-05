@@ -1,7 +1,25 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, Image, StyleSheet, Alert, ScrollView } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Image,
+  StyleSheet,
+  ScrollView,
+  Platform,
+  ToastAndroid,
+  Alert
+} from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { createPendingOrder, getUserInfo, formatCurrency, getOrderStatus, createBooking, deletePendingOrder, updateOrderStatus } from "@/constants/apiService";
+import {
+  createPendingOrder,
+  getUserInfo,
+  formatCurrency,
+  getOrderStatus,
+  createBooking,
+  deletePendingOrder,
+  updateOrderStatus,
+} from "@/constants/apiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import moment from "moment";
 import { AntDesign } from "@expo/vector-icons";
@@ -9,155 +27,153 @@ import { AntDesign } from "@expo/vector-icons";
 const ConfirmPay = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [countdown, setCountdown] = useState(15);
+  const [isPaid, setIsPaid] = useState(false);
+  const [bookingCreated, setBookingCreated] = useState(false);
+  const [expiredHandled, setExpiredHandled] = useState(false);
 
-  const getStringParam = (value: string | string[] | undefined): string => {
-    return Array.isArray(value) ? value[0] : value || "";
-  };
-
-  const booking_code = getStringParam(params.booking_code);
-  const fieldId = getStringParam(params.fieldId);
-  const fieldName = getStringParam(params.fieldName);
-  const fieldType = getStringParam(params.fieldType);
-  const selectedDate = getStringParam(params.date);
-  const selectedTimeSlots = JSON.parse(getStringParam(params.timeSlots)) as string[];
-  const price = getStringParam(params.price);
-  const extraService = getStringParam(params.extraService);
-  const extraPrice = getStringParam(params.extraPrice);
-
+  const getParam = (val: string | string[] | undefined) =>
+    Array.isArray(val) ? val[0] : val || "";
+  const bookingCode = getParam(params.booking_code);
+  const fieldId = getParam(params.fieldId);
+  const fieldName = getParam(params.fieldName);
+  const fieldType = getParam(params.fieldType);
+  const selectedDate = getParam(params.date);
+  const timeSlots = JSON.parse(getParam(params.timeSlots)) as string[];
+  const price = getParam(params.price);
+  const extraService = getParam(params.extraService);
+  const extraPrice = getParam(params.extraPrice);
   const totalPrice = parseFloat(price || "0") + (extraPrice ? parseFloat(extraPrice) : 0);
-  const [selectedPayment, setSelectedPayment] = useState<string>("VNPay");
-  const [isLoading, setIsLoading] = useState(false);
-  const [countdown, setCountdown] = useState(60); 
+
+  const slotData = timeSlots.map(slot => {
+    const [start, end] = slot.split(" - ");
+    return {
+      startTime: moment(`${selectedDate} ${start}`, "DD/MM HH:mm").format("YYYY-MM-DD HH:mm:ss"),
+      endTime: moment(`${selectedDate} ${end}`, "DD/MM HH:mm").format("YYYY-MM-DD HH:mm:ss"),
+    };
+  });
 
   const bankId = "970436";
   const accountNo = "1031505171";
   const accountName = "LaanLee";
-
-  const qrCodeUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact.png?amount=${totalPrice}&addInfo=${booking_code}&accountName=${accountName}`;
-
-  const timeSlotData = selectedTimeSlots.map((slot) => {
-    const [startTimeStr, endTimeStr] = slot.split(" - ");
-    return {
-      startTime: moment(`${selectedDate} ${startTimeStr}`, "DD/MM HH:mm").format("YYYY-MM-DD HH:mm:ss"),
-      endTime: moment(`${selectedDate} ${endTimeStr}`, "DD/MM HH:mm").format("YYYY-MM-DD HH:mm:ss"),
-    };
-  });
+  const qrCodeUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact.png?amount=${totalPrice}&addInfo=${bookingCode}&accountName=${accountName}`;
 
   useEffect(() => {
-    const init = async () => {
+    (async () => {
+      const token = await AsyncStorage.getItem("token");
+      if (!token) return;
+      const user = await getUserInfo();
+      const services = extraService
+        ? extraService.split(", ").map(s => ({ serviceId: parseInt(s.split("-")[1] || "0"), quantity: 1 }))
+        : [];
       try {
-        const token = await AsyncStorage.getItem("token");
-        if (!token) return;
-
-        const userInfo = await getUserInfo();
-        const user_Id = userInfo.user_id;
-
-        const services = extraService
-          ? extraService.split(", ").map((serviceName) => ({
-            serviceId: parseInt(serviceName.split("-")[1] || "0"),
-            quantity: 1,
-          }))
-          : [];
-
         await createPendingOrder(
           fieldId,
-          user_Id,
-          booking_code,
+          user.user_id,
+          bookingCode,
           selectedDate,
-          timeSlotData,
+          slotData,
           totalPrice,
           services,
-          selectedPayment.toLowerCase().replaceAll(" ", "_")
+          "vnpay"
         );
-      } catch (err) {
-        console.error("Không thể tạo đơn pending ban đầu", err);
+      } catch (e: any) {
+        if (!e.message.includes("Duplicate entry")) console.error(e);
       }
-    };
-
-    init();
+    })();
   }, []);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          handleExpire();
+    timerRef.current = setInterval(() => {
+      setCountdown(t => {
+        if (t <= 1) {
+          clearInterval(timerRef.current!);
+          onExpire();
           return 0;
         }
-        return prev - 1;
+        return t - 1;
       });
     }, 1000);
-
-    return () => clearInterval(timer);
+    return () => clearInterval(timerRef.current!);
   }, []);
 
-  const handleExpire = async () => {
-    const status = await checkPaymentStatus(false);
-    if (status !== "paid") {
-      try {
-        await deletePendingOrder(booking_code);
-        Alert.alert("⏰ Hết thời gian", "Đơn hàng đã bị huỷ do quá 5 phút mà chưa thanh toán.");
-        router.push("/customer/dashboard");
-      } catch (err) {
-        console.error("Lỗi khi xoá đơn hết hạn:", err);
+  const notify = (msg: string) => {
+    if (Platform.OS === "android") ToastAndroid.show(msg, ToastAndroid.SHORT);
+    else Alert.alert(msg);
+  };
+
+  const onExpire = async () => {
+    if (expiredHandled || bookingCreated) return;
+    setExpiredHandled(true);
+    try {
+      const { status } = await getOrderStatus(bookingCode);
+      if (status === "paid") await confirmBooking();
+      else {
+        await deletePendingOrder(bookingCode);
+        Alert.alert("⏰ Hết thời gian", "Đơn hàng đã bị huỷ.");
+        router.push('/customer/dashboard');
       }
+    } catch {
+      Alert.alert("Lỗi", "Không thể xử lý hết thời gian.");
+      router.push('/customer/dashboard');
     }
   };
 
   const handleMarkAsPaid = async () => {
+    if (isPaid) return;
+    setIsPaid(true);
     try {
-      await updateOrderStatus(booking_code, "paid");
-      Alert.alert("✅ Đã thanh toán", "Trạng thái đơn đã chuyển sang 'paid'. Bấm kiểm tra để xác nhận.");
-    } catch (err) {
-      console.error("❌ Lỗi cập nhật trạng thái:", err);
-      Alert.alert("Lỗi", "Không thể đánh dấu là đã thanh toán.");
+      await updateOrderStatus(bookingCode, 'paid');
+      notify('✅ Đã chuyển trạng thái đơn hàng sang paid');
+    } catch {
+      notify('❌ Lỗi cập nhật trạng thái');
     }
   };
-  
-  
 
-  const checkPaymentStatus = async (isManual = true) => {
+  const handleCheckStatus = async () => {
+    if (bookingCreated) {
+      notify('Đơn đã được tạo trước đó');
+      return;
+    }
     try {
-      const res = await getOrderStatus(booking_code);
-      if (res.status === "paid") {
-        const userInfo = await getUserInfo();
-        const user_Id = userInfo.user_id;
+      const { status } = await getOrderStatus(bookingCode);
+      if (status === 'paid') {
+        await confirmBooking();
+      } else {
+        notify('⏳ Giao dịch chưa được ghi nhận');
+      }
+    } catch {
+      notify('Lỗi kiểm tra trạng thái thanh toán');
+    }
+  };
 
-        const services = extraService
-          ? extraService.split(", ").map((serviceName) => ({
-            serviceId: parseInt(serviceName.split("-")[1] || "0"),
-            quantity: 1,
-          }))
-          : [];
-
-        await Promise.all(
-          timeSlotData.map((slot) =>
-            createBooking(
-              fieldId,
-              user_Id,
-              booking_code,
-              slot.startTime,
-              slot.endTime,
-              totalPrice / timeSlotData.length,
-              services,
-              selectedPayment.toLowerCase().replaceAll(" ", "_")
-            )
+  const confirmBooking = async () => {
+    try {
+      const user = await getUserInfo();
+      const services = extraService
+        ? extraService.split(', ').map(s => ({ serviceId: parseInt(s.split('-')[1] || '0'), quantity: 1 }))
+        : [];
+      await Promise.all(
+        slotData.map(slot =>
+          createBooking(
+            fieldId,
+            user.user_id,
+            bookingCode,
+            slot.startTime,
+            slot.endTime,
+            totalPrice / slotData.length,
+            services,
+            'vnpay'
           )
-        );
-
-        Alert.alert("✅ Thành công", "Hệ thống đã xác nhận thanh toán và đặt sân thành công.");
-        router.push("/customer/dashboard");
-      } else if (isManual) {
-        Alert.alert("⏳ Chưa thanh toán", "Giao dịch chưa được ghi nhận. Vui lòng kiểm tra lại sau.");
-      }
-      return res.status;
-    } catch (error) {
-      console.error("Lỗi khi kiểm tra trạng thái:", error);
-      if (isManual) {
-        Alert.alert("Lỗi", "Không thể kiểm tra trạng thái thanh toán.");
-      }
-      return "error";
+        )
+      );
+      setBookingCreated(true);
+      Alert.alert('✅ Thành công', 'Đặt sân thành công.');
+      router.push('/customer/dashboard');
+    } catch (e) {
+      console.error('Booking error', e);
+      Alert.alert('Lỗi', 'Không thể tạo booking.');
     }
   };
 
@@ -165,59 +181,43 @@ const ConfirmPay = () => {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.push("/customer/dashboard")}> {/* fallback back */}
+          <TouchableOpacity onPress={() => router.back()}>
             <AntDesign name="arrowleft" size={24} color="green" />
           </TouchableOpacity>
           <Text style={styles.title}>Xác nhận thanh toán</Text>
         </View>
 
         <View style={styles.infoContainer}>
-          <Text style={styles.sectionTitle}>Thông tin dịch vụ</Text>
-          <Text>Mã đơn hàng: {booking_code}</Text>
+          <Text style={styles.sectionTitle}>Mã đơn hàng: {bookingCode}</Text>
           <Text>Tên sân: {fieldName}</Text>
           <Text>Loại sân: {fieldType}</Text>
           <Text>Ngày: {selectedDate}</Text>
           <Text>Khung giờ:</Text>
-          {selectedTimeSlots.map((slot, index) => (
-            <Text key={index}>- {slot}</Text>
-          ))}
+          {timeSlots.map((slot, idx) => <Text key={idx}>- {slot}</Text>)}
           <Text style={styles.price}>Giá sân: {formatCurrency(price)}</Text>
-          {extraService && (
-            <>
-              <Text>Dịch vụ thêm: {extraService}</Text>
-              <Text style={styles.price}>Giá dịch vụ: {formatCurrency(extraPrice)}</Text>
-            </>
-          )}
+          {extraService && <>
+            <Text>Dịch vụ thêm: {extraService}</Text>
+            <Text style={styles.price}>Giá dịch vụ: {formatCurrency(extraPrice)}</Text>
+          </>}
           <Text style={styles.totalPrice}>Tổng tiền: {formatCurrency(totalPrice)}</Text>
+          
         </View>
 
+        
+
+        <View style={styles.qrContainer}>
         <Text style={styles.sectionTitle}>Thời gian còn lại: {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, "0")}</Text>
+          <Text style={styles.qrTitle}>Quét mã QR để thanh toán</Text>
+          <Image source={{ uri: qrCodeUrl }} style={styles.qrCode} />
+        </View>
 
-        {selectedPayment === "VNPay" && (
-          <View style={styles.qrContainer}>
-            <Text style={styles.qrTitle}>Quét mã QR để thanh toán</Text>
-            <Image source={{ uri: qrCodeUrl }} style={styles.qrCode} />
+        <TouchableOpacity onPress={handleMarkAsPaid} style={styles.checkButton}>
+          <Text style={styles.checkText}>Thanh toán</Text>
+        </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => checkPaymentStatus(true)}
-              style={{ marginTop: 20, padding: 12, backgroundColor: "#f59e0b", borderRadius: 8 }}
-            >
-              <Text style={{ color: "white", fontWeight: "bold", textAlign: "center" }}>
-                Kiểm tra trạng thái thanh toán
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={handleMarkAsPaid}
-              style={{ marginTop: 10, padding: 12, backgroundColor: "#16A34A", borderRadius: 8 }}
-            >
-              <Text style={{ color: "white", fontWeight: "bold", textAlign: "center" }}>
-                Thanh toán
-              </Text>
-            </TouchableOpacity>
-
-          </View>
-        )}
+        <TouchableOpacity onPress={handleCheckStatus} style={styles.checkButtonSecondary}>
+          <Text style={styles.checkText}>Kiểm tra trạng thái</Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -227,19 +227,18 @@ export default ConfirmPay;
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: "#fff" },
-  scrollContainer: {
-    paddingBottom: 20,
-  },
+  scrollContainer: { paddingBottom: 20 },
   header: { flexDirection: "row", alignItems: "center", padding: 16 },
   title: { fontSize: 18, fontWeight: "bold", marginLeft: 8 },
   infoContainer: { padding: 16, borderWidth: 1, borderRadius: 8, marginBottom: 10 },
   sectionTitle: { fontSize: 16, fontWeight: "bold", marginVertical: 8 },
+  countdown: { fontSize: 20, fontWeight: "bold", color: "#EF4444" },
   price: { fontWeight: "bold", color: "green" },
   totalPrice: { fontSize: 18, fontWeight: "bold", marginTop: 10 },
   qrContainer: { alignItems: "center", marginVertical: 20 },
   qrTitle: { fontSize: 16, fontWeight: "bold", marginBottom: 10 },
   qrCode: { width: 200, height: 200 },
-  checkButton: { backgroundColor: "#16A34A", padding: 14, borderRadius: 8, alignItems: "center" },
-  disabledButton: { backgroundColor: "#A0A0A0" },
+  checkButton: { backgroundColor: "#16A34A", padding: 14, borderRadius: 8, alignItems: "center", marginVertical: 10 },
+  checkButtonSecondary: { backgroundColor: "#f59e0b", padding: 14, borderRadius: 8, alignItems: "center", marginBottom: 20 },
   checkText: { color: "white", fontSize: 16, fontWeight: "bold" },
 });

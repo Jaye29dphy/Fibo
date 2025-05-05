@@ -9,7 +9,7 @@ router.post("/send-otp", sendOtp);
 router.post("/register", register);
 router.post("/login", login);
 router.get("/me", getUser);
-router.put("/:id", updateUser )
+router.put("/:id", updateUser);
 router.get("/notifications", authenticate, getNotifications);
 
 export default router;
