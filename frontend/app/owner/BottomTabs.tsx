@@ -16,12 +16,6 @@ export default function BottomTabs() {
         onPress={() => router.push("/owner/dashboard")}
       />
       <TabButton
-        icon="information-outline"
-        iconType="Ionicons"
-        label="Thông tin sân"
-        onPress={() => router.push("/owner/field-info")}
-      />
-      <TabButton
         icon="notifications-outline"
         iconType="Ionicons"
         label="Thông báo"
@@ -60,14 +54,16 @@ function TabButton({ icon, iconType, label, onPress }: TabButtonProps) {
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
-    justifyContent: "space-around",
     backgroundColor: "#fff",
     borderTopWidth: 1,
     borderTopColor: "#ccc",
     paddingVertical: 10,
   },
   tabButton: {
+    flex: 1,
     alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 5,
   },
   tabLabel: {
     fontSize: 12,

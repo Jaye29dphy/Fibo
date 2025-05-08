@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import pool from "../config/database";
-import { AuthRequest } from "../middleware/authMiddleware"; 
+import { AuthRequest } from "../middleware/authMiddleware";
 import moment from "moment";
 
 interface Field {
@@ -65,28 +65,32 @@ export const getFields = async (req: Request, res: Response): Promise<void> => {
 
 export const getFieldDetail = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { field_id } = req.params;
+    const { fieldId } = req.params;
+    console.log("[getFieldDetail] fieldId:", fieldId);
 
-    const [rows] = await pool.execute(
-      `
-      SELECT f.*, fi.image_name
-      FROM fields f
-      LEFT JOIN Field_Images fi ON f.field_id = fi.field_id AND fi.image_type = 'main'
-      WHERE f.field_id = ?
-      `,
-      [field_id]
+    if (!fieldId) {
+      console.warn("[getFieldDetail] Missing fieldId in request params.");
+      res.status(400).json({ error: "Missing fieldId" });
+    }
+
+    const [rows]: any = await pool.execute(
+      `SELECT f.*, fi.image_name 
+       FROM fields f 
+       LEFT JOIN Field_Images fi ON f.field_id = fi.field_id 
+       WHERE f.field_id = ?`,
+      [fieldId]
     );
 
-    if (Array.isArray(rows) && rows.length > 0) {
-      const field = rows[0] as Field;
-      res.json(field);
-    } else {
-      res.status(404).json({ error: "Field not found" });
-    }
+    console.log("[getFieldDetail] Query result:", rows);
+
+    res.json(rows);
   } catch (error) {
+    console.error("[getFieldDetail] Internal server error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
+
 
 
 export const getSubFields = async (req: Request, res: Response): Promise<void> => {
@@ -159,7 +163,7 @@ export const createBooking = async (req: AuthRequest, res: Response): Promise<vo
     // Tạo booking
     const [bookingResult] = await pool.execute(
       "INSERT INTO Bookings (user_id, field_id, start_time, end_time, total_cost, booking_code, payment_method, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-  [user_id, field_id, start_time, end_time, total_cost, booking_code, payment_method, 'confirmed']
+      [user_id, field_id, start_time, end_time, total_cost, booking_code, payment_method, 'confirmed']
     );
     const bookingId = (bookingResult as any).insertId;
 
@@ -273,7 +277,7 @@ export const createPendingOrder = async (req: Request, res: Response): Promise<v
         payment_method,
       ]
     );
-    
+
 
     res.status(201).json({ message: "Tạo đơn pending thành công" });
   } catch (error) {
@@ -400,7 +404,7 @@ export const cancelPendingOrder = async (req: Request, res: Response): Promise<v
     console.error("❌ Lỗi khi xoá đơn pending:", error);
     res.status(500).json({ error: "Không thể xoá đơn pending." });
   }
-  
+
 };
 
 

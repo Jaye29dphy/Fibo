@@ -106,7 +106,7 @@ const useOwnerFields = (): UseOwnerFieldsResult => {
                 const formattedFields = errorData.map((field: Field) => ({
                     ...field,
                     image_url: getImageUrl(field.image_name),
-                    rating: field.rating || 5,
+                    rating: field.rating || 0,
                     price_per_hour: field.price_per_hour || 0,
                 }));
                 setFields(formattedFields);
@@ -115,7 +115,7 @@ const useOwnerFields = (): UseOwnerFieldsResult => {
                 const formattedFields = errorData.fields.map((field: Field) => ({
                     ...field,
                     image_url: getImageUrl(field.image_name),
-                    rating: field.rating || 5,
+                    rating: field.rating || 0,
                     price_per_hour: field.price_per_hour || 0,
                 }));
                 setFields(formattedFields);

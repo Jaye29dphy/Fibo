@@ -66,27 +66,76 @@ const useRegister = () => {
   const fetchTimeSlots = async () => {
     setLoading(true);
     try {
-      // Tạo dữ liệu mẫu từ 05:00 đến 23:00
-      const mockTimeSlots: TimeSlot[] = [];
+      // Gọi API thực tế để lấy danh sách khung giờ
+      const token = await AsyncStorage.getItem('token');
+      console.log('Fetching timeslots from API...');
+
+      const response = await fetch(`${API_ENDPOINTS.GET_TIME_SLOTS}`, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        console.error('Failed to fetch timeslots:', response.status);
+        throw new Error('Cannot fetch timeslots');
+      }
+
+      const timeSlotsData = await response.json();
+      console.log('Fetched all timeslots:', timeSlotsData.length, 'slots');
+
+      if (timeSlotsData && Array.isArray(timeSlotsData)) {
+        const timeSlots = timeSlotsData.map(slot => ({
+          slot_id: slot.slot_id,
+          start_time: slot.start_time,
+          end_time: slot.end_time,
+          price: '',
+          selected: true // Mặc định là được chọn
+        }));
+
+        // Sắp xếp các khung giờ, đưa 00:00-01:00 và 01:00-02:00 xuống cuối
+        const sortedTimeSlots = [...timeSlots].sort((a, b) => {
+          const timeA = parseInt(a.start_time.split(':')[0]);
+          const timeB = parseInt(b.start_time.split(':')[0]);
+
+          // Đặc biệt xử lý khung giờ 00 và 01 ra cuối
+          if (timeA === 0 || timeA === 1) return 1;
+          if (timeB === 0 || timeB === 1) return -1;
+          return timeA - timeB;
+        });
+
+        setFieldData(prev => ({
+          ...prev,
+          timeSlots: sortedTimeSlots
+        }));
+      } else {
+        throw new Error('Invalid timeslots data format');
+      }
+    } catch (error) {
+      console.error('Lỗi khi lấy danh sách khung giờ:', error);
+
+      // Fallback: Tạo danh sách khung giờ mặc định khi API lỗi
+      console.log('Creating fallback timeslots...');
+      const fallbackTimeSlots: TimeSlot[] = [];
       for (let i = 5; i <= 23; i++) {
-        mockTimeSlots.push({
+        fallbackTimeSlots.push({
           slot_id: i - 4,
           start_time: `${i.toString().padStart(2, '0')}:00:00`,
           end_time: `${(i + 1).toString().padStart(2, '0')}:00:00`,
           price: '',
-          selected: true // Mặc định là được chọn
+          selected: true
         });
       }
 
-      // Thêm khung giờ 00:00-01:00 và 01:00-02:00 - sẽ xếp xuống cuối cùng sau khi sắp xếp
-      mockTimeSlots.push({
+      fallbackTimeSlots.push({
         slot_id: 20,
         start_time: '00:00:00',
         end_time: '01:00:00',
         price: '',
         selected: true
       });
-      mockTimeSlots.push({
+      fallbackTimeSlots.push({
         slot_id: 21,
         start_time: '01:00:00',
         end_time: '02:00:00',
@@ -94,12 +143,11 @@ const useRegister = () => {
         selected: true
       });
 
-      // Sắp xếp lại các khung giờ, đưa 00:00-01:00 và 01:00-02:00 xuống cuối
-      const sortedTimeSlots = [...mockTimeSlots].sort((a, b) => {
+      // Sắp xếp
+      const sortedFallback = [...fallbackTimeSlots].sort((a, b) => {
         const timeA = parseInt(a.start_time.split(':')[0]);
         const timeB = parseInt(b.start_time.split(':')[0]);
 
-        // Đặc biệt xử lý khung giờ 00 và 01 ra cuối
         if (timeA === 0 || timeA === 1) return 1;
         if (timeB === 0 || timeB === 1) return -1;
         return timeA - timeB;
@@ -107,29 +155,8 @@ const useRegister = () => {
 
       setFieldData(prev => ({
         ...prev,
-        timeSlots: sortedTimeSlots
+        timeSlots: sortedFallback
       }));
-
-      // TODO: Khi API sẵn sàng, thay thế bằng code dưới đây
-      /*
-      const response = await fetch(API_ENDPOINTS.GET_TIME_SLOTS);
-      const data = await response.json();
-      
-      if (data && Array.isArray(data)) {
-        const timeSlots = data.map(slot => ({
-          ...slot,
-          price: '',
-          selected: true // Mặc định là được chọn
-        }));
-        
-        setFieldData(prev => ({
-          ...prev,
-          timeSlots
-        }));
-      }
-      */
-    } catch (error) {
-      console.error('Lỗi khi lấy danh sách khung giờ:', error);
     } finally {
       setLoading(false);
     }

@@ -46,7 +46,7 @@ const getUserIdFromToken = (req: Request): number | null => {
 // Endpoint để lấy danh sách khung giờ
 export const getTimeSlots = async (req: Request, res: Response): Promise<void> => {
   try {
-    const query = `SELECT slot_id, start_time, end_time FROM fibo.slots ORDER BY 
+    const query = `SELECT slot_id, start_time, end_time FROM fibo.timeslots ORDER BY 
       CASE 
         WHEN start_time >= '05:00:00' THEN start_time 
         ELSE CONCAT('24', start_time) 
@@ -392,7 +392,7 @@ export const getOwnerFields = async (req: Request, res: Response): Promise<void>
 export const getAllFields = async (req: Request, res: Response): Promise<void> => {
   try {
     console.log('=== GET ALL FIELDS API CALLED ===');
-    
+
     // Truy vấn lấy danh sách tất cả các sân với rating
     const query = `
       SELECT 
@@ -436,12 +436,12 @@ export const getAllFields = async (req: Request, res: Response): Promise<void> =
 export const getFieldById = async (req: Request, res: Response): Promise<void> => {
   try {
     const fieldId = parseInt(req.params.id);
-    
+
     if (isNaN(fieldId)) {
       res.status(400).json({ message: 'Invalid field ID' });
       return;
     }
-    
+
     // Truy vấn để lấy thông tin chi tiết của sân
     const query = `
       SELECT 
@@ -458,33 +458,33 @@ export const getFieldById = async (req: Request, res: Response): Promise<void> =
       WHERE 
         f.field_id = ?
     `;
-    
+
     const [result] = await pool.execute(query, [fieldId]);
     const fields = result as any[];
-    
+
     if (fields.length === 0) {
       res.status(404).json({ message: 'Field not found' });
       return;
     }
-    
+
     const field = fields[0];
-    
+
     // Lấy danh sách ảnh của sân
     const imageQuery = `
       SELECT image_name, image_type 
       FROM fibo.field_images 
       WHERE field_id = ?
     `;
-    
+
     const [imageResult] = await pool.execute(imageQuery, [fieldId]);
     const images = imageResult as any[];
-    
+
     // Kết hợp thông tin và trả về
     res.status(200).json({
       ...field,
       images
     });
-    
+
   } catch (error: any) {
     console.error('Error in getFieldById:', error.message, error.stack);
     res.status(500).json({ message: 'Đã có lỗi xảy ra.', error: error.message });
