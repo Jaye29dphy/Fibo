@@ -4,20 +4,26 @@ import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
 import jwt from 'jsonwebtoken';
+import dotenv from "dotenv";
+dotenv.config();
 
-// Promisify fs.writeFile để sử dụng async/await
 const writeFileAsync = promisify(fs.writeFile);
 
-// Đường dẫn thư mục lưu ảnh
-const UPLOAD_DIR = 'D:\\img\\field';
+// Đảm bảo basePath luôn là string
+const basePath = process.env.FIELD_IMAGE_PATH;
 
-// Đảm bảo thư mục tồn tại
-if (!fs.existsSync(UPLOAD_DIR)) {
-  console.log('Creating upload directory:', UPLOAD_DIR);
+if (!basePath) {
+  console.error('❌ FIELD_IMAGE_PATH is not defined in .env');
+  process.exit(1); // hoặc throw new Error()
+}
+
+// Tại thời điểm này TypeScript biết basePath chắc chắn là string
+if (!fs.existsSync(basePath)) {
+  console.log('📁 Creating upload directory:', basePath);
   try {
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    fs.mkdirSync(basePath, { recursive: true });
   } catch (error) {
-    console.error('Failed to create upload directory:', error);
+    console.error('❌ Failed to create upload directory:', error);
   }
 }
 
@@ -276,7 +282,7 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
         if (!fileExtension) fileExtension = '.jpg';
 
         const imageName = `${fieldId}_${index}${fileExtension}`;
-        const imagePath = path.join(UPLOAD_DIR, imageName);
+        const imagePath = path.join(basePath, imageName);
 
         try {
           console.log('Saving image:', imageName, 'to:', imagePath);
