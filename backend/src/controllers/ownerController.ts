@@ -2,8 +2,7 @@ import { Response } from "express";
 import pool from "../config/database";
 import { AuthRequest } from "../middleware/authMiddleware";
 
-export class OwnerController {
-  // Lấy thông tin hồ sơ của owner
+export class OwnerController {  // Lấy thông tin hồ sơ của owner
   static async getProfile(req: AuthRequest, res: Response): Promise<void> {
     try {
       if (!req.user) {
@@ -16,9 +15,7 @@ export class OwnerController {
         return;
       }
 
-      const userId = req.user.id;
-
-      // Truy vấn thông tin người dùng từ database
+      const userId = req.user.id;      // Truy vấn thông tin người dùng từ database
       const [users]: any = await pool.execute(
         "SELECT user_id, full_name, email, phone, role, status, created_at, avatar FROM users WHERE user_id = ? AND role = 'owner'",
         [userId]
@@ -29,14 +26,26 @@ export class OwnerController {
         return;
       }
 
-      const user = users[0];
+      // Lấy thông tin từ bảng owners
+      const [owners]: any = await pool.execute(
+        "SELECT owner_id, business_name, address FROM owners WHERE user_id = ?",
+        [userId]
+      );
+
+      // Kết hợp thông tin từ cả hai bảng
+      const user = {
+        ...users[0],
+        owner_id: owners.length > 0 ? owners[0].owner_id : null,
+        business_name: owners.length > 0 ? owners[0].business_name : null,
+        address: owners.length > 0 ? owners[0].address : null
+      };
+
       res.status(200).json(user);
     } catch (error) {
       console.error("Error in getProfile:", error);
       res.status(500).json({ error: "Internal Server Error" });
     }
   }
-
   // Cập nhật thông tin hồ sơ của owner (nếu cần)
   static async updateProfile(req: AuthRequest, res: Response): Promise<void> {
     try {
@@ -48,10 +57,9 @@ export class OwnerController {
       if (req.user.role !== "owner") {
         res.status(403).json({ error: "Forbidden: Access denied" });
         return;
-      }
-
+      }      
       const userId = req.user.id;
-      const { full_name, email, phone } = req.body;
+      const { full_name, email, phone, business_name, address } = req.body;
 
       // Kiểm tra dữ liệu đầu vào
       if (!full_name || !email || !phone) {
@@ -59,15 +67,41 @@ export class OwnerController {
         return;
       }
 
-      // Cập nhật thông tin trong database
+      // Cập nhật thông tin user trong database
       await pool.execute(
         "UPDATE users SET full_name = ?, email = ?, phone = ? WHERE user_id = ? AND role = 'owner'",
         [full_name, email, phone, userId]
       );
 
-      // Lấy thông tin đã cập nhật
+      // Kiểm tra xem người dùng đã có record trong bảng owners chưa
+      const [owners]: any = await pool.execute(
+        "SELECT owner_id FROM owners WHERE user_id = ?",
+        [userId]
+      );
+
+      if (Array.isArray(owners) && owners.length > 0) {
+        // Người dùng đã có record trong bảng owners, cập nhật thông tin
+        await pool.execute(
+          "UPDATE owners SET business_name = ?, address = ? WHERE user_id = ?",
+          [business_name || null, address || null, userId]
+        );
+      } else {
+        // Người dùng chưa có record trong bảng owners, tạo mới
+        await pool.execute(
+          "INSERT INTO owners (user_id, business_name, address) VALUES (?, ?, ?)",
+          [userId, business_name || null, address || null]
+        );
+      }
+
+      // Lấy thông tin user đã cập nhật
       const [updatedUsers]: any = await pool.execute(
         "SELECT user_id, full_name, email, phone, role, status, created_at, avatar FROM users WHERE user_id = ?",
+        [userId]
+      );
+
+      // Lấy thông tin owner đã cập nhật
+      const [updatedOwners]: any = await pool.execute(
+        "SELECT owner_id, business_name, address FROM owners WHERE user_id = ?",
         [userId]
       );
 
@@ -76,7 +110,13 @@ export class OwnerController {
         return;
       }
 
-      const updatedUser = updatedUsers[0];
+      // Kết hợp thông tin từ cả hai bảng
+      const updatedUser = {
+        ...updatedUsers[0],
+        owner_id: updatedOwners.length > 0 ? updatedOwners[0].owner_id : null,
+        business_name: updatedOwners.length > 0 ? updatedOwners[0].business_name : null,
+        address: updatedOwners.length > 0 ? updatedOwners[0].address : null
+      };
       res.status(200).json({ message: "Profile updated successfully", user: updatedUser });
     } catch (error) {
       console.error("Error in updateProfile:", error);
@@ -151,9 +191,7 @@ export class OwnerController {
         return;
       }
 
-      const ownerId = owners[0].owner_id;
-
-      // Get subscription information
+      const ownerId = owners[0].owner_id;      // Get active subscription information
       const [subscriptions]: any = await pool.execute(
         `SELECT 
           os.subscription_id, 
@@ -171,7 +209,8 @@ export class OwnerController {
         JOIN 
           subscription_plans sp ON os.plan_id = sp.plan_id
         WHERE 
-          os.owner_id = ? 
+          os.owner_id = ?
+          AND os.status = 'active'
         ORDER BY 
           os.start_date DESC 
         LIMIT 1`,
@@ -202,7 +241,6 @@ export class OwnerController {
       res.status(500).json({ error: "Internal Server Error" });
     }
   }
-
   // Purchase subscription
   static async purchaseSubscription(req: AuthRequest, res: Response): Promise<void> {
     try {
@@ -248,13 +286,33 @@ export class OwnerController {
       endDate.setMonth(endDate.getMonth() + parseInt(months.toString()));
       const formattedEndDate = endDate.toISOString().slice(0, 19).replace('T', ' ');
 
-      // Insert the new subscription
-      await pool.execute(
-        `INSERT INTO owner_subscriptions 
-        (owner_id, plan_id, start_date, end_date, status) 
-        VALUES (?, ?, ?, ?, 'active')`,
-        [ownerId, planId, startDate, formattedEndDate]
-      );
+      // Transaction to ensure data consistency
+      await pool.execute('START TRANSACTION');
+      
+      try {
+        // Mark any active subscriptions as expired
+        await pool.execute(
+          `UPDATE owner_subscriptions 
+           SET status = 'expired' 
+           WHERE owner_id = ? AND status = 'active'`,
+          [ownerId]
+        );
+
+        // Insert the new subscription
+        await pool.execute(
+          `INSERT INTO owner_subscriptions 
+           (owner_id, plan_id, start_date, end_date, status) 
+           VALUES (?, ?, ?, ?, 'active')`,
+          [ownerId, planId, startDate, formattedEndDate]
+        );
+
+        // Commit transaction
+        await pool.execute('COMMIT');
+      } catch (error) {
+        // If anything goes wrong, rollback changes
+        await pool.execute('ROLLBACK');
+        throw error;
+      }
 
       // Get the inserted subscription with plan details
       const [subscriptions]: any = await pool.execute(

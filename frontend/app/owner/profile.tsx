@@ -30,6 +30,8 @@ type User = {
   status: string;
   created_at: string;
   avatar: string;
+  business_name?: string;
+  address?: string;
 };
 
 interface GitHubRelease {
@@ -227,7 +229,6 @@ export default function ProfileScreen() {
     }
   };
   
-
   const handleEditUser = async () => {
       if (!editedUser) return;
     
@@ -236,6 +237,8 @@ export default function ProfileScreen() {
           full_name: editedUser.full_name,
           email: editedUser.email,
           phone: editedUser.phone,
+          business_name: editedUser.business_name || "",
+          address: editedUser.address || ""
         });
     
         const freshUser = await getUserInfo(); // gọi lại API để lấy dữ liệu mới nhất
@@ -317,11 +320,20 @@ export default function ProfileScreen() {
           <AntDesign name="mail" size={20} color="#333" />
           <Text style={styles.label}>Email:</Text>
           <Text style={styles.value}>{user?.email || "N/A"}</Text>
-        </View>
-        <View style={styles.infoRow}>
+        </View>        <View style={styles.infoRow}>
           <AntDesign name="phone" size={20} color="#333" />
           <Text style={styles.label}>Số điện thoại:</Text>
           <Text style={styles.value}>{user?.phone || "N/A"}</Text>
+        </View>
+        <View style={styles.infoRow}>
+          <AntDesign name="shoppingcart" size={20} color="#333" />
+          <Text style={styles.label}>Tên doanh nghiệp:</Text>
+          <Text style={styles.value}>{user?.business_name || "Chưa cập nhật"}</Text>
+        </View>
+        <View style={styles.infoRow}>
+          <AntDesign name="enviromento" size={20} color="#333" />
+          <Text style={styles.label}>Địa chỉ:</Text>
+          <Text style={styles.value}>{user?.address || "Chưa cập nhật"}</Text>
         </View>
         <View style={styles.infoRow}>
           <AntDesign name="idcard" size={20} color="#333" />
@@ -358,8 +370,7 @@ export default function ProfileScreen() {
           <TouchableOpacity onPress={() => setMembershipModalVisible(true)}>
             <MaterialIcons name="card-membership" size={20} color="#42ba96" />
           </TouchableOpacity>
-        </View>
-        <View style={styles.divider} />
+        </View>        <View style={styles.divider} />
         {subscriptionLoading ? (
           <ActivityIndicator size="small" color="#42ba96" />
         ) : subscription ? (
@@ -400,13 +411,19 @@ export default function ProfileScreen() {
                 {subscription.status === "active" ? "Còn hạn" : "Hết hạn"}
               </Text>
             </View>
+            <TouchableOpacity 
+              style={styles.manageSubButton}
+              onPress={() => router.push('/owner/subscriptions')}
+            >
+              <Text style={styles.manageSubText}>Quản lý gói đăng ký</Text>
+            </TouchableOpacity>
           </>
         ) : (
           <View style={styles.noSubscriptionContainer}>
             <Text style={styles.noSubscriptionText}>Bạn chưa có gói hội viên nào</Text>
             <TouchableOpacity
               style={styles.purchaseButton}
-              onPress={() => setMembershipModalVisible(true)}
+              onPress={() => router.push('/owner/subscriptions')}
             >
               <Text style={styles.purchaseButtonText}>Mua gói hội viên</Text>
             </TouchableOpacity>
@@ -511,15 +528,37 @@ export default function ProfileScreen() {
                   prev ? { ...prev, email: text } : null
                 )
               }
-            />
-
-            <Text style={styles.modalLabel}>Số điện thoại:</Text>
+            />            <Text style={styles.modalLabel}>Số điện thoại:</Text>
             <TextInput
               style={styles.input}
               value={editedUser?.phone}
               onChangeText={(text) =>
                 setEditedUser((prev) =>
                   prev ? { ...prev, phone: text } : null
+                )
+              }
+            />
+
+            <Text style={styles.modalLabel}>Tên doanh nghiệp:</Text>
+            <TextInput
+              style={styles.input}
+              value={editedUser?.business_name}
+              placeholder="Nhập tên doanh nghiệp"
+              onChangeText={(text) =>
+                setEditedUser((prev) =>
+                  prev ? { ...prev, business_name: text } : null
+                )
+              }
+            />
+            
+            <Text style={styles.modalLabel}>Địa chỉ:</Text>
+            <TextInput
+              style={styles.input}
+              value={editedUser?.address}
+              placeholder="Nhập địa chỉ"
+              onChangeText={(text) =>
+                setEditedUser((prev) =>
+                  prev ? { ...prev, address: text } : null
                 )
               }
             />
@@ -628,22 +667,19 @@ export default function ProfileScreen() {
               </Text>
             </View>
 
-            <TouchableOpacity
-              style={styles.purchaseModalButton}
-              onPress={async () => {
-                try {
-                  await purchaseSubscription(selectedPlan, selectedMonths);
-                  
-                  // Refresh subscription data
-                  const data = await getOwnerSubscription();
-                  setSubscription(data);
-                  
-                  Alert.alert("Thành công", "Đã mua gói hội viên thành công!");
-                  setMembershipModalVisible(false);
-                } catch (error) {
-                  console.error("Lỗi khi mua gói hội viên:", error);
-                  Alert.alert("Lỗi", "Không thể mua gói hội viên. Vui lòng thử lại.");
-                }
+            <TouchableOpacity              style={styles.purchaseModalButton}
+              onPress={() => {
+                // Chuyển hướng đến trang thanh toán
+                setMembershipModalVisible(false);
+                router.push({
+                  pathname: "/owner/subscription-payment",
+                  params: {
+                    plan: selectedPlan,
+                    planName: selectedPlan === "classic" ? "Classic" : "VIP Pro",
+                    months: selectedMonths,
+                    price: selectedPlan === "classic" ? 250000 : 1000000
+                  }
+                });
               }}
             >
               <Text style={styles.purchaseModalButtonText}>Thanh toán</Text>
@@ -1001,9 +1037,20 @@ const styles = StyleSheet.create({
     width: "80%",
     alignItems: "center",
     marginBottom: 10,
-  },
-  purchaseModalButtonText: {
+  },  purchaseModalButtonText: {
     fontSize: 16,
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  manageSubButton: {
+    backgroundColor: "#42ba96",
+    paddingVertical: 10,
+    borderRadius: 5,
+    marginTop: 15,
+    alignItems: "center",
+  },
+  manageSubText: {
+    fontSize: 14,
     color: "#fff",
     fontWeight: "bold",
   },

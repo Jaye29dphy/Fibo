@@ -318,9 +318,37 @@ export const deleteReview = async (reviewId: number) => {
 
 export const updateUserInfo = async (
   userId: number,
-  updatedData: { full_name: string; email: string; phone: string }
+  updatedData: { full_name: string; email: string; phone: string; business_name?: string; address?: string }
 ) => {
+  // Nếu là owner, sử dụng endpoint updateProfile của owner
+  const token = await AsyncStorage.getItem("token");
+  if (!token) {
+    throw new Error("Not authorized");
+  }
+  
+  // Giải mã token để lấy vai trò của người dùng
+  const decoded = decodeToken(token);
+  if (decoded && decoded.role === "owner") {
+    return fetchAPI(API_ENDPOINTS.UPDATE_OWNER_PROFILE, "PUT", updatedData);
+  }
+  
+  // Nếu không phải owner, sử dụng endpoint update user thông thường
   return fetchAPI(API_ENDPOINTS.UPDATE_USER_INFO(userId), "PUT", updatedData);
+};
+
+// Hàm phụ trợ để giải mã token JWT
+const decodeToken = (token: string) => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error("Error decoding token:", error);
+    return null;
+  }
 };
 
 // Subscription related functions
@@ -361,4 +389,35 @@ export const purchaseSubscription = async (plan: string, months: number) => {
   
   // Return the subscription data from the response
   return response.subscription || response;
+};
+
+export const getSubscriptionPlans = async () => {
+  try {
+    const response = await fetchAPI(API_ENDPOINTS.GET_SUBSCRIPTION_PLANS, "GET");
+    return response;
+  } catch (error) {
+    console.error("Error fetching subscription plans:", error);
+    return [];
+  }
+};
+
+export const getSubscriptionHistory = async () => {
+  try {
+    const response = await fetchAPI(API_ENDPOINTS.GET_SUBSCRIPTION_HISTORY, "GET");
+    // Transform dates to proper format
+    if (Array.isArray(response)) {
+      return response.map(subscription => {
+        if (subscription.start_date) {
+          subscription.start_date = new Date(subscription.start_date).toISOString();
+        }
+        if (subscription.end_date) {
+          subscription.end_date = new Date(subscription.end_date).toISOString();
+        }
+        return subscription;
+      });
+    }
+    return response;  } catch (error) {
+    console.error("Error fetching subscription history:", error);
+    return [];
+  }
 };

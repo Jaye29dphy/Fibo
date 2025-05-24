@@ -13,6 +13,8 @@ import os from "os";
 import imageMiddleware from "./middleware/imageMiddleware";
 import notificationsRoutes from "./routes/notificationsRoutes";
 import reviewRoutes from "./routes/reviewRoutes";
+import ownerRoutes from "./routes/ownerRoutes";
+import subscriptionRoutes from "./routes/subscriptionRoutes";
 
 dotenv.config();
 const app = express();
@@ -53,6 +55,8 @@ app.use("/api/fields", fieldRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/fields", courtRoutes);
+app.use("/api/owner", ownerRoutes);
+app.use("/api/subscriptions", subscriptionRoutes);
 
 const PORT: number = Number(process.env.PORT) || 5000;
 const localIP = Object.values(os.networkInterfaces())
