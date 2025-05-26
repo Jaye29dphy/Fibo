@@ -7,8 +7,7 @@ import { getSubFields, getTimeSlots, getServices, formatCurrency, getStringParam
 
 const BookingScreen = () => {
   const router = useRouter();
-  const { field_id, name, price, location, image } = useLocalSearchParams(); // image giờ là image_name
-
+  const { field_id, name, price, location, image } = useLocalSearchParams();
   const [subFields, setSubFields] = useState<any[]>([]);
   const [timeSlots, setTimeSlots] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);

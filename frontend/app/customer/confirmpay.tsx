@@ -28,7 +28,7 @@ const ConfirmPay = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const [countdown, setCountdown] = useState(15);
+  const [countdown, setCountdown] = useState(30);
   const [isPaid, setIsPaid] = useState(false);
   const [bookingCreated, setBookingCreated] = useState(false);
   const [expiredHandled, setExpiredHandled] = useState(false);
