@@ -67,9 +67,6 @@ export default function ProfileScreen() {
   const [tempAvatar, setTempAvatar] = useState<string | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(true);
-  const [membershipModalVisible, setMembershipModalVisible] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<"classic" | "pro">("classic");
-  const [selectedMonths, setSelectedMonths] = useState(1);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -367,10 +364,8 @@ export default function ProfileScreen() {
       <View style={styles.infoBox}>
         <View style={styles.infoHeader}>
           <Text style={styles.infoTitle}>THÔNG TIN HỘI VIÊN</Text>
-          <TouchableOpacity onPress={() => setMembershipModalVisible(true)}>
-            <MaterialIcons name="card-membership" size={20} color="#42ba96" />
-          </TouchableOpacity>
-        </View>        <View style={styles.divider} />
+        </View>
+        <View style={styles.divider} />
         {subscriptionLoading ? (
           <ActivityIndicator size="small" color="#42ba96" />
         ) : subscription ? (
@@ -573,121 +568,6 @@ export default function ProfileScreen() {
             <TouchableOpacity
               style={[styles.modalClose, { alignSelf: "center" }]}
               onPress={() => setEditModalVisible(false)}
-            >
-              <Text style={styles.modalCloseText}>Hủy</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Modal Membership Purchase */}
-      <Modal visible={membershipModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, styles.membershipModalContent]}>
-            <Text style={[styles.modalTitle, { alignSelf: "center" }]}>
-              Mua gói hội viên
-            </Text>
-
-            {/* Plan Selection */}
-            <Text style={styles.modalSubtitle}>Chọn gói hội viên:</Text>
-            <View style={styles.plansContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.planOption,
-                  selectedPlan === "classic" && styles.selectedPlan
-                ]}
-                onPress={() => setSelectedPlan("classic")}
-              >
-                <Text style={[
-                  styles.planName,
-                  selectedPlan === "classic" && styles.selectedPlanText
-                ]}>Standard</Text>
-                <Text style={styles.planPrice}>250.000đ/tháng</Text>
-                <Text style={styles.planDescription}>
-                  - Giảm 10% phí dịch vụ{"\n"}
-                  - Tối đa 3 sân{"\n"}
-                  - Hỗ trợ 16/7
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.planOption,
-                  selectedPlan === "pro" && styles.selectedPlan
-                ]}
-                onPress={() => setSelectedPlan("pro")}
-              >
-                <Text style={[
-                  styles.planName,
-                  selectedPlan === "pro" && styles.selectedPlanText
-                ]}>Premium</Text>
-                <Text style={styles.planPrice}>1.000.000đ/tháng</Text>
-                <Text style={styles.planDescription}>
-                  - Giảm 15% phí dịch vụ{"\n"}
-                  - Tối đa 5 sân{"\n"}
-                  - Hỗ trợ 24/7
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Duration Selection */}
-            <Text style={styles.modalSubtitle}>Thời hạn đăng ký:</Text>
-            <View style={styles.durationContainer}>
-              <TouchableOpacity 
-                style={[styles.durationOption, selectedMonths === 1 && styles.selectedDuration]}
-                onPress={() => setSelectedMonths(1)}
-              >
-                <Text style={styles.durationText}>1 tháng</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.durationOption, selectedMonths === 3 && styles.selectedDuration]}
-                onPress={() => setSelectedMonths(3)}
-              >
-                <Text style={styles.durationText}>3 tháng</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.durationOption, selectedMonths === 6 && styles.selectedDuration]}
-                onPress={() => setSelectedMonths(6)}
-              >
-                <Text style={styles.durationText}>6 tháng</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.durationOption, selectedMonths === 12 && styles.selectedDuration]}
-                onPress={() => setSelectedMonths(12)}
-              >
-                <Text style={styles.durationText}>12 tháng</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Total calculation */}
-            <View style={styles.totalContainer}>
-              <Text style={styles.totalLabel}>Tổng thanh toán:</Text>
-              <Text style={styles.totalAmount}>
-                {(selectedPlan === "classic" ? 250000 : 1000000) * selectedMonths} VND
-              </Text>
-            </View>
-
-            <TouchableOpacity              style={styles.purchaseModalButton}
-              onPress={() => {
-                // Chuyển hướng đến trang thanh toán
-                setMembershipModalVisible(false);
-                router.push({
-                  pathname: "/owner/subscription-payment",
-                  params: {
-                    plan: selectedPlan,
-                    planName: selectedPlan === "classic" ? "Classic" : "VIP Pro",
-                    months: selectedMonths,
-                    price: selectedPlan === "classic" ? 250000 : 1000000
-                  }
-                });
-              }}
-            >
-              <Text style={styles.purchaseModalButtonText}>Thanh toán</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.modalClose, { alignSelf: "center" }]}
-              onPress={() => setMembershipModalVisible(false)}
             >
               <Text style={styles.modalCloseText}>Hủy</Text>
             </TouchableOpacity>

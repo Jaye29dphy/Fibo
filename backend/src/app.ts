@@ -15,6 +15,7 @@ import notificationsRoutes from "./routes/notificationsRoutes";
 import reviewRoutes from "./routes/reviewRoutes";
 import ownerRoutes from "./routes/ownerRoutes";
 import subscriptionRoutes from "./routes/subscriptionRoutes";
+import subscriptionOrderRoutes from "./routes/subscriptionOrderRoutes";
 
 dotenv.config();
 const app = express();
@@ -57,6 +58,7 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/fields", courtRoutes);
 app.use("/api/owner", ownerRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
+app.use("/api/subscription-orders", subscriptionOrderRoutes);
 
 const PORT: number = Number(process.env.PORT) || 5000;
 const localIP = Object.values(os.networkInterfaces())

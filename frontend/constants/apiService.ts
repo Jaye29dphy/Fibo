@@ -276,7 +276,8 @@ export const createPendingOrder = async (
 export const createSubscriptionPendingOrder = async (
   userId: string,
   subscriptionCode: string,
-  plan: string,
+  plan: string, // plan_code e.g. 'classic', 'pro'
+  planDisplayName: string, // plan_name e.g. 'Gói Standard', 'Gói Pro' 
   months: number,
   totalCost: number,
   paymentMethod: string = "banking"
@@ -284,7 +285,8 @@ export const createSubscriptionPendingOrder = async (
   const body = {
     user_id: userId,
     subscription_code: subscriptionCode,
-    plan,
+    plan, // This is plan_code
+    plan_display_name: planDisplayName, // This is for snapshotting the display name
     months,
     total_cost: totalCost,
     payment_method: paymentMethod
@@ -314,9 +316,8 @@ export const getSubscriptionOrderStatus = async (subscriptionCode: string) => {
   return fetchAPI(url, "GET");
 };
 
-export const updateSubscriptionOrderStatus = async (subscriptionCode: string, status: string) => {
-  const url = `${API_ENDPOINTS.UPDATE_SUBSCRIPTION_ORDER_STATUS}/${subscriptionCode}`;
-  return fetchAPI(url, "POST", { status });
+export const updateSubscriptionOrderStatus = async (orderId: string, status: string) => {
+  return fetchAPI(`${API_ENDPOINTS.UPDATE_SUBSCRIPTION_ORDER_STATUS}/${orderId}`, "POST", { new_status: status });
 };
 
 export const deleteSubscriptionPendingOrder = async (subscriptionCode: string) => {

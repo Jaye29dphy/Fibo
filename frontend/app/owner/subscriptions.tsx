@@ -79,26 +79,68 @@ const SubscriptionsScreen = () => {
       setLoading(false);
       setPlansLoading(false);
     }
-  };    const handlePurchase = () => {
+  };  const handlePurchase = () => {
     if (!selectedPlan) {
       Alert.alert("Lỗi", "Vui lòng chọn gói đăng ký");
       return;
     }
-    
+
+    // Check if user already has an active subscription (excluding the default "Free" plan if plan_id === 1)
+    if (currentSubscription && currentSubscription.status === 'active' && currentSubscription.plan_id !== 1) {
+      Alert.alert(
+        "Thông báo",
+        "Bạn đã có gói đăng ký đang hoạt động. Bạn có muốn gia hạn hoặc thay đổi gói không?",
+        [
+          {
+            text: "Hủy",
+            style: "cancel"
+          },
+          {
+            text: "Đến trang thanh toán",
+            onPress: () => proceedToPayment()
+          }
+        ]
+      );
+      return;
+    }
+
+    proceedToPayment();
+  };
+
+  const proceedToPayment = () => {
+    if (!selectedPlan) {
+      // This should ideally not happen if handlePurchase is called correctly
+      Alert.alert("Lỗi", "Chưa chọn gói để thanh toán.");
+      return;
+    }
     try {
-      // Chuyển hướng đến trang thanh toán
       setPurchaseModalVisible(false);
       const planName = selectedPlan.name || 'unknown';
-      const planType = planName.toLowerCase().includes('pro') ? 'pro' : 'classic';
-      console.log("Selected plan:", selectedPlan);
-      
+      let planCode = "";
+      const planNameLower = selectedPlan.name.toLowerCase(); // For robust checking
+
+      // Determine planCode based on plan_id or name
+      // Assuming plan_id 3 is 'pro' (maps to 'premium' in DB)
+      // Assuming plan_id 2 is 'classic' (maps to 'standard' in DB)
+      if (selectedPlan.plan_id === 3 || planNameLower.includes('pro')) { 
+        planCode = "premium"; // Send 'premium' for pro plans
+      } else if (selectedPlan.plan_id === 2 || planNameLower.includes('standard') || planNameLower.includes('classic')) { 
+        planCode = "standard"; // Send 'standard' for classic/standard plans
+      }
+
+      if (planCode === "") {
+        Alert.alert("Lỗi", `Gói "${planName}" không thể được xử lý qua kênh thanh toán này hoặc không hợp lệ. Vui lòng chọn gói được hỗ trợ (Standard/Premium).`);
+        return;
+      }
+
       router.push({
-        pathname: "/customer/payment",
+        pathname: "/owner/subscription-payment",
         params: {
-          plan: planType,
+          planId: selectedPlan.plan_id.toString(),
           planName: planName,
-          months: selectedMonths,
-          price: selectedPlan.price || 0,
+          planCode: planCode, // Pass the determined planCode
+          months: selectedMonths.toString(),
+          price: (selectedPlan.price || 0).toString(),
           type: "subscription"
         }
       });
@@ -156,13 +198,15 @@ const SubscriptionsScreen = () => {
     }
     
     const remainingDays = calculateRemainingDays(currentSubscription.end_date);
+    const isPro = currentSubscription.plan_name.toLowerCase().includes('pro');
+    const isClassic = currentSubscription.plan_name.toLowerCase().includes('classic');
     
     return (
       <View style={styles.currentSubContainer}>
         <View style={[
           styles.subHeader,
-          currentSubscription.plan_name.toLowerCase().includes('pro') ? styles.proHeader : 
-          currentSubscription.plan_name.toLowerCase().includes('classic') ? styles.classicHeader : 
+          isPro ? styles.proHeader : 
+          isClassic ? styles.classicHeader : 
           styles.basicHeader
         ]}>
           <Text style={styles.planNameText}>{currentSubscription.plan_name}</Text>
@@ -192,6 +236,11 @@ const SubscriptionsScreen = () => {
             <Text style={styles.subDetailLabel}>Số sân tối đa:</Text>
             <Text style={styles.subDetailValue}>{currentSubscription.max_fields}</Text>
           </View>
+
+          <View style={styles.subDetail}>
+            <Text style={styles.subDetailLabel}>Giá gói:</Text>
+            <Text style={styles.subDetailValue}>{formatPrice(currentSubscription.price)}</Text>
+          </View>
           
           {currentSubscription.status === 'active' && (
             <View style={styles.remainingContainer}>
@@ -202,7 +251,10 @@ const SubscriptionsScreen = () => {
           )}
           
           {currentSubscription.description && (
-            <Text style={styles.descriptionText}>{currentSubscription.description}</Text>
+            <View style={styles.descriptionBox}>
+              <Text style={styles.descriptionTitle}>Mô tả gói:</Text>
+              <Text style={styles.descriptionText}>{currentSubscription.description}</Text>
+            </View>
           )}
           
           <TouchableOpacity 
@@ -244,14 +296,16 @@ const SubscriptionsScreen = () => {
                     </TouchableOpacity>
                   </View>
                 ) : (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.plansScrollView}>
+                  <View style={styles.planCardsContainer}>
                     {subscriptionPlans.map((plan) => (
                       <TouchableOpacity
                         key={plan.plan_id}
                         style={[
-                          styles.planCard,
+                          styles.enhancedPlanCard,
                           selectedPlan?.plan_id === plan.plan_id && styles.selectedPlanCard,
-                          plan.name?.toLowerCase().includes('pro') ? styles.proPlanCard : styles.classicPlanCard
+                          plan.name?.toLowerCase().includes('pro') ? styles.proPlanCard : 
+                          plan.name?.toLowerCase().includes('classic') ? styles.classicPlanCard : 
+                          styles.basicPlanCard
                         ]}
                         onPress={() => setSelectedPlan(plan)}
                       >
@@ -262,7 +316,26 @@ const SubscriptionsScreen = () => {
                           {plan.name || "Gói đăng ký"}
                         </Text>
                         <Text style={styles.planCardPrice}>{formatPrice(plan.price || 0)}</Text>
-                        <Text style={styles.planCardFeature}>Tối đa {plan.max_fields || 0} sân</Text>
+                        <View style={styles.planFeaturesList}>
+                          <View style={styles.planFeatureItem}>
+                            <FontAwesome5 name="check-circle" size={14} color="#42ba96" />
+                            <Text style={styles.planCardFeature}>
+                              {plan.name?.toLowerCase().includes('standard') ? 'Tối đa 3 sân' : 'Tối đa 5 sân'}
+                            </Text>
+                          </View>
+                          <View style={styles.planFeatureItem}>
+                            <FontAwesome5 name="headset" size={14} color="#42ba96" />
+                            <Text style={styles.planCardFeature}>
+                              {plan.name?.toLowerCase().includes('standard') ? 'Hỗ trợ 16/7' : 'Hỗ trợ 24/7'}
+                            </Text>
+                          </View>
+                          <View style={styles.planFeatureItem}>
+                            <Ionicons name="pricetag-outline" size={14} color="#42ba96" />
+                            <Text style={styles.planCardFeature}>
+                              {plan.name?.toLowerCase().includes('standard') ? 'Giảm 10% phí dịch vụ' : 'Giảm 15% phí dịch vụ'}
+                            </Text>
+                          </View>
+                        </View>
                         {plan.name?.toLowerCase().includes('pro') && (
                           <View style={styles.recommendBadge}>
                             <Text style={styles.recommendText}>Đề xuất</Text>
@@ -270,7 +343,7 @@ const SubscriptionsScreen = () => {
                         )}
                       </TouchableOpacity>
                     ))}
-                  </ScrollView>
+                  </View>
                 )}
                 
                 <Text style={styles.sectionTitle}>Chọn thời gian:</Text>
@@ -353,6 +426,81 @@ const SubscriptionsScreen = () => {
         <Text style={styles.sectionTitle}>Gói đăng ký hiện tại</Text>
         {renderCurrentSubscription()}
       </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Các gói đăng ký có sẵn</Text>
+        {plansLoading ? (
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator size="small" color="#42ba96" />
+          </View>
+        ) : subscriptionPlans.length === 0 ? (
+          <View style={styles.noPlansContainer}>
+            <Text style={styles.noPlansText}>Không có gói đăng ký nào hiện có</Text>
+            <TouchableOpacity 
+              style={styles.retryButton}
+              onPress={loadData}
+            >
+              <Text style={styles.retryButtonText}>Thử lại</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.availablePlansContainer}>
+            {subscriptionPlans.map((plan) => (
+              <View
+                key={plan.plan_id}
+                style={[
+                  styles.enhancedPlanCard,
+                  plan.name?.toLowerCase().includes('pro') ? styles.proPlanCard :
+                  plan.name?.toLowerCase().includes('classic') || plan.name?.toLowerCase().includes('standard') ? styles.classicPlanCard :
+                  styles.basicPlanCard
+                ]}
+              >
+                <Text style={styles.planCardName}>
+                  {plan.name || "Gói đăng ký"}
+                </Text>
+                <Text style={styles.planCardPrice}>{formatPrice(plan.price || 0)}</Text>
+                
+                <View style={styles.planFeaturesList}>
+                  <View style={styles.planFeatureItem}>
+                    <FontAwesome5 name="check-circle" size={14} color="#42ba96" />
+                    <Text style={styles.planCardFeature}>
+                      {plan.name?.toLowerCase().includes('standard') || plan.name?.toLowerCase().includes('classic') ? 'Tối đa 3 sân' : 'Tối đa 5 sân'}
+                    </Text>
+                  </View>
+                  <View style={styles.planFeatureItem}>
+                    <FontAwesome5 name="headset" size={14} color="#42ba96" />
+                    <Text style={styles.planCardFeature}>
+                      {plan.name?.toLowerCase().includes('standard') || plan.name?.toLowerCase().includes('classic') ? 'Hỗ trợ 16/7' : 'Hỗ trợ 24/7'}
+                    </Text>
+                  </View>
+                  <View style={styles.planFeatureItem}>
+                    <Ionicons name="pricetag-outline" size={14} color="#42ba96" />
+                    <Text style={styles.planCardFeature}>
+                      {plan.name?.toLowerCase().includes('standard') || plan.name?.toLowerCase().includes('classic') ? 'Giảm 10% phí dịch vụ' : 'Giảm 15% phí dịch vụ'}
+                    </Text>
+                  </View>
+                </View>
+                
+                {plan.name?.toLowerCase().includes('pro') && (
+                  <View style={styles.recommendBadge}>
+                    <Text style={styles.recommendText}>Đề xuất</Text>
+                  </View>
+                )}
+                
+                <TouchableOpacity
+                  style={styles.upgradeToPlanButton}
+                  onPress={() => {
+                    setSelectedPlan(plan);
+                    setPurchaseModalVisible(true);
+                  }}
+                >
+                  <Text style={styles.upgradeToPlanButtonText}>Chọn gói này</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
       
       <View style={styles.section}>
         <SubscriptionHistory />
@@ -374,7 +522,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 15,
     paddingVertical: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
@@ -385,8 +533,8 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   section: {
-    marginVertical: 10,
-    paddingHorizontal: 20,
+    padding: 15,
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 16,
@@ -494,10 +642,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#42ba96',
   },
+  descriptionBox: {
+    backgroundColor: '#f9f9f9',
+    padding: 12,
+    borderRadius: 6,
+    marginBottom: 15,
+    borderLeftWidth: 3,
+    borderLeftColor: '#42ba96',
+  },
+  descriptionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#555',
+    marginBottom: 5,
+  },
   descriptionText: {
     fontSize: 14,
     color: '#777',
-    marginBottom: 15,
     lineHeight: 20,
   },
   renewButton: {
@@ -670,6 +831,48 @@ const styles = StyleSheet.create({
   closeModalText: {
     color: '#777',
     fontSize: 16,
+  },
+  planCardsContainer: {
+    marginBottom: 20,
+  },
+  enhancedPlanCard: {
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    backgroundColor: '#fff',
+  },
+  basicPlanCard: {
+    borderColor: '#ccc',
+  },
+  planFeaturesList: {
+    marginTop: 10,
+  },
+  planFeatureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    gap: 8,
+  },
+  availablePlansContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  upgradeToPlanButton: {
+    backgroundColor: '#42ba96',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  upgradeToPlanButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

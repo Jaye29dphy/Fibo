@@ -1,260 +1,251 @@
 import { Request, Response } from "express";
-import pool from "../config/database";
-import { AuthRequest } from "../middleware/authMiddleware";
+import pool from "../config/database"; // Assuming pool is your database connection pool
 
 export class SubscriptionOrderController {
   // Tạo đơn hàng subscription pending
   static async createSubscriptionPendingOrder(req: Request, res: Response): Promise<void> {
+    let connection;
     try {
       const {
         user_id,
         subscription_code,
-        plan,
+        plan: plan_code_from_req, // This is 'classic' or 'pro' from frontend
+        plan_display_name,      // This is 'Gói Standard' etc. from frontend
         months,
         total_cost,
         payment_method = 'banking'
       } = req.body;
 
-      if (!user_id || !subscription_code || !plan || !months || !total_cost) {
-        res.status(400).json({ error: "Thiếu thông tin đơn hàng subscription." });
+      if (!user_id || !subscription_code || !plan_code_from_req || !plan_display_name || !months || total_cost === undefined) {
+        res.status(400).json({ error: "Missing required fields for pending order (user_id, subscription_code, plan, plan_display_name, months, total_cost)." });
         return;
       }
 
-      // Kiểm tra plan có hợp lệ không
-      // if (!['basic', 'classic', 'pro'].includes(plan.toLowerCase())) {
-      //   res.status(400).json({ error: "Loại gói subscription không hợp lệ." });
-      //   return;
-      // }
-      // Query the subscription_plans table to get plan_id and validate plan name
-      const [planRows]: any = await pool.execute(
-        "SELECT plan_id FROM subscription_plans WHERE plan_code = ?",
-        [plan.toLowerCase()]
+      connection = await pool.getConnection();
+      const [planRows]: any = await connection.query(
+        "SELECT plan_id, plan_code, price FROM subscription_plans WHERE plan_code = ?",
+        [plan_code_from_req.toLowerCase()]
       );
 
       if (planRows.length === 0) {
-        res.status(400).json({ error: "Loại gói subscription không hợp lệ hoặc không tồn tại." });
+        res.status(400).json({ error: `Invalid plan code from request: ${plan_code_from_req}` });
         return;
       }
-      const plan_id_snapshot = planRows[0].plan_id;      await pool.execute(
+      const planDetails = planRows[0]; // planDetails.plan_code will be from DB (e.g. 'standard')
+
+      // Calculate expiration time (e.g., 15 minutes from now)
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+      const [result]: any = await connection.query(
         `INSERT INTO subscriptionpendingorders 
-         (subscription_code, user_id, plan_name_snapshot, months, total_cost, payment_method, plan_id_snapshot) 
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [subscription_code, user_id, plan.toLowerCase(), months, total_cost, payment_method, plan_id_snapshot]
+          (user_id, subscription_code, plan_name_snapshot, plan_id_snapshot, months_purchased, price_per_month_snapshot, total_cost, payment_method, status, expires_at, created_at, updated_at) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, NOW(), NOW())`,
+        [
+          user_id,
+          subscription_code,
+          plan_display_name,       // Use the display name sent from frontend
+          planDetails.plan_id,     // Use the plan_id from DB
+          months,
+          planDetails.price,       // Price per month from DB
+          total_cost, 
+          payment_method,
+          expiresAt
+        ]
       );
 
-      res.status(201).json({ message: "Tạo đơn hàng subscription pending thành công" });
+      await connection.commit();
+      // Return the newly created order_id
+      res.status(201).json({ 
+        message: 'Subscription pending order created successfully.', 
+        order_id: result.insertId, // Send back the insertId as order_id
+        subscription_code: subscription_code // Also send back the generated subscription_code for reference
+      });
     } catch (error) {
-      console.error("Lỗi tạo đơn hàng subscription pending:", error);
-      res.status(500).json({ error: "Lỗi server" });
+      console.error("Error in createSubscriptionPendingOrder:", error);
+      res.status(500).json({ error: "Internal Server Error creating pending order." });
+    } finally {
+      if (connection) connection.release();
     }
   }
 
   // Lấy trạng thái đơn hàng subscription
   static async getSubscriptionOrderStatus(req: Request, res: Response): Promise<void> {
     try {
-      const { subscription_code } = req.params;      const [rows]: any = await pool.execute(
-        "SELECT status FROM subscriptionpendingorders WHERE subscription_code = ?",
-        [subscription_code]
-      );
-
-      if (!rows.length) {
-        res.status(404).json({ error: "Không tìm thấy đơn hàng subscription." });
+      const { subscription_code } = req.params;
+      if (!subscription_code) {
+        res.status(400).json({ error: "Subscription code is required." });
         return;
       }
 
-      res.status(200).json({ status: rows[0].status });
+      const [rows]: any = await pool.query(
+        "SELECT status, plan_name_snapshot, total_cost, created_at, expires_at FROM subscriptionpendingorders WHERE subscription_code = ?",
+        [subscription_code]
+      );
+
+      if (rows.length === 0) {
+        res.status(404).json({ error: "Subscription order not found." });
+        return;
+      }
+      res.status(200).json(rows[0]);
     } catch (error) {
-      console.error("Lỗi khi lấy trạng thái đơn hàng subscription:", error);
-      res.status(500).json({ error: "Lỗi server" });
+      console.error("Error in getSubscriptionOrderStatus:", error);
+      res.status(500).json({ error: "Internal Server Error." });
     }
   }
 
   // Cập nhật trạng thái đơn hàng subscription
   static async updateSubscriptionOrderStatus(req: Request, res: Response): Promise<void> {
+    const { order_id } = req.params;
+    const { new_status } = req.body; // Should be 'paid' or 'cancelled'
+
+    if (!order_id || !new_status) {
+      res.status(400).json({ message: 'Order ID and new status are required.' });
+      return;
+    }
+
+    if (!['paid', 'cancelled'].includes(new_status)) {
+      res.status(400).json({ message: "Invalid status. Must be 'paid' or 'cancelled'." });
+      return;
+    }
+
+    const connection = await pool.getConnection();
     try {
-      const { subscription_code } = req.params;
-      const { status } = req.body;
-
-      if (!status || !['pending', 'paid', 'cancelled', 'expired'].includes(status)) {
-        res.status(400).json({ error: "Trạng thái không hợp lệ." });
-        return;
-      }
-
-      // Start transaction
-      const connection = await pool.getConnection();
       await connection.beginTransaction();
 
-      try {        const [result]: any = await connection.execute(
-          "UPDATE subscriptionpendingorders SET status = ? WHERE subscription_code = ?",
-          [status, subscription_code]
+      // Fetch order details first
+      const [orderDetailsRows]: any = await connection.query(
+        'SELECT * FROM subscriptionpendingorders WHERE order_id = ?',
+        [order_id]
+      );
+
+      if (orderDetailsRows.length === 0) {
+        await connection.rollback();
+        res.status(404).json({ message: 'Pending order not found.' });
+        return;
+      }
+      const orderDetails = orderDetailsRows[0];
+
+      // Update the status of the pending order
+      await connection.query(
+        'UPDATE subscriptionpendingorders SET status = ?, updated_at = NOW() WHERE order_id = ?',
+        [new_status, order_id]
+      );
+
+      if (new_status === 'paid') {
+        // Record the payment
+        await SubscriptionOrderController.recordSubscriptionPayment(
+          connection,
+          orderDetails.order_id,
+          orderDetails.subscription_code_snapshot, // Ensure this is passed
+          orderDetails.amount_due,
+          'ConfirmedManually', // Payment method
+          null // Payment gateway transaction ID
         );
 
-        if (result.affectedRows === 0) {
-          await connection.rollback();
-          res.status(404).json({ error: "Không tìm thấy đơn hàng subscription để cập nhật." });
-          return;
-        }        if (status === 'paid') {
-          // Lấy thông tin đơn hàng để ghi vào bảng payments và kích hoạt subscription
-          const [orderRows]: any = await connection.execute(
-            "SELECT order_id, user_id, plan_id_snapshot, months, total_cost, payment_method FROM subscriptionpendingorders WHERE subscription_code = ?",
-            [subscription_code]
-          );
-
-          if (orderRows.length > 0) {
-            const order = orderRows[0];
-            await SubscriptionOrderController.recordSubscriptionPayment(
-              connection, 
-              order.order_id,
-              subscription_code,
-              order.total_cost,
-              order.payment_method || 'banking', 
-              null 
-            );
-
-            // Kích hoạt hoặc cập nhật subscription cho owner
-            await SubscriptionOrderController.activateOrUpdateOwnerSubscription(
-              connection,
-              order.user_id, 
-              order.plan_id_snapshot,
-              order.months
-            );
-
-          } else {
-            // Should not happen if update was successful, but good to handle
-            await connection.rollback();
-            res.status(404).json({ error: "Không tìm thấy thông tin đơn hàng sau khi cập nhật." });
-            return;
-          }
-        }
-
-        await connection.commit();
-        res.status(200).json({ message: "Cập nhật trạng thái đơn hàng subscription thành công." });
-
-      } catch (error) {
-        await connection.rollback();
-        console.error("Lỗi trong quá trình giao dịch cập nhật trạng thái đơn hàng subscription:", error);
-        res.status(500).json({ error: "Lỗi server khi cập nhật trạng thái." });
-      } finally {
-        connection.release();
+        // Activate or update the owner's subscription
+        await SubscriptionOrderController.activateOrUpdateOwnerSubscription(
+          connection,
+          orderDetails.owner_id,
+          orderDetails.plan_id_snapshot, // Corrected to plan_id_snapshot
+          orderDetails.months_snapshot
+        );
       }
+      // If 'cancelled', no further action is needed beyond updating the status.
 
+      await connection.commit();
+      res.status(200).json({ message: `Subscription order ${order_id} status updated to ${new_status}.` });
     } catch (error) {
-      console.error("Lỗi khi cập nhật trạng thái đơn hàng subscription:", error);
-      res.status(500).json({ error: "Lỗi server" });
+      await connection.rollback();
+      console.error('Error updating subscription order status:', error);
+      res.status(500).json({ message: 'Failed to update subscription order status.', error: (error as Error).message });
+    } finally {
+      connection.release();
     }
   }
 
   // Helper method to record payment
   private static async recordSubscriptionPayment(
     connection: any, // Accept connection for transaction
-    orderId: number,
-    subscriptionCode: string,
+    orderId: number, // This is subscriptionpendingorders.order_id
+    subscriptionCode: string, // This parameter is kept for now, might be useful for logging or other non-DB purposes
     amountPaid: number,
-    paymentMethodDetails: string,
+    paymentMethod: string,
     paymentGatewayTransactionId: string | null
   ): Promise<void> {
-    try {
-      await connection.execute(
-        `INSERT INTO subscription_payments 
-         (order_id, payment_gateway_transaction_id, amount_paid, currency, payment_method_details, payment_status, transaction_timestamp) 
-         VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-        [
-          orderId,
-          paymentGatewayTransactionId,
-          amountPaid,
-          'VND', // Assuming VND
-          paymentMethodDetails,
-          'succeeded', // Assuming payment is successful if this is called
-        ]
-      );
-      console.log(`Payment recorded for order_id: ${orderId}, subscription_code: ${subscriptionCode}`);
-    } catch (error) {
-      console.error("Lỗi khi ghi nhận thanh toán subscription:", error);
-      // This error should be caught by the calling function's transaction rollback
-      throw error; 
-    }
+    // Assuming subscription_payments table exists with appropriate columns
+    // Removed subscription_code from the INSERT statement as the column does not exist in the table.
+    await connection.query(
+      `INSERT INTO subscription_payments 
+        (order_id, amount_paid, payment_date, payment_method, status, payment_gateway_transaction_id) 
+        VALUES (?, ?, NOW(), ?, 'completed', ?)`,
+      [orderId, amountPaid, paymentMethod, paymentGatewayTransactionId]
+    );
   }
 
   private static async activateOrUpdateOwnerSubscription(
     connection: any,
     userId: number,
-    planIdSnapshot: number,
+    planIdSnapshot: number, // Changed from planSkuSnapshot: string to planIdSnapshot: number
     monthsPurchased: number
   ): Promise<void> {
-    try {
-      // 1. Get owner_id from user_id
-      const [ownerRows]: any = await connection.execute(
-        "SELECT owner_id FROM owners WHERE user_id = ?",
-        [userId]
-      );
+    // The planId is now directly passed as planIdSnapshot
+    const planId = planIdSnapshot;
 
-      if (ownerRows.length === 0) {
-        throw new Error(`Owner not found for user_id: ${userId}`);
-      }
-      const ownerId = ownerRows[0].owner_id;
+    const [ownerRows]: any = await connection.query("SELECT owner_id FROM owners WHERE user_id = ?", [userId]);
+    let ownerId: number;
 
-      // 2. Calculate start_date and end_date
-      const startDate = new Date();
-      const endDate = new Date(startDate);
-      endDate.setMonth(startDate.getMonth() + monthsPurchased);
-
-      // 3. Check for existing active subscription and UPSERT
-      const [existingSubscription]: any = await connection.execute(
-        "SELECT subscription_id FROM owner_subscriptions WHERE owner_id = ? AND status = 'active'",
-        [ownerId]
-      );
-
-      if (existingSubscription.length > 0) {
-        // Update existing active subscription
-        const subscriptionId = existingSubscription[0].subscription_id;
-        await connection.execute(
-          `UPDATE owner_subscriptions 
-           SET plan_id = ?, start_date = ?, end_date = ?, last_updated_at = NOW()
-           WHERE subscription_id = ?`,
-          [planIdSnapshot, startDate, endDate, subscriptionId]
-        );
-        console.log(`Owner subscription updated for owner_id: ${ownerId}, subscription_id: ${subscriptionId}`);
-      } else {
-        // Insert new subscription
-        await connection.execute(
-          `INSERT INTO owner_subscriptions 
-           (owner_id, plan_id, start_date, end_date, status, created_at) 
-           VALUES (?, ?, ?, ?, 'active', NOW())`,
-          [ownerId, planIdSnapshot, startDate, endDate]
-        );
-        console.log(`New subscription created for owner_id: ${ownerId}`);
-      }
-      
-      // 4. Log subscription history (optional)
-      await connection.execute(
-        `INSERT INTO subscription_history 
-         (owner_id, plan_id, start_date, end_date, created_at) 
-         VALUES (?, ?, ?, ?, NOW())`,
-        [ownerId, planIdSnapshot, startDate, endDate]
-      );
-    } catch (error) {
-      console.error("Lỗi khi cập nhật gói đăng ký:", error);
-      throw error; 
+    if (ownerRows.length === 0) {
+      // This case should ideally be handled, e.g., by creating an owner record or throwing a specific error
+      console.error(`No owner record found for user_id: ${userId} during subscription activation.`);
+      throw new Error(`Owner record not found for user ${userId}.`);
+    } else {
+      ownerId = ownerRows[0].owner_id;
     }
+    
+    const now = new Date();
+    const startDate = now.toISOString().slice(0, 19).replace('T', ' ');
+    
+    const endDate = new Date(now);
+    endDate.setMonth(endDate.getMonth() + monthsPurchased);
+    const formattedEndDate = endDate.toISOString().slice(0, 19).replace('T', ' ');
+
+    // Mark any existing active subscriptions for this owner as 'expired'
+    await connection.query(
+      "UPDATE owner_subscriptions SET status = 'expired' WHERE owner_id = ? AND status = 'active'",
+      [ownerId]
+    );
+
+    // Insert the new subscription
+    await connection.query(
+      `INSERT INTO owner_subscriptions 
+       (owner_id, plan_id, start_date, end_date, status) 
+       VALUES (?, ?, ?, ?, 'active')`,
+      [ownerId, planId, startDate, formattedEndDate]
+    );
   }
 
-  // Xóa đơn hàng subscription pending
+  // Xóa đơn hàng subscription pending (Optional: if needed)
   static async deleteSubscriptionPendingOrder(req: Request, res: Response): Promise<void> {
     try {
-      const { subscription_code } = req.params;      const [result]: any = await pool.execute(
-        "DELETE FROM subscriptionpendingorders WHERE subscription_code = ?",
+      const { subscription_code } = req.params;
+      if (!subscription_code) {
+        res.status(400).json({ error: "Subscription code is required." });
+        return;
+      }
+
+      const [result]: any = await pool.query(
+        "DELETE FROM subscriptionpendingorders WHERE subscription_code = ? AND status = 'pending'", // Only delete if still pending
         [subscription_code]
       );
 
       if (result.affectedRows === 0) {
-        res.status(404).json({ error: "Không tìm thấy đơn hàng subscription để xóa." });
+        res.status(404).json({ error: "Pending order not found or not in deletable state." });
         return;
       }
-
-      res.status(200).json({ message: "Đã xóa đơn hàng subscription pending." });
+      res.status(200).json({ message: "Pending subscription order deleted successfully." });
     } catch (error) {
-      console.error("Lỗi khi xóa đơn hàng subscription pending:", error);
-      res.status(500).json({ error: "Không thể xóa đơn hàng subscription pending." });
+      console.error("Error in deleteSubscriptionPendingOrder:", error);
+      res.status(500).json({ error: "Internal Server Error." });
     }
   }
 }

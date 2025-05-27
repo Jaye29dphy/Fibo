@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,8 @@ import {
   purchaseSubscription,
   getUserInfo,
   getOwnerSubscription,
+  createSubscriptionPendingOrder,
+  updateSubscriptionOrderStatus,
 } from "@/constants/apiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AntDesign } from "@expo/vector-icons";
@@ -28,17 +30,24 @@ const SubscriptionPayment = () => {
   const [isPaid, setIsPaid] = useState(false);
   const [subscriptionPurchased, setSubscriptionPurchased] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [currentOrderId, setCurrentOrderId] = useState<number | null>(null); // State to store order_id
 
   const getParam = (val: string | string[] | undefined) =>
     Array.isArray(val) ? val[0] : val || "";
-    
-  const plan = getParam(params.plan);
+
+  // Correctly get and parse parameters
+  const planId = getParam(params.planId);
   const planName = getParam(params.planName);
-  const months = parseInt(getParam(params.months) || "1", 10);
-  const price = parseInt(getParam(params.price) || "0", 10);
-  const totalPrice = price * months;
-  const subscriptionCode = `SUB${Date.now()}`;
+  const planCode = getParam(params.planCode); // This should be "classic" or "pro"
+  const monthsParam = getParam(params.months) || "1";
+  const priceParam = getParam(params.price) || "0";
   
+  const months = parseInt(monthsParam, 10);
+  const price = parseInt(priceParam, 10);
+  const totalPrice = price * months;
+  const subscriptionCode = useMemo(() => `SUB${Date.now()}`, []);
+
   // Thông tin ngân hàng và mã QR
   const bankId = "970436";  // Agribank
   const accountNo = "1031505171";
@@ -46,6 +55,58 @@ const SubscriptionPayment = () => {
   const qrCodeUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact.png?amount=${totalPrice}&addInfo=${subscriptionCode}&accountName=${accountName}`;
 
   useEffect(() => {
+    const fetchUserInfoAndCreateOrder = async () => {
+      try {
+        const token = await AsyncStorage.getItem("token");
+        if (token) {
+          const userInfo = await getUserInfo(); // Assuming getUserInfo fetches logged-in user's details
+          if (userInfo && userInfo.user_id) {
+            setUserId(userInfo.user_id.toString());
+            // Create pending order
+            const pendingOrderPayload = {
+              user_id: userInfo.user_id,
+              subscription_code: subscriptionCode,
+              plan: planCode, // 'classic' or 'pro'
+              plan_display_name: planName, // <<< ADDED: Pass planName as plan_display_name
+              months: months,
+              total_cost: totalPrice,
+              payment_method: 'banking'
+            };
+            console.log('Creating pending order with payload:', pendingOrderPayload);
+            const createdOrder = await createSubscriptionPendingOrder(
+              pendingOrderPayload.user_id.toString(),
+              pendingOrderPayload.subscription_code,
+              pendingOrderPayload.plan,
+              pendingOrderPayload.plan_display_name, // <<< ADDED: Pass plan_display_name
+              pendingOrderPayload.months,
+              pendingOrderPayload.total_cost,
+              pendingOrderPayload.payment_method
+            );
+            console.log('Pending order created for subscription code:', subscriptionCode, 'Order ID:', createdOrder.order_id);
+            if (createdOrder && createdOrder.order_id) {
+              setCurrentOrderId(createdOrder.order_id); // Store the order_id
+            } else {
+              Alert.alert("Lỗi", "Không nhận được ID đơn hàng từ máy chủ.");
+              router.back();
+              return; // Stop further execution if order_id is not received
+            }
+          } else {
+            Alert.alert("Lỗi", "Không thể lấy thông tin người dùng để tạo đơn hàng.");
+            router.back();
+          }
+        } else {
+          Alert.alert("Lỗi", "Bạn chưa đăng nhập.");
+          router.replace("/customer"); // Or your login screen
+        }
+      } catch (error) {
+        console.error("Error fetching user info or creating pending order:", error);
+        Alert.alert("Lỗi", "Không thể khởi tạo đơn hàng. Vui lòng thử lại.");
+        router.back();
+      }
+    };
+
+    fetchUserInfoAndCreateOrder();
+
     // Bắt đầu đếm ngược
     timerRef.current = setInterval(() => {
       setCountdown(t => {
@@ -70,6 +131,47 @@ const SubscriptionPayment = () => {
   const onExpire = async () => {
     if (subscriptionPurchased) return;
     
+    if (!currentOrderId) {
+      console.warn("onExpire: currentOrderId is null, cannot update status to expired.");
+      // Optionally, still show the alert to the user
+      Alert.alert(
+        "Hết thời gian thanh toán", 
+        "Phiên thanh toán đã hết hạn. Bạn có muốn tạo phiên thanh toán mới không?",
+        [
+          {
+            text: "Hủy",
+            onPress: () => router.push('/owner/subscriptions'),
+            style: "cancel"
+          },
+          {
+            text: "Tạo mới",
+            onPress: () => {
+              router.replace({
+                pathname: "/owner/subscription-payment",
+                params: { 
+                  planId: planId,
+                  planName: planName,
+                  planCode: planCode,
+                  months: monthsParam, 
+                  price: priceParam,   
+                }
+              });
+            }
+          }
+        ]
+      );
+      return;
+    }
+
+    try {
+      // Update order status to 'expired' using order_id
+      await updateSubscriptionOrderStatus(currentOrderId.toString(), 'expired');
+      console.log('Subscription order expired:', currentOrderId);
+    } catch (error) {
+      console.error("Error updating order status to expired:", error);
+      // Continue with user notification even if API call fails
+    }
+
     Alert.alert(
       "Hết thời gian thanh toán", 
       "Phiên thanh toán đã hết hạn. Bạn có muốn tạo phiên thanh toán mới không?",
@@ -84,11 +186,12 @@ const SubscriptionPayment = () => {
           onPress: () => {
             router.replace({
               pathname: "/owner/subscription-payment",
-              params: {
-                plan,
-                planName,
-                months,
-                price
+              params: { 
+                planId: planId,
+                planName: planName,
+                planCode: planCode,
+                months: monthsParam, 
+                price: priceParam,   
               }
             });
           }
@@ -100,32 +203,78 @@ const SubscriptionPayment = () => {
   const handleMarkAsPaid = async () => {
     if (isPaid || loading) return;
     
-    setIsPaid(true);
-    setLoading(true);
+    if (!currentOrderId) {
+      Alert.alert("Lỗi", "Không tìm thấy ID đơn hàng để cập nhật. Vui lòng thử tạo lại đơn hàng.");
+      setLoading(false);
+      return;
+    }
+
+    console.log("[SubscriptionPayment] handleMarkAsPaid: Called. Order ID:", currentOrderId, "planCode:", planCode, "months:", months); // Log call
+    setLoading(true); 
     
     try {
-      // Gọi API để mua subscription
-      await purchaseSubscription(plan.toLowerCase(), months);
+      // Validate planCode against 'standard' and 'premium'
+      if (!planCode || (planCode !== "standard" && planCode !== "premium")) {
+          Alert.alert("Lỗi", `Gói đăng ký không hợp lệ. Mã gói nhận được: '${planCode}'. Vui lòng đảm bảo mã gói là 'standard' hoặc 'premium'.`);
+          setLoading(false);
+          return;
+      }
       
-      setSubscriptionPurchased(true);
-      setLoading(false);
+      console.log("[SubscriptionPayment] handleMarkAsPaid: Calling updateSubscriptionOrderStatus with 'paid' for order ID:", currentOrderId); // Log API call
+      const response = await updateSubscriptionOrderStatus(currentOrderId.toString(), 'paid');
+      console.log("[SubscriptionPayment] handleMarkAsPaid: API response:", response); // Log API response
       
-      // Hiển thị thông báo thành công
+      setSubscriptionPurchased(true); 
+      setIsPaid(true); 
+      
       Alert.alert(
-        "Thanh toán thành công", 
-        "Gói đăng ký của bạn đã được kích hoạt thành công!",
+        "Xác nhận thành công", 
+        "Yêu cầu thanh toán của bạn đã được ghi nhận. Gói sẽ được kích hoạt sau khi quản trị viên xác nhận.",
         [
           {
             text: "OK",
-            onPress: () => router.push('/owner/subscriptions')
+            onPress: () => router.replace('/owner/subscriptions')
           }
         ]
       );
-    } catch (error) {
-      console.error("Lỗi khi thanh toán:", error);
-      setIsPaid(false);
+    } catch (error: any) {
+      console.error("[SubscriptionPayment] handleMarkAsPaid: Error:", error); // Log error
+      Alert.alert("Lỗi", `Có lỗi xảy ra khi xác nhận thanh toán: ${error.message || 'Vui lòng thử lại.'}`);
+    } finally {
+      console.log("[SubscriptionPayment] handleMarkAsPaid: Finally block. Setting loading to false."); // Log finally
       setLoading(false);
-      notify("Có lỗi xảy ra khi xử lý thanh toán. Vui lòng thử lại.");
+    }
+  };
+
+  const handleCancelPayment = async () => {
+    if (loading) return;
+
+    if (!currentOrderId) {
+      Alert.alert("Lỗi", "Không tìm thấy ID đơn hàng để hủy. Vui lòng thử lại.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      console.log("[SubscriptionPayment] handleCancelPayment: Calling updateSubscriptionOrderStatus with 'cancelled' for order ID:", currentOrderId);
+      await updateSubscriptionOrderStatus(currentOrderId.toString(), 'cancelled');
+      console.log("[SubscriptionPayment] handleCancelPayment: Order cancelled successfully.");
+
+      Alert.alert(
+        "Thông báo",
+        "Đơn hàng đã được hủy.",
+        [
+          {
+            text: "OK",
+            onPress: () => router.replace('/owner/subscriptions')
+          }
+        ]
+      );
+    } catch (error: any) {
+      console.error("[SubscriptionPayment] handleCancelPayment: Error:", error);
+      Alert.alert("Lỗi", `Có lỗi xảy ra khi hủy đơn hàng: ${error.message || 'Vui lòng thử lại.'}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -165,28 +314,41 @@ const SubscriptionPayment = () => {
           <Text style={styles.instructionText}>2. Quét mã QR ở trên</Text>
           <Text style={styles.instructionText}>3. Xác nhận thanh toán số tiền {formatPrice(totalPrice)}</Text>
           <Text style={styles.instructionText}>4. Chọn "Xác nhận đã thanh toán" bên dưới</Text>
+          <Text style={styles.instructionText}>5. Hoặc chọn "Hủy thanh toán" nếu bạn không muốn tiếp tục.</Text>
         </View>
 
         <TouchableOpacity 
           onPress={handleMarkAsPaid} 
           style={[
             styles.payButton,
-            (isPaid || loading) && styles.disabledButton
+            (isPaid || loading) && styles.disabledButton // Disable if already paid or loading
           ]}
-          disabled={isPaid || loading}
+          disabled={isPaid || loading} // Disable if already paid or loading
         >
-          {loading ? (
+          {loading && !isPaid ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <Text style={styles.payButtonText}>
-              {isPaid ? "Đang xử lý..." : "Xác nhận đã thanh toán"}
-            </Text>
+            <Text style={styles.payButtonText}>Xác nhận đã thanh toán</Text>
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.back()} style={styles.cancelButton}>
-          <Text style={styles.cancelButtonText}>Hủy thanh toán</Text>
-        </TouchableOpacity>
+        {!isPaid && (
+          <TouchableOpacity 
+            onPress={handleCancelPayment} 
+            style={[
+              styles.cancelButton,
+              loading && styles.disabledButton
+            ]}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#dc3545" size="small" />
+            ) : (
+              <Text style={styles.cancelButtonText}>Hủy thanh toán</Text>
+            )}
+          </TouchableOpacity>
+        )}
+
       </ScrollView>
     </View>
   );
@@ -287,6 +449,20 @@ const styles = StyleSheet.create({
     alignItems: "center", 
     marginBottom: 12 
   },
+  cancelButton: {
+    backgroundColor: '#f8f9fa', // Light grey background
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10, // Add some space above the cancel button
+    borderWidth: 1,
+    borderColor: '#dc3545' // Red border
+  },
+  cancelButtonText: {
+    color: '#dc3545', // Red text
+    fontSize: 16,
+    fontWeight: "bold",
+  },
   disabledButton: {
     backgroundColor: "#94d3a2",
     opacity: 0.8
@@ -295,17 +471,6 @@ const styles = StyleSheet.create({
     color: "white", 
     fontSize: 16, 
     fontWeight: "bold" 
-  },
-  cancelButton: {
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#e0e0e0"
-  },
-  cancelButtonText: {
-    color: "#555",
-    fontSize: 16
   }
 });
 

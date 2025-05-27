@@ -245,6 +245,7 @@ export class OwnerController {  // Lấy thông tin hồ sơ của owner
   }
   // Purchase subscription
   static async purchaseSubscription(req: AuthRequest, res: Response): Promise<void> {
+    let connection; // Declare connection here to be accessible in catch/finally
     try {
       if (!req.user) {
         res.status(401).json({ error: "Unauthorized: User not found" });
@@ -259,8 +260,11 @@ export class OwnerController {  // Lấy thông tin hồ sơ của owner
         return;
       }
 
+      // Get a connection from the pool
+      connection = await pool.getConnection();
+
       // Get the owner_id
-      const [owners]: any = await pool.execute(
+      const [owners]: any = await connection.execute(
         "SELECT owner_id FROM owners WHERE user_id = ?",
         [userId]
       );
@@ -268,7 +272,7 @@ export class OwnerController {  // Lấy thông tin hồ sơ của owner
       let ownerId;
       if (!Array.isArray(owners) || owners.length === 0) {
         // Create a new owner record if it doesn't exist
-        const [insertResult]: any = await pool.execute(
+        const [insertResult]: any = await connection.execute(
           "INSERT INTO owners (user_id) VALUES (?)",
           [userId]
         );
@@ -289,11 +293,11 @@ export class OwnerController {  // Lấy thông tin hồ sơ của owner
       const formattedEndDate = endDate.toISOString().slice(0, 19).replace('T', ' ');
 
       // Transaction to ensure data consistency
-      await pool.execute('START TRANSACTION');
+      await connection.beginTransaction();
       
       try {
         // Mark any active subscriptions as expired
-        await pool.execute(
+        await connection.execute(
           `UPDATE owner_subscriptions 
            SET status = 'expired' 
            WHERE owner_id = ? AND status = 'active'`,
@@ -301,7 +305,7 @@ export class OwnerController {  // Lấy thông tin hồ sơ của owner
         );
 
         // Insert the new subscription
-        await pool.execute(
+        await connection.execute(
           `INSERT INTO owner_subscriptions 
            (owner_id, plan_id, start_date, end_date, status) 
            VALUES (?, ?, ?, ?, 'active')`,
@@ -309,13 +313,13 @@ export class OwnerController {  // Lấy thông tin hồ sơ của owner
         );
 
         // Commit transaction
-        await pool.execute('COMMIT');
+        await connection.commit();
       } catch (error) {
         // If anything goes wrong, rollback changes
-        await pool.execute('ROLLBACK');
+        await connection.rollback();
         throw error;
       }      // Get the inserted subscription with plan details
-      const [subscriptions]: any = await pool.execute(
+      const [subscriptions]: any = await connection.execute(
         `SELECT 
           os.subscription_id, 
           os.owner_id,
@@ -351,6 +355,10 @@ export class OwnerController {  // Lấy thông tin hồ sơ của owner
     } catch (error) {
       console.error("Error in purchaseSubscription:", error);
       res.status(500).json({ error: "Internal Server Error" });
+    } finally {
+      if (connection) {
+        connection.release(); // Release the connection back to the pool
+      }
     }
   }
 }
