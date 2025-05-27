@@ -3,7 +3,7 @@ import { API_ENDPOINTS, API_URL, AVATAR_BASE_URL } from "./apiConfig";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 
-const fetchAPI = async (endpoint: string, method = "GET", body?: any, isFormData = false) => {
+export const fetchAPI = async (endpoint: string, method = "GET", body?: any, isFormData = false) => {
   const token = await AsyncStorage.getItem("token");
 
   const headers: HeadersInit = {};
@@ -273,6 +273,27 @@ export const createPendingOrder = async (
   return fetchAPI(API_ENDPOINTS.CREATE_PENDING_ORDER, "POST", body);
 };
 
+export const createSubscriptionPendingOrder = async (
+  userId: string,
+  subscriptionCode: string,
+  plan: string,
+  months: number,
+  totalCost: number,
+  paymentMethod: string = "banking"
+) => {
+  const body = {
+    user_id: userId,
+    subscription_code: subscriptionCode,
+    plan,
+    months,
+    total_cost: totalCost,
+    payment_method: paymentMethod
+  };
+
+  return fetchAPI(API_ENDPOINTS.CREATE_SUBSCRIPTION_PENDING_ORDER, "POST", body);
+};
+
+
 export const getOrderStatus = async (bookingCode: string) => {
   const url = `${API_ENDPOINTS.GET_ORDER_STATUS}/${bookingCode}`;
   return fetchAPI(url, "GET");
@@ -285,6 +306,21 @@ export const updateOrderStatus = async (bookingCode: string, status: string) => 
 
 export const deletePendingOrder = async (bookingCode: string) => {
   const url = `${API_ENDPOINTS.DELETE_PENDING_ORDER}/${bookingCode}`;
+  return fetchAPI(url, "DELETE");
+};
+
+export const getSubscriptionOrderStatus = async (subscriptionCode: string) => {
+  const url = `${API_ENDPOINTS.GET_SUBSCRIPTION_ORDER_STATUS}/${subscriptionCode}`;
+  return fetchAPI(url, "GET");
+};
+
+export const updateSubscriptionOrderStatus = async (subscriptionCode: string, status: string) => {
+  const url = `${API_ENDPOINTS.UPDATE_SUBSCRIPTION_ORDER_STATUS}/${subscriptionCode}`;
+  return fetchAPI(url, "POST", { status });
+};
+
+export const deleteSubscriptionPendingOrder = async (subscriptionCode: string) => {
+  const url = `${API_ENDPOINTS.DELETE_SUBSCRIPTION_PENDING_ORDER}/${subscriptionCode}`;
   return fetchAPI(url, "DELETE");
 };
 
@@ -393,8 +429,20 @@ export const purchaseSubscription = async (plan: string, months: number) => {
 
 export const getSubscriptionPlans = async () => {
   try {
+    console.log("Calling getSubscriptionPlans API...");
     const response = await fetchAPI(API_ENDPOINTS.GET_SUBSCRIPTION_PLANS, "GET");
-    return response;
+    console.log("Subscription plans API response:", response);
+    
+    // Ensure we're returning an array of plans
+    if (Array.isArray(response)) {
+      return response;
+    } else if (response && typeof response === 'object') {
+      // Some APIs wrap the data in an object
+      const plans = response.plans || response.data || [];
+      console.log("Extracted plans:", plans);
+      return plans;
+    }
+    return [];
   } catch (error) {
     console.error("Error fetching subscription plans:", error);
     return [];
@@ -416,7 +464,8 @@ export const getSubscriptionHistory = async () => {
         return subscription;
       });
     }
-    return response;  } catch (error) {
+    return response;
+  } catch (error) {
     console.error("Error fetching subscription history:", error);
     return [];
   }

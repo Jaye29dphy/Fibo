@@ -63,7 +63,7 @@ export default function LoginScreen() {
         <View style={styles.loginContainer}>
           <View style={styles.header}>
             <ImageBackground
-              source={require("../../assets/images/doituyencc.png")}
+              source={require("../../assets/images/logosieuchat.png")}
               style={styles.logo}
             />
             <Text style={styles.title}>FIBO</Text>

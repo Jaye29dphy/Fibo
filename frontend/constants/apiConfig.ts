@@ -1,4 +1,4 @@
-export const API_URL = "http://192.168.1.3:5000";
+export const API_URL = "http://192.168.1.113:5000";
 
 export const GITHUB_REPO = "https://api.github.com/repos/Jaye29dphy/Fibo";
 export const FIELD_IMAGE_BASE_URL = `${API_URL}/fields`;
@@ -30,9 +30,12 @@ export const API_ENDPOINTS = {
   GET_ORDER_STATUS: `${API_URL}/courts/orders/status`,
   UPDATE_ORDER_STATUS: `${API_URL}/courts/orders/update-status`,  UPDATE_FIELD_STATUS: `${API_URL}/courts/:fieldId/status`,  
   GET_OWNER_SUBSCRIPTION: `${API_URL}/api/owner/subscription`,
-  PURCHASE_SUBSCRIPTION: `${API_URL}/api/owner/subscription`,
-  GET_SUBSCRIPTION_PLANS: `${API_URL}/api/subscriptions/plans`,
+  PURCHASE_SUBSCRIPTION: `${API_URL}/api/owner/subscription`,  GET_SUBSCRIPTION_PLANS: `${API_URL}/api/subscriptions/plans`,
   GET_SUBSCRIPTION_HISTORY: `${API_URL}/api/subscriptions/history`,
+  CREATE_SUBSCRIPTION_PENDING_ORDER: `${API_URL}/api/subscription-orders/pending`,
+  DELETE_SUBSCRIPTION_PENDING_ORDER: `${API_URL}/api/subscription-orders/delete-pending`,
+  GET_SUBSCRIPTION_ORDER_STATUS: `${API_URL}/api/subscription-orders/status`,
+  UPDATE_SUBSCRIPTION_ORDER_STATUS: `${API_URL}/api/subscription-orders/update-status`,
   UPDATE_OWNER_PROFILE: `${API_URL}/api/owner/profile`,
   UPDATE_USER_INFO: (userId: number | string) => `${API_URL}/api/auth/${userId}`,
 };

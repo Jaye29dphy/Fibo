@@ -60,11 +60,17 @@ const SubscriptionsScreen = () => {
       // Load current subscription
       const subscriptionData = await getOwnerSubscription();
       setCurrentSubscription(subscriptionData);
-      
-      // Load plans
+        // Load plans
       const plansData = await getSubscriptionPlans();
+      console.log("Fetched subscription plans:", plansData);
       if (Array.isArray(plansData)) {
-        setSubscriptionPlans(plansData.filter(plan => plan.plan_id > 1)); // Filter out Basic plan
+        // No filtering to make sure we display all available plans
+        setSubscriptionPlans(plansData);
+      } else if (plansData && typeof plansData === 'object') {
+        // If it's not an array but an object with plans property
+        const planArray = plansData.plans || plansData.data || [];
+        console.log("Converting to array:", planArray);
+        setSubscriptionPlans(planArray);
       }
     } catch (error) {
       console.error("Error loading subscriptions data:", error);
@@ -73,23 +79,33 @@ const SubscriptionsScreen = () => {
       setLoading(false);
       setPlansLoading(false);
     }
-  };
-    const handlePurchase = () => {
-    if (!selectedPlan) return;
+  };    const handlePurchase = () => {
+    if (!selectedPlan) {
+      Alert.alert("Lỗi", "Vui lòng chọn gói đăng ký");
+      return;
+    }
     
-    // Chuyển hướng đến trang thanh toán
-    setPurchaseModalVisible(false);
-    const planType = selectedPlan.name.toLowerCase().includes('pro') ? 'pro' : 'classic';
-    
-    router.push({
-      pathname: "/owner/subscription-payment",
-      params: {
-        plan: planType,
-        planName: selectedPlan.name,
-        months: selectedMonths,
-        price: selectedPlan.price
-      }
-    });
+    try {
+      // Chuyển hướng đến trang thanh toán
+      setPurchaseModalVisible(false);
+      const planName = selectedPlan.name || 'unknown';
+      const planType = planName.toLowerCase().includes('pro') ? 'pro' : 'classic';
+      console.log("Selected plan:", selectedPlan);
+      
+      router.push({
+        pathname: "/customer/payment",
+        params: {
+          plan: planType,
+          planName: planName,
+          months: selectedMonths,
+          price: selectedPlan.price || 0,
+          type: "subscription"
+        }
+      });
+    } catch (error) {
+      console.error("Navigation error:", error);
+      Alert.alert("Lỗi", "Không thể chuyển đến trang thanh toán. Vui lòng thử lại sau.");
+    }
   };
   
   const formatDate = (dateString: string | null) => {
@@ -199,8 +215,7 @@ const SubscriptionsScreen = () => {
       </View>
     );
   };
-  
-  const renderPurchaseModal = () => {
+    const renderPurchaseModal = () => {
     return (
       <Modal
         visible={purchaseModalVisible}
@@ -217,33 +232,46 @@ const SubscriptionsScreen = () => {
             ) : (
               <>
                 <Text style={styles.sectionTitle}>Chọn gói:</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.plansScrollView}>
-                  {subscriptionPlans.map((plan) => (
-                    <TouchableOpacity
-                      key={plan.plan_id}
-                      style={[
-                        styles.planCard,
-                        selectedPlan?.plan_id === plan.plan_id && styles.selectedPlanCard,
-                        plan.name.toLowerCase().includes('pro') ? styles.proPlanCard : styles.classicPlanCard
-                      ]}
-                      onPress={() => setSelectedPlan(plan)}
+                
+                {subscriptionPlans.length === 0 ? (
+                  <View style={styles.noPlansContainer}>
+                    <Text style={styles.noPlansText}>Không có gói đăng ký nào hiện có</Text>
+                    <TouchableOpacity 
+                      style={styles.retryButton}
+                      onPress={loadData}
                     >
-                      <Text style={[
-                        styles.planCardName,
-                        selectedPlan?.plan_id === plan.plan_id && styles.selectedPlanCardText
-                      ]}>
-                        {plan.name}
-                      </Text>
-                      <Text style={styles.planCardPrice}>{formatPrice(plan.price)}</Text>
-                      <Text style={styles.planCardFeature}>Tối đa {plan.max_fields} sân</Text>
-                      {plan.name.toLowerCase().includes('pro') && (
-                        <View style={styles.recommendBadge}>
-                          <Text style={styles.recommendText}>Đề xuất</Text>
-                        </View>
-                      )}
+                      <Text style={styles.retryButtonText}>Thử lại</Text>
                     </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                  </View>
+                ) : (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.plansScrollView}>
+                    {subscriptionPlans.map((plan) => (
+                      <TouchableOpacity
+                        key={plan.plan_id}
+                        style={[
+                          styles.planCard,
+                          selectedPlan?.plan_id === plan.plan_id && styles.selectedPlanCard,
+                          plan.name?.toLowerCase().includes('pro') ? styles.proPlanCard : styles.classicPlanCard
+                        ]}
+                        onPress={() => setSelectedPlan(plan)}
+                      >
+                        <Text style={[
+                          styles.planCardName,
+                          selectedPlan?.plan_id === plan.plan_id && styles.selectedPlanCardText
+                        ]}>
+                          {plan.name || "Gói đăng ký"}
+                        </Text>
+                        <Text style={styles.planCardPrice}>{formatPrice(plan.price || 0)}</Text>
+                        <Text style={styles.planCardFeature}>Tối đa {plan.max_fields || 0} sân</Text>
+                        {plan.name?.toLowerCase().includes('pro') && (
+                          <View style={styles.recommendBadge}>
+                            <Text style={styles.recommendText}>Đề xuất</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
                 
                 <Text style={styles.sectionTitle}>Chọn thời gian:</Text>
                 <View style={styles.durationContainer}>
@@ -591,8 +619,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
-  },
-  totalAmount: {
+  },  totalAmount: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#42ba96',
@@ -607,6 +634,33 @@ const styles = StyleSheet.create({
   purchaseButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  noPlansContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f9f9f9',
+    borderRadius: 10,
+    marginBottom: 20,
+    width: '100%',
+  },
+  noPlansText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#777',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#42ba96',
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: '600',
   },
   closeModalButton: {

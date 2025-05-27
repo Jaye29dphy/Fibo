@@ -2,16 +2,13 @@ import { Response } from "express";
 import pool from "../config/database";
 import { AuthRequest } from "../middleware/authMiddleware";
 
-export class SubscriptionController {
-  // Get all subscription plans
+export class SubscriptionController {  // Get all subscription plans
   static async getAllSubscriptionPlans(req: AuthRequest, res: Response): Promise<void> {
-    try {
-      const [plans]: any = await pool.execute(
+    try {      console.log("Fetching subscription plans...");        const [plans]: any = await pool.execute(
         `SELECT 
           plan_id,
-          name,
+          plan_code AS name,
           price,
-          duration,
           max_fields,
           description
         FROM 
@@ -19,6 +16,8 @@ export class SubscriptionController {
         ORDER BY
           price ASC`
       );
+      
+      console.log(`Found ${plans.length} subscription plans:`, plans);
 
       res.status(200).json(plans);
     } catch (error) {
@@ -56,7 +55,7 @@ export class SubscriptionController {
           os.subscription_id, 
           os.owner_id,
           os.plan_id,
-          sp.name AS plan_name,
+          sp.plan_code AS plan_name,
           sp.price,
           sp.max_fields,
           os.start_date,
@@ -96,9 +95,8 @@ export class SubscriptionController {
           os.owner_id,
           o.user_id,
           u.full_name AS owner_name,
-          u.email AS owner_email,
-          os.plan_id,
-          sp.name AS plan_name,
+          u.email AS owner_email,          os.plan_id,
+          sp.plan_code AS plan_name,
           sp.price,
           sp.max_fields,
           os.start_date,

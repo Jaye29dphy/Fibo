@@ -191,13 +191,15 @@ export class OwnerController {  // Lấy thông tin hồ sơ của owner
         return;
       }
 
-      const ownerId = owners[0].owner_id;      // Get active subscription information
+      const ownerId = owners[0].owner_id;
+      
+      // Get active subscription information
       const [subscriptions]: any = await pool.execute(
         `SELECT 
           os.subscription_id, 
           os.owner_id,
           os.plan_id,
-          sp.name AS plan_name,
+          sp.plan_code AS plan_name,
           sp.price,
           sp.max_fields,
           os.start_date,
@@ -312,15 +314,13 @@ export class OwnerController {  // Lấy thông tin hồ sơ của owner
         // If anything goes wrong, rollback changes
         await pool.execute('ROLLBACK');
         throw error;
-      }
-
-      // Get the inserted subscription with plan details
+      }      // Get the inserted subscription with plan details
       const [subscriptions]: any = await pool.execute(
         `SELECT 
           os.subscription_id, 
           os.owner_id,
           os.plan_id,
-          sp.name AS plan_name,
+          sp.plan_code AS plan_name,
           sp.price,
           sp.max_fields,
           os.start_date,
