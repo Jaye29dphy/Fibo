@@ -59,7 +59,7 @@ export default function LoginScreen() {
       style={styles.backgroundImage}
     >
       <View style={styles.overlay}>
-        {/* Container bao quanh khu vực đăng nhập/đăng ký với lớp phủ trắng trong suốt */}
+        
         <View style={styles.loginContainer}>
           <View style={styles.header}>
             <ImageBackground

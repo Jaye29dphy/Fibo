@@ -62,7 +62,6 @@ export default function RegisterField() {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Back Button */}
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.push('/owner/dashboard')}
@@ -71,12 +70,12 @@ export default function RegisterField() {
           <Ionicons name="arrow-back" size={28} color="#FFFFFF" />
         </TouchableOpacity>
 
-        {/* Title */}
+        
         <Text style={styles.title}>Đăng ký sân tập</Text>
 
-        {/* Form Fields */}
+       
         <View style={styles.formContainer}>
-          {/* Field Name */}
+          
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Tên sân</Text>
             <View style={styles.sectionContent}>
@@ -90,7 +89,7 @@ export default function RegisterField() {
             </View>
           </View>
 
-          {/* Location */}
+          
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Vị trí</Text>
             <View style={styles.sectionContent}>
@@ -104,7 +103,7 @@ export default function RegisterField() {
             </View>
           </View>
 
-          {/* Field Type */}
+          
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Loại sân</Text>
             <View style={styles.sectionContent}>
@@ -124,7 +123,7 @@ export default function RegisterField() {
             </View>
           </View>
 
-          {/* Description */}
+         
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Đặc điểm sân</Text>
             <View style={styles.sectionContent}>
@@ -140,7 +139,7 @@ export default function RegisterField() {
             </View>
           </View>
 
-          {/* Sub Field Count */}
+          
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Số lượng sân</Text>
             <View style={styles.sectionContent}>
@@ -187,11 +186,11 @@ export default function RegisterField() {
             </View>
           </View>
 
-          {/* Additional Services */}
+          
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Dịch vụ thêm</Text>
             <View style={styles.sectionContent}>
-              {/* Danh sách dịch vụ */}
+              
               {fieldData.services.map((service, index) => (
                 <View key={index} style={styles.serviceContainer}>
                   <TextInput
@@ -226,7 +225,7 @@ export default function RegisterField() {
                 </View>
               ))}
 
-              {/* Button thêm dịch vụ */}
+             
               <TouchableOpacity
                 style={styles.addButton}
                 onPress={() => addService()}
@@ -237,7 +236,7 @@ export default function RegisterField() {
             </View>
           </View>
 
-          {/* Time Slots and Prices */}
+          
           <Text style={styles.label}>Nhập khung giờ & giá sân</Text>
           <TextInput
             style={styles.input}
@@ -248,7 +247,7 @@ export default function RegisterField() {
             keyboardType="numeric"
           />
 
-          {/* Sync Prices Checkbox - Sử dụng TouchableOpacity và custom checkbox thay vì react-native-paper */}
+         
           <TouchableOpacity
             style={styles.checkboxContainer}
             onPress={() => toggleSyncPrices(!syncPrices)}
@@ -262,7 +261,7 @@ export default function RegisterField() {
             <Text style={styles.checkboxLabel}>Đồng bộ giá sân giữa các khung giờ</Text>
           </TouchableOpacity>
 
-          {/* Time Slots List */}
+          
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#3B82F6" />
@@ -273,7 +272,7 @@ export default function RegisterField() {
               {fieldData.timeSlots.map((slot) => (
                 <View key={slot.slot_id} style={styles.timeSlotWrapper}>
                   <View style={styles.timeSlotBox}>
-                    {/* Checkbox và thông tin khung giờ */}
+                  
                     <TouchableOpacity
                       style={styles.timeSlotCheckbox}
                       onPress={() => toggleTimeSlotSelection(slot.slot_id)}
@@ -289,7 +288,7 @@ export default function RegisterField() {
                       </View>
                     </TouchableOpacity>
 
-                    {/* Hiển thị khung giờ */}
+                   
                     <View style={[
                       styles.timeSlotRow,
                       slot.selected && styles.selectedTimeSlot
@@ -305,7 +304,7 @@ export default function RegisterField() {
                     </View>
                   </View>
 
-                  {/* Phần nhập giá sân theo giờ */}
+               
                   {slot.selected && (
                     <TextInput
                       style={styles.timeSlotPriceInput}
@@ -322,7 +321,7 @@ export default function RegisterField() {
             </View>
           )}
 
-          {/* Image Upload */}
+       
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Ảnh sân</Text>
             <View style={styles.sectionContent}>
@@ -334,7 +333,7 @@ export default function RegisterField() {
                 <Text style={styles.uploadText}>Tải ảnh lên</Text>
               </TouchableOpacity>
 
-              {/* Image List */}
+             
               <FlatList
                 data={fieldData.images}
                 horizontal
@@ -357,7 +356,7 @@ export default function RegisterField() {
           </View>
         </View>
 
-        {/* Submit Button */}
+        
         <TouchableOpacity
           style={[styles.submitButton, isSubmitting && styles.disabledButton]}
           onPress={handleSubmit}
@@ -370,7 +369,7 @@ export default function RegisterField() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Modal */}
+    
       <Modal
         animationType="fade"
         transparent

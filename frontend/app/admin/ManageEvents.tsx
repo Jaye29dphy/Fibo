@@ -6,7 +6,7 @@ export default function ManageEvents() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Quản lý sự kiện</Text>
-      {/* Nội dung quản lý sự kiện tại đây */}
+     
     </View>
   );
 }

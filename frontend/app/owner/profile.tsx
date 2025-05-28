@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import * as FileSystem from "expo-file-system"; 
+import * as FileSystem from "expo-file-system";
 import { Platform } from "react-native";
 import {
   View,
@@ -120,20 +120,20 @@ export default function ProfileScreen() {
       Alert.alert("Lỗi", "Không thể upload ảnh vì thông tin user không hợp lệ.");
       return;
     }
-  
+
     setUploading(true);
     setTempAvatar(imageUri);
     console.log("Đã set tempAvatar:", imageUri);
-  
+
     try {
       // Create the FormData object
       const formData = new FormData();
-      
+
       // Add the image to FormData with appropriate metadata
       const filename = imageUri.split('/').pop() || `avatar_${Date.now()}.jpg`;
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : 'image/jpeg';
-      
+
       // Prepare the file object in a format Expo & React Native can handle
       // @ts-ignore - Type definition mismatch with React Native's FormData
       formData.append('avatar', {
@@ -141,15 +141,15 @@ export default function ProfileScreen() {
         name: filename,
         type
       });
-      
+
       // Add user_id as a separate field
       formData.append("user_id", user.user_id.toString());
-      
+
       console.log("FormData đã tạo với các trường:", Object.fromEntries(formData));
-  
+
       const response = await uploadAvatar(formData);
       console.log("API response:", response);
-      
+
       if (response.avatar) {
         setUser((prevUser) =>
           prevUser ? { ...prevUser, avatar: response.avatar } : null
@@ -173,28 +173,28 @@ export default function ProfileScreen() {
       const permissionResult = useCamera
         ? await ImagePicker.requestCameraPermissionsAsync()
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
-  
+
       if (!permissionResult.granted) {
         Alert.alert("Lỗi", "Ứng dụng cần quyền truy cập để tiếp tục!");
         return;
       }
-  
+
       const result = useCamera
         ? await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 1,
-          })
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 1,
+        })
         : await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 1,
-          });
-  
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 1,
+        });
+
       console.log("ImagePicker result:", result);
-  
+
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const imageUri = result.assets[0].uri;
         console.log("Selected image URI:", imageUri);
@@ -225,28 +225,28 @@ export default function ProfileScreen() {
       router.push("/owner/dashboard"); // fallback nếu người dùng đi thẳng vào
     }
   };
-  
+
   const handleEditUser = async () => {
-      if (!editedUser) return;
-    
-      try {
-        await updateUserInfo(editedUser.user_id, {
-          full_name: editedUser.full_name,
-          email: editedUser.email,
-          phone: editedUser.phone,
-          business_name: editedUser.business_name || "",
-          address: editedUser.address || ""
-        });
-    
-        const freshUser = await getUserInfo(); // gọi lại API để lấy dữ liệu mới nhất
-        setUser(freshUser); // cập nhật lại giao diện
-        Alert.alert("Thành công", "Thông tin đã được cập nhật!");
-        setEditModalVisible(false);
-      } catch (error) {
-        console.error("Lỗi khi cập nhật:", error);
-        Alert.alert("Lỗi", "Không thể cập nhật thông tin.");
-      }
-    };
+    if (!editedUser) return;
+
+    try {
+      await updateUserInfo(editedUser.user_id, {
+        full_name: editedUser.full_name,
+        email: editedUser.email,
+        phone: editedUser.phone,
+        business_name: editedUser.business_name || "",
+        address: editedUser.address || ""
+      });
+
+      const freshUser = await getUserInfo(); // gọi lại API để lấy dữ liệu mới nhất
+      setUser(freshUser); // cập nhật lại giao diện
+      Alert.alert("Thành công", "Thông tin đã được cập nhật!");
+      setEditModalVisible(false);
+    } catch (error) {
+      console.error("Lỗi khi cập nhật:", error);
+      Alert.alert("Lỗi", "Không thể cập nhật thông tin.");
+    }
+  };
 
   if (loading) {
     return (
@@ -258,16 +258,17 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
-      <TouchableOpacity onPress={handleBack}>
-  <AntDesign name="arrowleft" size={24} color="white" />
-</TouchableOpacity>
+        <TouchableOpacity onPress={handleBack}>
+          <AntDesign name="arrowleft" size={24} color="white" />
+        </TouchableOpacity>
 
-        <Text style={styles.title}>Hồ Sơ</Text>
+        <View style={{ flex: 1, alignItems: 'center' }}>
+          <Text style={styles.title}>Hồ Sơ</Text>
+        </View>
+
+        <View style={{ width: 24 }} />
       </View>
-
-      {/* Ảnh đại diện */}
       <View style={styles.avatarSection}>
         <TouchableOpacity
           style={styles.avatarContainer}
@@ -298,8 +299,6 @@ export default function ProfileScreen() {
         </TouchableOpacity>
         <Text style={styles.userName}>{user?.full_name || "N/A"}</Text>
       </View>
-
-      {/* Thông tin cá nhân */}
       <View style={styles.infoBox}>
         <View style={styles.infoHeader}>
           <Text style={styles.infoTitle}>THÔNG TIN CÁ NHÂN</Text>
@@ -343,13 +342,13 @@ export default function ProfileScreen() {
           <Text style={styles.value}>
             {user?.created_at
               ? new Date(user.created_at).toLocaleString("vi-VN", {
-                  year: "numeric",
-                  month: "2-digit",
-                  day: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                })
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })
               : "N/A"}
           </Text>
         </View>
@@ -359,8 +358,6 @@ export default function ProfileScreen() {
           <Text style={styles.value}>{user?.status || "N/A"}</Text>
         </View>
       </View>
-
-      {/* Thông tin hội viên */}
       <View style={styles.infoBox}>
         <View style={styles.infoHeader}>
           <Text style={styles.infoTitle}>THÔNG TIN HỘI VIÊN</Text>
@@ -375,9 +372,9 @@ export default function ProfileScreen() {
               <Text style={styles.label}>Bậc hội viên:</Text>
               <Text style={[
                 styles.value,
-                subscription.plan_name === "VIP Pro" ? styles.proPlan : 
-                subscription.plan_name === "Classic" ? styles.classicPlan : 
-                styles.nonePlan
+                subscription.plan_name === "VIP Pro" ? styles.proPlan :
+                  subscription.plan_name === "Classic" ? styles.classicPlan :
+                    styles.nonePlan
               ]}>
                 {subscription.plan_name}
               </Text>
@@ -400,13 +397,13 @@ export default function ProfileScreen() {
               <Ionicons name="checkmark-circle" size={20} color={subscription.status === "active" ? "#42ba96" : "#ff4d4d"} />
               <Text style={styles.label}>Trạng thái:</Text>
               <Text style={[
-                styles.value, 
+                styles.value,
                 subscription.status === "active" ? styles.activeStatus : styles.expiredStatus
               ]}>
                 {subscription.status === "active" ? "Còn hạn" : "Hết hạn"}
               </Text>
             </View>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.manageSubButton}
               onPress={() => router.push('/owner/subscriptions')}
             >
@@ -425,8 +422,6 @@ export default function ProfileScreen() {
           </View>
         )}
       </View>
-
-      {/* Thông tin phiên bản */}
       <View style={styles.infoBox}>
         <View style={styles.infoHeader}>
           <Text style={styles.infoTitle}>THÔNG TIN PHIÊN BẢN</Text>
@@ -446,8 +441,6 @@ export default function ProfileScreen() {
           <Text style={styles.value}>Không có thông tin phiên bản.</Text>
         )}
       </View>
-
-      {/* Nút Xóa tài khoản */}
       <TouchableOpacity
         style={styles.deleteButton}
         onPress={() => router.push("/customer/confirmdelete")}
@@ -455,13 +448,9 @@ export default function ProfileScreen() {
       >
         <Text style={styles.deleteButtonText}>Xóa tài khoản</Text>
       </TouchableOpacity>
-
-      {/* Nút đăng xuất */}
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Text style={styles.logoutText}>Đăng Xuất</Text>
       </TouchableOpacity>
-
-      {/* Modal chọn ảnh */}
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -494,8 +483,6 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
-
-      {/* Modal chỉnh sửa thông tin */}
       <Modal visible={editModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -545,7 +532,7 @@ export default function ProfileScreen() {
                 )
               }
             />
-            
+
             <Text style={styles.modalLabel}>Địa chỉ:</Text>
             <TextInput
               style={styles.input}
@@ -917,7 +904,7 @@ const styles = StyleSheet.create({
     width: "80%",
     alignItems: "center",
     marginBottom: 10,
-  },  purchaseModalButtonText: {
+  }, purchaseModalButtonText: {
     fontSize: 16,
     color: "#fff",
     fontWeight: "bold",

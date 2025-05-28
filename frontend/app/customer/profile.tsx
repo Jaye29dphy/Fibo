@@ -211,15 +211,12 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <AntDesign name="arrowleft" size={24} color="white" />
         </TouchableOpacity>
         <Text style={styles.title}>Hồ Sơ</Text>
       </View>
-
-      {/* Ảnh đại diện */}
       <View style={styles.avatarSection}>
         <TouchableOpacity
           style={styles.avatarContainer}
@@ -250,8 +247,6 @@ export default function ProfileScreen() {
         </TouchableOpacity>
         <Text style={styles.userName}>{user?.full_name || "N/A"}</Text>
       </View>
-
-      {/* Thông tin cá nhân */}
       <View style={styles.infoBox}>
         <View style={styles.infoHeader}>
           <Text style={styles.infoTitle}>THÔNG TIN CÁ NHÂN</Text>
@@ -302,8 +297,6 @@ export default function ProfileScreen() {
           <Text style={styles.value}>{user?.status || "N/A"}</Text>
         </View>
       </View>
-
-      {/* Thông tin phiên bản */}
       <View style={styles.infoBox}>
         <View style={styles.infoHeader}>
           <Text style={styles.infoTitle}>THÔNG TIN PHIÊN BẢN</Text>
@@ -324,7 +317,6 @@ export default function ProfileScreen() {
         )}
       </View>
 
-      {/* Nút Xóa tài khoản */}
       <TouchableOpacity
         style={styles.deleteButton}
         onPress={() => router.push("/customer/confirmdelete")}
@@ -333,12 +325,10 @@ export default function ProfileScreen() {
         <Text style={styles.deleteButtonText}>Xóa tài khoản</Text>
       </TouchableOpacity>
 
-      {/* Nút đăng xuất */}
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Text style={styles.logoutText}>Đăng Xuất</Text>
       </TouchableOpacity>
 
-      {/* Modal chọn ảnh */}
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -372,7 +362,7 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* Modal chỉnh sửa thông tin */}
+
       <Modal visible={editModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>

@@ -80,7 +80,7 @@ export default function NotificationScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Thanh màu xanh thông báo */}
+      
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <AntDesign name="arrowleft" size={24} color="white" />
@@ -88,7 +88,7 @@ export default function NotificationScreen() {
         <Text style={styles.notificationTitle}>Thông báo</Text>
       </View>
 
-      {/* Nội dung thông báo */}
+      
       <View style={styles.body}>
         {loading ? (
           <Text>Đang tải...</Text>
@@ -104,7 +104,7 @@ export default function NotificationScreen() {
         )}
       </View>
 
-      {/* Modal hiển thị chi tiết thông báo */}
+     
       <Modal
         animationType="slide"
         transparent={true}
@@ -134,8 +134,6 @@ export default function NotificationScreen() {
           </View>
         </View>
       </Modal>
-
-      {/* Hiển thị Bottom Tab */}
       <BottomTabs />
     </View>
   );

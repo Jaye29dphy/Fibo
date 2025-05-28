@@ -56,7 +56,7 @@ export default function ConfirmDeleteScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Header */}
+   
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color="black" />
@@ -64,13 +64,13 @@ export default function ConfirmDeleteScreen() {
                 <Text style={styles.headerTitle}>Xoá tài khoản</Text>
             </View>
 
-            {/* Warning */}
+            
             <View style={styles.warningBox}>
                 <Ionicons name="warning" size={40} color="#cb0909" />
                 <Text style={styles.warningText}>Cảnh báo</Text>
             </View>
 
-            {/* Description */}
+           
             <View style={styles.description}>
                 <Text style={styles.descriptionText}>
                     • Một khi bạn nhấn nút xoá tài khoản và nhập đúng mật khẩu, tài khoản của bạn sẽ bị xoá vĩnh viễn.
@@ -86,12 +86,12 @@ export default function ConfirmDeleteScreen() {
                 </Text>
             </View>
 
-            {/* Delete Button */}
+            
             <TouchableOpacity style={styles.deleteButton} onPress={() => setModalVisible(true)}>
                 <Text style={styles.deleteButtonText}>Xoá tài khoản</Text>
             </TouchableOpacity>
 
-            {/* Modal */}
+            
             <Modal visible={modalVisible} transparent animationType="fade">
                 <View style={styles.overlay}>
                     <View style={styles.modalBox}>

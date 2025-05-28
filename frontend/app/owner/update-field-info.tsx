@@ -104,7 +104,7 @@ export default function UpdateFieldInfo() {
 
     return (
         <View style={styles.container}>
-            {/* Header */}
+          
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()}>
                     <Ionicons name="arrow-back" size={24} color="#000" />
@@ -113,7 +113,7 @@ export default function UpdateFieldInfo() {
                 <Ionicons name="calendar-outline" size={24} color="#000" />
             </View>
 
-            {/* Subtitle and Refresh Button Row */}
+           
             <View style={styles.subtitleRow}>
                 <Text style={styles.subtitle}>Danh sách sân</Text>
                 <TouchableOpacity
@@ -125,7 +125,6 @@ export default function UpdateFieldInfo() {
                 </TouchableOpacity>
             </View>
 
-            {/* Field List */}
             {loading ? (
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#3F51B5" />
@@ -185,7 +184,7 @@ export default function UpdateFieldInfo() {
                 </ScrollView>
             )}
 
-            {/* Bottom Tabs */}
+           
             <OwnerBottomTabs />
         </View>
     );

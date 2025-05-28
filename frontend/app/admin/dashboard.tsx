@@ -100,7 +100,7 @@ export default function Dashboard() {
       />
 
       <View style={styles.mainContent}>
-        <ScrollView style={styles.content}>{renderContent()}</ScrollView>
+        <View style={styles.content}>{renderContent()}</View>
       </View>
     </View>
   );

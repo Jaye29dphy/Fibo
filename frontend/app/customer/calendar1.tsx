@@ -72,7 +72,7 @@ export default function MyCalendar() {
         <Button title="Tải lại lịch hẹn" onPress={refreshBookings} />
       </View>
 
-      {/* Ensure the button is positioned above the BottomTabs */}
+    
       <View style={styles.buttonContainer}>
         <Button title="Xem tất cả lịch đặt sân" onPress={() => router.push("/customer/calendar2")} />
       </View>

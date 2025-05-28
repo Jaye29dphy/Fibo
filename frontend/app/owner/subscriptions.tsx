@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from "expo-router";
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
-import { getOwnerSubscription, getSubscriptionPlans, purchaseSubscription } from '@/constants/apiService';
+import { getSubscriptionHistory, getSubscriptionPlans, purchaseSubscription } from '@/constants/apiService';
 import SubscriptionHistory from '@/components/SubscriptionHistory';
 
 interface Subscription {
@@ -26,6 +26,7 @@ interface Subscription {
   end_date: string | null;
   status: 'active' | 'expired';
   description?: string;
+  total_cost: number;
 }
 
 interface SubscriptionPlan {
@@ -47,39 +48,53 @@ const SubscriptionsScreen = () => {
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
   const [selectedMonths, setSelectedMonths] = useState(1);
   const [purchasing, setPurchasing] = useState(false);
-  
+
   useEffect(() => {
     loadData();
   }, []);
-  
+
   const loadData = async () => {
-    try {
-      setLoading(true);
-      setPlansLoading(true);
-      
-      // Load current subscription
-      const subscriptionData = await getOwnerSubscription();
-      setCurrentSubscription(subscriptionData);
-        // Load plans
-      const plansData = await getSubscriptionPlans();
-      console.log("Fetched subscription plans:", plansData);
-      if (Array.isArray(plansData)) {
-        // No filtering to make sure we display all available plans
-        setSubscriptionPlans(plansData);
-      } else if (plansData && typeof plansData === 'object') {
-        // If it's not an array but an object with plans property
-        const planArray = plansData.plans || plansData.data || [];
-        console.log("Converting to array:", planArray);
-        setSubscriptionPlans(planArray);
-      }
-    } catch (error) {
-      console.error("Error loading subscriptions data:", error);
-      Alert.alert("Lỗi", "Không thể tải thông tin gói đăng ký. Vui lòng thử lại sau.");
-    } finally {
-      setLoading(false);
-      setPlansLoading(false);
+  try {
+    setLoading(true);
+    setPlansLoading(true);
+
+    // Lấy toàn bộ lịch sử
+    const history = await getSubscriptionHistory();
+
+    if (Array.isArray(history) && history.length > 0) {
+      // 🔎 Lọc các gói active
+      const activeSubscriptions = history.filter(item => item.status === 'active');
+
+      // 🔁 Sắp xếp theo start_date giảm dần
+      activeSubscriptions.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+
+      // ✅ Lấy gói active mới nhất
+      const newestActive = activeSubscriptions[0] || null;
+      setCurrentSubscription(newestActive);
+    } else {
+      setCurrentSubscription(null);
     }
-  };  const handlePurchase = () => {
+
+    // Load các gói có thể mua
+    const plansData = await getSubscriptionPlans();
+    if (Array.isArray(plansData)) {
+      setSubscriptionPlans(plansData);
+    } else if (plansData && typeof plansData === 'object') {
+      const planArray = plansData.plans || plansData.data || [];
+      setSubscriptionPlans(planArray);
+    }
+  } catch (error) {
+    console.error("Lỗi khi load dữ liệu:", error);
+    Alert.alert("Lỗi", "Không thể tải dữ liệu gói đăng ký.");
+  } finally {
+    setLoading(false);
+    setPlansLoading(false);
+  }
+};
+
+
+
+  const handlePurchase = () => {
     if (!selectedPlan) {
       Alert.alert("Lỗi", "Vui lòng chọn gói đăng ký");
       return;
@@ -122,9 +137,9 @@ const SubscriptionsScreen = () => {
       // Determine planCode based on plan_id or name
       // Assuming plan_id 3 is 'pro' (maps to 'premium' in DB)
       // Assuming plan_id 2 is 'classic' (maps to 'standard' in DB)
-      if (selectedPlan.plan_id === 3 || planNameLower.includes('pro')) { 
+      if (selectedPlan.plan_id === 2 || planNameLower.includes('pro')) {
         planCode = "premium"; // Send 'premium' for pro plans
-      } else if (selectedPlan.plan_id === 2 || planNameLower.includes('standard') || planNameLower.includes('classic')) { 
+      } else if (selectedPlan.plan_id === 1 || planNameLower.includes('standard') || planNameLower.includes('classic')) {
         planCode = "standard"; // Send 'standard' for classic/standard plans
       }
 
@@ -149,25 +164,25 @@ const SubscriptionsScreen = () => {
       Alert.alert("Lỗi", "Không thể chuyển đến trang thanh toán. Vui lòng thử lại sau.");
     }
   };
-  
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "N/A";
     return new Date(dateString).toLocaleDateString("vi-VN");
   };
-  
+
   const formatPrice = (price: number) => {
     return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".") + " VND";
   };
-  
+
   const calculateRemainingDays = (endDateString: string | null) => {
     if (!endDateString) return 0;
-    
+
     const endDate = new Date(endDateString);
     const today = new Date();
     const diffTime = endDate.getTime() - today.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
-  
+
   const renderCurrentSubscription = () => {
     if (loading) {
       return (
@@ -176,8 +191,10 @@ const SubscriptionsScreen = () => {
         </View>
       );
     }
-    
-    if (!currentSubscription || currentSubscription.plan_id === 1) {
+
+    if (!currentSubscription ||
+      currentSubscription.status !== 'active' ||
+      currentSubscription.plan_name.toLowerCase() === 'basic') {
       return (
         <View style={styles.noSubscriptionContainer}>
           <FontAwesome5 name="crown" size={40} color="#ddd" style={styles.noSubIcon} />
@@ -187,7 +204,7 @@ const SubscriptionsScreen = () => {
           <Text style={styles.noSubscriptionSubtext}>
             Nâng cấp ngay để mở khóa thêm nhiều tính năng
           </Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.upgradeButton}
             onPress={() => setPurchaseModalVisible(true)}
           >
@@ -196,18 +213,18 @@ const SubscriptionsScreen = () => {
         </View>
       );
     }
-    
+
     const remainingDays = calculateRemainingDays(currentSubscription.end_date);
     const isPro = currentSubscription.plan_name.toLowerCase().includes('pro');
     const isClassic = currentSubscription.plan_name.toLowerCase().includes('classic');
-    
+
     return (
       <View style={styles.currentSubContainer}>
         <View style={[
           styles.subHeader,
-          isPro ? styles.proHeader : 
-          isClassic ? styles.classicHeader : 
-          styles.basicHeader
+          isPro ? styles.proHeader :
+            isClassic ? styles.classicHeader :
+              styles.basicHeader
         ]}>
           <Text style={styles.planNameText}>{currentSubscription.plan_name}</Text>
           <View style={styles.statusContainer}>
@@ -216,7 +233,7 @@ const SubscriptionsScreen = () => {
             </Text>
           </View>
         </View>
-        
+
         <View style={styles.subDetailsContainer}>
           <View style={styles.subDetail}>
             <Text style={styles.subDetailLabel}>Ngày bắt đầu:</Text>
@@ -224,14 +241,14 @@ const SubscriptionsScreen = () => {
               {formatDate(currentSubscription.start_date)}
             </Text>
           </View>
-          
+
           <View style={styles.subDetail}>
             <Text style={styles.subDetailLabel}>Ngày kết thúc:</Text>
             <Text style={styles.subDetailValue}>
               {formatDate(currentSubscription.end_date)}
             </Text>
           </View>
-          
+
           <View style={styles.subDetail}>
             <Text style={styles.subDetailLabel}>Số sân tối đa:</Text>
             <Text style={styles.subDetailValue}>{currentSubscription.max_fields}</Text>
@@ -239,9 +256,9 @@ const SubscriptionsScreen = () => {
 
           <View style={styles.subDetail}>
             <Text style={styles.subDetailLabel}>Giá gói:</Text>
-            <Text style={styles.subDetailValue}>{formatPrice(currentSubscription.price)}</Text>
+            <Text style={styles.subDetailValue}>{formatPrice(currentSubscription.total_cost)}</Text>
           </View>
-          
+
           {currentSubscription.status === 'active' && (
             <View style={styles.remainingContainer}>
               <Text style={styles.remainingText}>
@@ -249,17 +266,32 @@ const SubscriptionsScreen = () => {
               </Text>
             </View>
           )}
-          
+
           {currentSubscription.description && (
             <View style={styles.descriptionBox}>
               <Text style={styles.descriptionTitle}>Mô tả gói:</Text>
-              <Text style={styles.descriptionText}>{currentSubscription.description}</Text>
+              {Array.isArray(currentSubscription.description)
+                ? currentSubscription.description.map((line, index) => (
+                  <Text key={index} style={styles.descriptionText}>• {line}</Text>
+                ))
+                : <Text style={styles.descriptionText}>{currentSubscription.description}</Text>}
             </View>
           )}
-          
-          <TouchableOpacity 
+
+
+          <TouchableOpacity
             style={styles.renewButton}
-            onPress={() => setPurchaseModalVisible(true)}
+           onPress={() => {
+  if (remainingDays > 10) {
+    Alert.alert(
+      "Thông báo",
+      "Bạn chỉ có thể gia hạn khi gói hiện tại còn dưới 10 ngày."
+    );
+    return;
+  }
+  setPurchaseModalVisible(true);
+}}
+
           >
             <Text style={styles.renewButtonText}>Gia hạn gói</Text>
           </TouchableOpacity>
@@ -267,7 +299,7 @@ const SubscriptionsScreen = () => {
       </View>
     );
   };
-    const renderPurchaseModal = () => {
+  const renderPurchaseModal = () => {
     return (
       <Modal
         visible={purchaseModalVisible}
@@ -278,17 +310,17 @@ const SubscriptionsScreen = () => {
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Chọn gói đăng ký</Text>
-            
+
             {plansLoading ? (
               <ActivityIndicator size="small" color="#42ba96" />
             ) : (
               <>
                 <Text style={styles.sectionTitle}>Chọn gói:</Text>
-                
+
                 {subscriptionPlans.length === 0 ? (
                   <View style={styles.noPlansContainer}>
                     <Text style={styles.noPlansText}>Không có gói đăng ký nào hiện có</Text>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.retryButton}
                       onPress={loadData}
                     >
@@ -303,9 +335,9 @@ const SubscriptionsScreen = () => {
                         style={[
                           styles.enhancedPlanCard,
                           selectedPlan?.plan_id === plan.plan_id && styles.selectedPlanCard,
-                          plan.name?.toLowerCase().includes('pro') ? styles.proPlanCard : 
-                          plan.name?.toLowerCase().includes('classic') ? styles.classicPlanCard : 
-                          styles.basicPlanCard
+                          plan.name?.toLowerCase().includes('pro') ? styles.proPlanCard :
+                            plan.name?.toLowerCase().includes('classic') ? styles.classicPlanCard :
+                              styles.basicPlanCard
                         ]}
                         onPress={() => setSelectedPlan(plan)}
                       >
@@ -332,7 +364,7 @@ const SubscriptionsScreen = () => {
                           <View style={styles.planFeatureItem}>
                             <Ionicons name="pricetag-outline" size={14} color="#42ba96" />
                             <Text style={styles.planCardFeature}>
-                              {plan.name?.toLowerCase().includes('standard') ? 'Giảm 10% phí dịch vụ' : 'Giảm 15% phí dịch vụ'}
+                              {plan.name?.toLowerCase().includes('standard') ? 'Giảm 10% phí dịch vụ. ' : 'Giảm 15% phí dịch vụ. '}
                             </Text>
                           </View>
                         </View>
@@ -345,42 +377,42 @@ const SubscriptionsScreen = () => {
                     ))}
                   </View>
                 )}
-                
+
                 <Text style={styles.sectionTitle}>Chọn thời gian:</Text>
                 <View style={styles.durationContainer}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.durationOption, selectedMonths === 1 && styles.selectedDuration]}
                     onPress={() => setSelectedMonths(1)}
                   >
                     <Text style={styles.durationText}>1 tháng</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.durationOption, selectedMonths === 3 && styles.selectedDuration]}
                     onPress={() => setSelectedMonths(3)}
                   >
                     <Text style={styles.durationText}>3 tháng</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.durationOption, selectedMonths === 6 && styles.selectedDuration]}
                     onPress={() => setSelectedMonths(6)}
                   >
                     <Text style={styles.durationText}>6 tháng</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.durationOption, selectedMonths === 12 && styles.selectedDuration]}
                     onPress={() => setSelectedMonths(12)}
                   >
                     <Text style={styles.durationText}>12 tháng</Text>
                   </TouchableOpacity>
                 </View>
-                
+
                 <View style={styles.totalContainer}>
                   <Text style={styles.totalLabel}>Tổng thanh toán:</Text>
                   <Text style={styles.totalAmount}>
                     {selectedPlan ? formatPrice(selectedPlan.price * selectedMonths) : "0 VND"}
                   </Text>
                 </View>
-                
+
                 <TouchableOpacity
                   style={[
                     styles.purchaseButton,
@@ -397,7 +429,7 @@ const SubscriptionsScreen = () => {
                 </TouchableOpacity>
               </>
             )}
-            
+
             <TouchableOpacity
               style={styles.closeModalButton}
               onPress={() => setPurchaseModalVisible(false)}
@@ -409,7 +441,7 @@ const SubscriptionsScreen = () => {
       </Modal>
     );
   };
-  
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -421,7 +453,7 @@ const SubscriptionsScreen = () => {
           <Ionicons name="refresh" size={24} color="#42ba96" />
         </TouchableOpacity>
       </View>
-      
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Gói đăng ký hiện tại</Text>
         {renderCurrentSubscription()}
@@ -436,7 +468,7 @@ const SubscriptionsScreen = () => {
         ) : subscriptionPlans.length === 0 ? (
           <View style={styles.noPlansContainer}>
             <Text style={styles.noPlansText}>Không có gói đăng ký nào hiện có</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.retryButton}
               onPress={loadData}
             >
@@ -451,15 +483,15 @@ const SubscriptionsScreen = () => {
                 style={[
                   styles.enhancedPlanCard,
                   plan.name?.toLowerCase().includes('pro') ? styles.proPlanCard :
-                  plan.name?.toLowerCase().includes('classic') || plan.name?.toLowerCase().includes('standard') ? styles.classicPlanCard :
-                  styles.basicPlanCard
+                    plan.name?.toLowerCase().includes('classic') || plan.name?.toLowerCase().includes('standard') ? styles.classicPlanCard :
+                      styles.basicPlanCard
                 ]}
               >
                 <Text style={styles.planCardName}>
                   {plan.name || "Gói đăng ký"}
                 </Text>
                 <Text style={styles.planCardPrice}>{formatPrice(plan.price || 0)}</Text>
-                
+
                 <View style={styles.planFeaturesList}>
                   <View style={styles.planFeatureItem}>
                     <FontAwesome5 name="check-circle" size={14} color="#42ba96" />
@@ -470,23 +502,23 @@ const SubscriptionsScreen = () => {
                   <View style={styles.planFeatureItem}>
                     <FontAwesome5 name="headset" size={14} color="#42ba96" />
                     <Text style={styles.planCardFeature}>
-                      {plan.name?.toLowerCase().includes('standard') || plan.name?.toLowerCase().includes('classic') ? 'Hỗ trợ 16/7' : 'Hỗ trợ 24/7'}
+                      {plan.name?.toLowerCase().includes('standard') || plan.name?.toLowerCase().includes('classic') ? ' Hỗ trợ 16/7' : ' Hỗ trợ 24/7'}
                     </Text>
                   </View>
                   <View style={styles.planFeatureItem}>
                     <Ionicons name="pricetag-outline" size={14} color="#42ba96" />
                     <Text style={styles.planCardFeature}>
-                      {plan.name?.toLowerCase().includes('standard') || plan.name?.toLowerCase().includes('classic') ? 'Giảm 10% phí dịch vụ' : 'Giảm 15% phí dịch vụ'}
+                      {plan.name?.toLowerCase().includes('standard') || plan.name?.toLowerCase().includes('classic') ? 'Giảm 10% phí dịch vụ. ' : 'Giảm 15% phí dịch vụ. '}
                     </Text>
                   </View>
                 </View>
-                
+
                 {plan.name?.toLowerCase().includes('pro') && (
                   <View style={styles.recommendBadge}>
                     <Text style={styles.recommendText}>Đề xuất</Text>
                   </View>
                 )}
-                
+
                 <TouchableOpacity
                   style={styles.upgradeToPlanButton}
                   onPress={() => {
@@ -501,11 +533,11 @@ const SubscriptionsScreen = () => {
           </View>
         )}
       </View>
-      
+
       <View style={styles.section}>
         <SubscriptionHistory />
       </View>
-      
+
       {renderPurchaseModal()}
     </ScrollView>
   );
@@ -672,7 +704,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  
+
   // Modal styles
   modalContainer: {
     flex: 1,
@@ -780,7 +812,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
-  },  totalAmount: {
+  }, totalAmount: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#42ba96',

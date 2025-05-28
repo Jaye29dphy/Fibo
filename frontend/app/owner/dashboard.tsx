@@ -9,15 +9,15 @@ export default function OwnerDashboard() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      
       <View style={styles.header}>
         <Text style={styles.title}>FIBO</Text>
         <Text style={styles.subtitle}>Bạn muốn làm gì?</Text>
       </View>
 
-      {/* Action Buttons */}
+     
       <View style={styles.buttonContainer}>
-        {/* 1. Đăng ký sân */}
+        
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => router.push("/owner/register-field")}
@@ -26,7 +26,7 @@ export default function OwnerDashboard() {
           <Text style={styles.buttonText}>Đăng ký sân</Text>
         </TouchableOpacity>
 
-        {/* 2. Cập nhật thông tin sân */}
+        
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => router.push("/owner/update-field-info")}
@@ -35,7 +35,7 @@ export default function OwnerDashboard() {
           <Text style={styles.buttonText}>Cập nhật thông tin sân</Text>
         </TouchableOpacity>
 
-        {/* 3. Quản lý lịch */}
+        
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => router.push("/owner/manage-schedule")}
@@ -44,7 +44,7 @@ export default function OwnerDashboard() {
           <Text style={styles.buttonText}>Quản lý lịch</Text>
         </TouchableOpacity>
 
-        {/* 4. Xử lý yêu cầu khiếu nại */}
+       
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => router.push("/owner/handle-requests")}
@@ -54,7 +54,7 @@ export default function OwnerDashboard() {
         </TouchableOpacity>
       </View>
 
-      {/* Bottom Tabs */}
+      
       <OwnerBottomTabs />
     </View>
   );

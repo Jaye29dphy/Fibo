@@ -26,59 +26,63 @@ export class SubscriptionController {  // Get all subscription plans
     }
   }
   
-  // Get subscription history for an owner
-  static async getSubscriptionHistory(req: AuthRequest, res: Response): Promise<void> {
-    try {
-      if (!req.user) {
-        res.status(401).json({ error: "Unauthorized: User not found" });
-        return;
-      }
-
-      const userId = req.user.id;
-
-      // First, find the owner_id
-      const [owners]: any = await pool.execute(
-        "SELECT owner_id FROM owners WHERE user_id = ?",
-        [userId]
-      );
-
-      if (!Array.isArray(owners) || owners.length === 0) {
-        res.status(404).json({ error: "No owner record found" });
-        return;
-      }
-
-      const ownerId = owners[0].owner_id;
-
-      // Get subscription history
-      const [subscriptions]: any = await pool.execute(
-        `SELECT 
-          os.subscription_id, 
-          os.owner_id,
-          os.plan_id,
-          sp.plan_code AS plan_name,
-          sp.price,
-          sp.max_fields,
-          os.start_date,
-          os.end_date,
-          os.status,
-          sp.description
-        FROM 
-          owner_subscriptions os
-        JOIN 
-          subscription_plans sp ON os.plan_id = sp.plan_id
-        WHERE 
-          os.owner_id = ? 
-        ORDER BY 
-          os.start_date DESC`,
-        [ownerId]
-      );
-
-      res.status(200).json(subscriptions);
-    } catch (error) {
-      console.error("Error in getSubscriptionHistory:", error);
-      res.status(500).json({ error: "Internal Server Error" });
+  // Lịch sử gói đăng ký theo owner
+static async getSubscriptionHistory(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Unauthorized: User not found" });
+      return;
     }
+
+    const userId = req.user.id;
+
+    // Tìm owner_id tương ứng với user
+    const [owners]: any = await pool.execute(
+      "SELECT owner_id FROM owners WHERE user_id = ?",
+      [userId]
+    );
+
+    if (!Array.isArray(owners) || owners.length === 0) {
+      res.status(404).json({ error: "Không tìm thấy chủ sân cho tài khoản này." });
+      return;
+    }
+
+    const ownerId = owners[0].owner_id;
+
+    // Lấy danh sách lịch sử đăng ký, kèm thông tin gói và đơn hàng nếu có
+    const [subscriptions]: any = await pool.execute(
+      `SELECT 
+        os.subscription_id, 
+        os.owner_id,
+        os.plan_id,
+        sp.plan_code AS plan_name,
+        sp.price,
+        sp.max_fields,
+        os.start_date,
+        os.end_date,
+        os.status,
+        sp.description,
+        spo.total_cost
+      FROM 
+        owner_subscriptions os
+      JOIN 
+        subscription_plans sp ON os.plan_id = sp.plan_id
+      LEFT JOIN 
+        subscriptionpendingorders spo ON os.source_pending_order_id = spo.order_id
+      WHERE 
+        os.owner_id = ?
+      ORDER BY 
+        os.start_date DESC`,
+      [ownerId]
+    );
+
+    res.status(200).json(subscriptions);
+  } catch (error) {
+    console.error("❌ Error in getSubscriptionHistory:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
+}
+
   
   // Get all owner subscriptions for admin
   static async getAllOwnerSubscriptions(req: AuthRequest, res: Response): Promise<void> {

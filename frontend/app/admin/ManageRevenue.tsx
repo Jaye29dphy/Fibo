@@ -6,7 +6,7 @@ export default function ManageRevenue() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Quản lý doanh thu</Text>
-      {/* Nội dung quản lý doanh thu tại đây */}
+     
     </View>
   );
 }

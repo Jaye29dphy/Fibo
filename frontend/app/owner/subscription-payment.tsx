@@ -40,7 +40,7 @@ const SubscriptionPayment = () => {
   const planId = getParam(params.planId);
   const planName = getParam(params.planName);
   const planCode = getParam(params.planCode); // This should be "classic" or "pro"
-  const monthsParam = getParam(params.months) || "1";
+  const monthsParam = getParam(params.months);
   const priceParam = getParam(params.price) || "0";
   
   const months = parseInt(monthsParam, 10);
@@ -201,82 +201,105 @@ const SubscriptionPayment = () => {
   };
 
   const handleMarkAsPaid = async () => {
-    if (isPaid || loading) return;
-    
-    if (!currentOrderId) {
-      Alert.alert("Lỗi", "Không tìm thấy ID đơn hàng để cập nhật. Vui lòng thử tạo lại đơn hàng.");
-      setLoading(false);
+  if (isPaid || loading) return;
+
+  if (!currentOrderId) {
+    if (Platform.OS === "android") {
+      ToastAndroid.show("Không tìm thấy ID đơn hàng để cập nhật.", ToastAndroid.SHORT);
+    } else {
+      console.log("Không tìm thấy ID đơn hàng để cập nhật.");
+    }
+    return;
+  }
+
+  console.log("[SubscriptionPayment] handleMarkAsPaid: Called. Order ID:", currentOrderId, "planCode:", planCode, "months:", months);
+  setLoading(true);
+
+  try {
+    // Kiểm tra planCode hợp lệ
+    if (!planCode || (planCode !== "standard" && planCode !== "premium")) {
+      if (Platform.OS === "android") {
+        ToastAndroid.show(`Gói không hợp lệ: ${planCode}`, ToastAndroid.SHORT);
+      } else {
+        console.log(`Gói không hợp lệ: ${planCode}`);
+      }
       return;
     }
 
-    console.log("[SubscriptionPayment] handleMarkAsPaid: Called. Order ID:", currentOrderId, "planCode:", planCode, "months:", months); // Log call
-    setLoading(true); 
-    
-    try {
-      // Validate planCode against 'standard' and 'premium'
-      if (!planCode || (planCode !== "standard" && planCode !== "premium")) {
-          Alert.alert("Lỗi", `Gói đăng ký không hợp lệ. Mã gói nhận được: '${planCode}'. Vui lòng đảm bảo mã gói là 'standard' hoặc 'premium'.`);
-          setLoading(false);
-          return;
-      }
-      
-      console.log("[SubscriptionPayment] handleMarkAsPaid: Calling updateSubscriptionOrderStatus with 'paid' for order ID:", currentOrderId); // Log API call
-      const response = await updateSubscriptionOrderStatus(currentOrderId.toString(), 'paid');
-      console.log("[SubscriptionPayment] handleMarkAsPaid: API response:", response); // Log API response
-      
-      setSubscriptionPurchased(true); 
-      setIsPaid(true); 
-      
-      Alert.alert(
-        "Xác nhận thành công", 
-        "Yêu cầu thanh toán của bạn đã được ghi nhận. Gói sẽ được kích hoạt sau khi quản trị viên xác nhận.",
-        [
-          {
-            text: "OK",
-            onPress: () => router.replace('/owner/subscriptions')
-          }
-        ]
-      );
-    } catch (error: any) {
-      console.error("[SubscriptionPayment] handleMarkAsPaid: Error:", error); // Log error
-      Alert.alert("Lỗi", `Có lỗi xảy ra khi xác nhận thanh toán: ${error.message || 'Vui lòng thử lại.'}`);
-    } finally {
-      console.log("[SubscriptionPayment] handleMarkAsPaid: Finally block. Setting loading to false."); // Log finally
-      setLoading(false);
+    // Gọi API cập nhật trạng thái đơn hàng
+    const response = await updateSubscriptionOrderStatus(currentOrderId.toString(), 'paid');
+    console.log("[handleMarkAsPaid] API response:", response);
+
+    setSubscriptionPurchased(true);
+    setIsPaid(true);
+
+    // Hiển thị thông báo thành công
+    if (Platform.OS === "android") {
+      ToastAndroid.show("✅ Xác nhận thành công! Đang chuyển trang...", ToastAndroid.SHORT);
+    } else {
+      console.log("✅ Xác nhận thành công! Đang chuyển trang...");
     }
-  };
+
+    // Chuyển sang màn subscriptions sau 2 giây
+    setTimeout(() => {
+      router.replace('/owner/subscriptions');
+    }, 2000);
+
+  } catch (error: any) {
+    console.error("[handleMarkAsPaid] Error:", error);
+    if (Platform.OS === "android") {
+      ToastAndroid.show("❌ Có lỗi khi xác nhận thanh toán", ToastAndroid.SHORT);
+    } else {
+      console.log("❌ Có lỗi khi xác nhận thanh toán");
+    }
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleCancelPayment = async () => {
-    if (loading) return;
+  if (loading) return;
 
-    if (!currentOrderId) {
-      Alert.alert("Lỗi", "Không tìm thấy ID đơn hàng để hủy. Vui lòng thử lại.");
-      return;
+  if (!currentOrderId) {
+    if (Platform.OS === "android") {
+      ToastAndroid.show("Không tìm thấy ID đơn hàng để hủy.", ToastAndroid.SHORT);
+    } else {
+      console.log("Không tìm thấy ID đơn hàng để hủy.");
+    }
+    return;
+  }
+
+  setLoading(true);
+  try {
+    console.log("[SubscriptionPayment] handleCancelPayment: Calling updateSubscriptionOrderStatus with 'cancelled' for order ID:", currentOrderId);
+    
+    await updateSubscriptionOrderStatus(currentOrderId.toString(), 'cancelled');
+    
+    // Thông báo thành công
+    if (Platform.OS === "android") {
+      ToastAndroid.show("✅ Đơn hàng đã được hủy. Đang chuyển trang...", ToastAndroid.SHORT);
+    } else {
+      console.log("✅ Đơn hàng đã được hủy. Đang chuyển trang...");
     }
 
-    setLoading(true);
-    try {
-      console.log("[SubscriptionPayment] handleCancelPayment: Calling updateSubscriptionOrderStatus with 'cancelled' for order ID:", currentOrderId);
-      await updateSubscriptionOrderStatus(currentOrderId.toString(), 'cancelled');
-      console.log("[SubscriptionPayment] handleCancelPayment: Order cancelled successfully.");
-
-      Alert.alert(
-        "Thông báo",
-        "Đơn hàng đã được hủy.",
-        [
-          {
-            text: "OK",
-            onPress: () => router.replace('/owner/subscriptions')
-          }
-        ]
-      );
-    } catch (error: any) {
-      console.error("[SubscriptionPayment] handleCancelPayment: Error:", error);
-      Alert.alert("Lỗi", `Có lỗi xảy ra khi hủy đơn hàng: ${error.message || 'Vui lòng thử lại.'}`);
-    } finally {
-      setLoading(false);
+    // Chuyển trang sau 1.5s
+    setTimeout(() => {
+      router.replace('/owner/subscriptions');
+    }, 1500);
+    
+  } catch (error: any) {
+    console.error("[SubscriptionPayment] handleCancelPayment: Error:", error);
+    if (Platform.OS === "android") {
+      ToastAndroid.show("❌ Có lỗi xảy ra khi hủy đơn hàng", ToastAndroid.SHORT);
+    } else {
+      console.log("❌ Có lỗi xảy ra khi hủy đơn hàng");
     }
-  };
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const formatPrice = (price: number) => {
     return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".") + " VND";
