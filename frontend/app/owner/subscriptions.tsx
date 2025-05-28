@@ -24,7 +24,7 @@ interface Subscription {
   max_fields: number;
   start_date: string | null;
   end_date: string | null;
-  status: 'active' | 'expired';
+  status: 'active' | 'expired' | 'cancelled';
   description?: string;
   total_cost: number;
 }
@@ -52,7 +52,6 @@ const SubscriptionsScreen = () => {
   useEffect(() => {
     loadData();
   }, []);
-
   const loadData = async () => {
   try {
     setLoading(true);
@@ -62,15 +61,17 @@ const SubscriptionsScreen = () => {
     const history = await getSubscriptionHistory();
 
     if (Array.isArray(history) && history.length > 0) {
-      // 🔎 Lọc các gói active
-      const activeSubscriptions = history.filter(item => item.status === 'active');
+      // 🔎 Lọc các gói active hoặc expired
+      const activeOrExpiredSubscriptions = history.filter(item => 
+        item.status === 'active' || item.status === 'expired'
+      );
 
       // 🔁 Sắp xếp theo start_date giảm dần
-      activeSubscriptions.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+      activeOrExpiredSubscriptions.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
 
-      // ✅ Lấy gói active mới nhất
-      const newestActive = activeSubscriptions[0] || null;
-      setCurrentSubscription(newestActive);
+      // ✅ Lấy gói mới nhất (active hoặc expired)
+      const newestSubscription = activeOrExpiredSubscriptions[0] || null;
+      setCurrentSubscription(newestSubscription);
     } else {
       setCurrentSubscription(null);
     }
@@ -190,10 +191,8 @@ const SubscriptionsScreen = () => {
           <ActivityIndicator size="large" color="#42ba96" />
         </View>
       );
-    }
-
-    if (!currentSubscription ||
-      currentSubscription.status !== 'active' ||
+    }    if (!currentSubscription ||
+      (currentSubscription.status !== 'active' && currentSubscription.status !== 'expired') ||
       currentSubscription.plan_name.toLowerCase() === 'basic') {
       return (
         <View style={styles.noSubscriptionContainer}>
@@ -265,9 +264,7 @@ const SubscriptionsScreen = () => {
                 Còn {remainingDays} ngày sử dụng
               </Text>
             </View>
-          )}
-
-          {currentSubscription.description && (
+          )}          {currentSubscription.description && (
             <View style={styles.descriptionBox}>
               <Text style={styles.descriptionTitle}>Mô tả gói:</Text>
               {Array.isArray(currentSubscription.description)
@@ -276,25 +273,17 @@ const SubscriptionsScreen = () => {
                 ))
                 : <Text style={styles.descriptionText}>{currentSubscription.description}</Text>}
             </View>
+          )}          {/* Chỉ hiển thị nút Gia hạn gói khi: status = 'expired' HOẶC còn dưới 10 ngày */}
+          {(currentSubscription.status === 'expired' || (currentSubscription.status === 'active' && remainingDays <= 10)) && (
+            <TouchableOpacity
+              style={styles.renewButton}
+              onPress={() => setPurchaseModalVisible(true)}
+            >
+              <Text style={styles.renewButtonText}>
+                {currentSubscription.status === 'expired' ? 'Gia hạn gói' : 'Gia hạn sớm'}
+              </Text>
+            </TouchableOpacity>
           )}
-
-
-          <TouchableOpacity
-            style={styles.renewButton}
-           onPress={() => {
-  if (remainingDays > 10) {
-    Alert.alert(
-      "Thông báo",
-      "Bạn chỉ có thể gia hạn khi gói hiện tại còn dưới 10 ngày."
-    );
-    return;
-  }
-  setPurchaseModalVisible(true);
-}}
-
-          >
-            <Text style={styles.renewButtonText}>Gia hạn gói</Text>
-          </TouchableOpacity>
         </View>
       </View>
     );
@@ -452,87 +441,90 @@ const SubscriptionsScreen = () => {
         <TouchableOpacity onPress={loadData}>
           <Ionicons name="refresh" size={24} color="#42ba96" />
         </TouchableOpacity>
-      </View>
-
-      <View style={styles.section}>
+      </View>      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Gói đăng ký hiện tại</Text>
         {renderCurrentSubscription()}
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Các gói đăng ký có sẵn</Text>
-        {plansLoading ? (
-          <View style={styles.loaderContainer}>
-            <ActivityIndicator size="small" color="#42ba96" />
-          </View>
-        ) : subscriptionPlans.length === 0 ? (
-          <View style={styles.noPlansContainer}>
-            <Text style={styles.noPlansText}>Không có gói đăng ký nào hiện có</Text>
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={loadData}
-            >
-              <Text style={styles.retryButtonText}>Thử lại</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.availablePlansContainer}>
-            {subscriptionPlans.map((plan) => (
-              <View
-                key={plan.plan_id}
-                style={[
-                  styles.enhancedPlanCard,
-                  plan.name?.toLowerCase().includes('pro') ? styles.proPlanCard :
-                    plan.name?.toLowerCase().includes('classic') || plan.name?.toLowerCase().includes('standard') ? styles.classicPlanCard :
-                      styles.basicPlanCard
-                ]}
+      {/* Chỉ hiển thị phần "Các gói đăng ký có sẵn" khi KHÔNG có gói active */}
+      {(!currentSubscription || 
+        currentSubscription.status !== 'active' || 
+        currentSubscription.plan_name.toLowerCase() === 'basic') && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Các gói đăng ký có sẵn</Text>
+          {plansLoading ? (
+            <View style={styles.loaderContainer}>
+              <ActivityIndicator size="small" color="#42ba96" />
+            </View>
+          ) : subscriptionPlans.length === 0 ? (
+            <View style={styles.noPlansContainer}>
+              <Text style={styles.noPlansText}>Không có gói đăng ký nào hiện có</Text>
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={loadData}
               >
-                <Text style={styles.planCardName}>
-                  {plan.name || "Gói đăng ký"}
-                </Text>
-                <Text style={styles.planCardPrice}>{formatPrice(plan.price || 0)}</Text>
-
-                <View style={styles.planFeaturesList}>
-                  <View style={styles.planFeatureItem}>
-                    <FontAwesome5 name="check-circle" size={14} color="#42ba96" />
-                    <Text style={styles.planCardFeature}>
-                      {plan.name?.toLowerCase().includes('standard') || plan.name?.toLowerCase().includes('classic') ? 'Tối đa 3 sân' : 'Tối đa 5 sân'}
-                    </Text>
-                  </View>
-                  <View style={styles.planFeatureItem}>
-                    <FontAwesome5 name="headset" size={14} color="#42ba96" />
-                    <Text style={styles.planCardFeature}>
-                      {plan.name?.toLowerCase().includes('standard') || plan.name?.toLowerCase().includes('classic') ? ' Hỗ trợ 16/7' : ' Hỗ trợ 24/7'}
-                    </Text>
-                  </View>
-                  <View style={styles.planFeatureItem}>
-                    <Ionicons name="pricetag-outline" size={14} color="#42ba96" />
-                    <Text style={styles.planCardFeature}>
-                      {plan.name?.toLowerCase().includes('standard') || plan.name?.toLowerCase().includes('classic') ? 'Giảm 10% phí dịch vụ. ' : 'Giảm 15% phí dịch vụ. '}
-                    </Text>
-                  </View>
-                </View>
-
-                {plan.name?.toLowerCase().includes('pro') && (
-                  <View style={styles.recommendBadge}>
-                    <Text style={styles.recommendText}>Đề xuất</Text>
-                  </View>
-                )}
-
-                <TouchableOpacity
-                  style={styles.upgradeToPlanButton}
-                  onPress={() => {
-                    setSelectedPlan(plan);
-                    setPurchaseModalVisible(true);
-                  }}
+                <Text style={styles.retryButtonText}>Thử lại</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.availablePlansContainer}>
+              {subscriptionPlans.map((plan) => (
+                <View
+                  key={plan.plan_id}
+                  style={[
+                    styles.enhancedPlanCard,
+                    plan.name?.toLowerCase().includes('pro') ? styles.proPlanCard :
+                      plan.name?.toLowerCase().includes('classic') || plan.name?.toLowerCase().includes('standard') ? styles.classicPlanCard :
+                        styles.basicPlanCard
+                  ]}
                 >
-                  <Text style={styles.upgradeToPlanButtonText}>Chọn gói này</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
+                  <Text style={styles.planCardName}>
+                    {plan.name || "Gói đăng ký"}
+                  </Text>
+                  <Text style={styles.planCardPrice}>{formatPrice(plan.price || 0)}</Text>
+
+                  <View style={styles.planFeaturesList}>
+                    <View style={styles.planFeatureItem}>
+                      <FontAwesome5 name="check-circle" size={14} color="#42ba96" />
+                      <Text style={styles.planCardFeature}>
+                        {plan.name?.toLowerCase().includes('standard') || plan.name?.toLowerCase().includes('classic') ? 'Tối đa 3 sân' : 'Tối đa 5 sân'}
+                      </Text>
+                    </View>
+                    <View style={styles.planFeatureItem}>
+                      <FontAwesome5 name="headset" size={14} color="#42ba96" />
+                      <Text style={styles.planCardFeature}>
+                        {plan.name?.toLowerCase().includes('standard') || plan.name?.toLowerCase().includes('classic') ? ' Hỗ trợ 16/7' : ' Hỗ trợ 24/7'}
+                      </Text>
+                    </View>
+                    <View style={styles.planFeatureItem}>
+                      <Ionicons name="pricetag-outline" size={14} color="#42ba96" />
+                      <Text style={styles.planCardFeature}>
+                        {plan.name?.toLowerCase().includes('standard') || plan.name?.toLowerCase().includes('classic') ? 'Giảm 10% phí dịch vụ. ' : 'Giảm 15% phí dịch vụ. '}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {plan.name?.toLowerCase().includes('pro') && (
+                    <View style={styles.recommendBadge}>
+                      <Text style={styles.recommendText}>Đề xuất</Text>
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    style={styles.upgradeToPlanButton}
+                    onPress={() => {
+                      setSelectedPlan(plan);
+                      setPurchaseModalVisible(true);
+                    }}
+                  >
+                    <Text style={styles.upgradeToPlanButtonText}>Chọn gói này</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
 
       <View style={styles.section}>
         <SubscriptionHistory />

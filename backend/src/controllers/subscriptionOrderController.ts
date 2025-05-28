@@ -30,6 +30,7 @@ export class SubscriptionOrderController {
 
       if (!user_id || !subscription_code || !plan_code_from_req || !plan_display_name || !months || total_cost === undefined) {
          res.status(400).json({ error: "Thiếu thông tin bắt buộc: user_id, subscription_code, plan, plan_display_name, months, total_cost." });
+         return;
       }
 
       connection = await pool.getConnection();
@@ -41,6 +42,7 @@ export class SubscriptionOrderController {
 
       if (planRows.length === 0) {
          res.status(400).json({ error: `Không tìm thấy plan code hợp lệ: ${plan_code_from_req}` });
+         return;
       }
 
       const planDetails = planRows[0];
@@ -84,6 +86,7 @@ export class SubscriptionOrderController {
       const { subscription_code } = req.params;
       if (!subscription_code) {
          res.status(400).json({ error: "Subscription code is required." });
+         return;
       }
 
       const [rows]: any = await pool.query(
@@ -93,6 +96,7 @@ export class SubscriptionOrderController {
 
       if (rows.length === 0) {
          res.status(404).json({ error: "Subscription order not found." });
+         return;
       }
 
        res.status(200).json(rows[0]);
@@ -120,19 +124,34 @@ static async updateSubscriptionOrderStatus(req: Request, res: Response): Promise
     if (orderRows.length === 0) {
       res.status(404).json({ error: "Không tìm thấy đơn hàng." });
       return;
-    }
-
-    const order = orderRows[0];
+    }    const order = orderRows[0];
     const userId = order.user_id;
 
-    // 👉 gọi xử lý gói đăng ký
-    await SubscriptionOrderController.activateOrUpdateOwnerSubscription(connection, userId, order.order_id);
-
-    // 👉 cập nhật trạng thái đơn
+    // 👉 Đầu tiên cập nhật trạng thái đơn
     await connection.query(
       `UPDATE subscriptionpendingorders SET status = ?, updated_at = NOW() WHERE order_id = ?`,
       [status, order_id]
     );
+
+    // Chỉ xử lý gói đăng ký khi trạng thái là 'paid'
+    if (status === 'paid') {
+      // 👉 gọi xử lý gói đăng ký
+      await SubscriptionOrderController.activateOrUpdateOwnerSubscription(connection, userId, order.order_id);
+    } else if (status === 'cancelled' || status === 'expired') {
+      // Tìm và vô hiệu hóa subscription liên quan nếu có
+      const [ownerRows]: any = await connection.query(
+        "SELECT owner_id FROM owners WHERE user_id = ?", 
+        [userId]
+      );
+      
+      if (ownerRows.length > 0) {
+        const ownerId = ownerRows[0].owner_id;
+        await connection.query(
+          "UPDATE owner_subscriptions SET status = ?, updated_at = NOW() WHERE source_pending_order_id = ? AND owner_id = ?",
+          [status, order_id, ownerId]
+        );
+      }
+    }
 
     await connection.commit();
     res.status(200).json({ message: "Cập nhật trạng thái đơn hàng và đăng ký thành công." });
@@ -175,10 +194,18 @@ static async activateOrUpdateOwnerSubscription(connection: any, userId: number, 
       throw new Error("months_purchased không hợp lệ hoặc không tồn tại.");
     }
 
+    // Kiểm tra xem đã tồn tại gói subscription nào từ source_pending_order_id khác mà đang active không
+    const [existingActiveSubscriptions]: any = await connection.query(
+      `SELECT * FROM owner_subscriptions 
+       WHERE owner_id = ? AND status = 'active' AND source_pending_order_id != ?`,
+      [ownerId, orderId]
+    );
+
     const startDate = new Date();
     const endDate = new Date(startDate);
     endDate.setMonth(endDate.getMonth() + monthsPurchased);
 
+    // Chỉ thực hiện update subscription khi đơn hàng đã được thanh toán
     await connection.query(
       `INSERT INTO owner_subscriptions (
         owner_id, plan_id, start_date, end_date, status, source_pending_order_id, created_at, updated_at
@@ -197,30 +224,62 @@ static async activateOrUpdateOwnerSubscription(connection: any, userId: number, 
     console.error("❌ Lỗi khi xử lý activateOrUpdateOwnerSubscription:", error);
     throw error;
   }
-}
-
-
-  // Xóa đơn hàng subscription pending
+}  // Cập nhật trạng thái đơn hàng subscription pending thành cancelled (thay vì xóa)
   static async deleteSubscriptionPendingOrder(req: Request, res: Response): Promise<void> {
+    let connection;
     try {
       const { subscription_code } = req.params;
       if (!subscription_code) {
-         res.status(400).json({ error: "Subscription code is required." });
+        res.status(400).json({ error: "Subscription code is required." });
+        return;
       }
 
-      const [result]: any = await pool.query(
-        "DELETE FROM subscriptionpendingorders WHERE subscription_code = ? AND status = 'pending'",
+      connection = await pool.getConnection();
+      await connection.beginTransaction();
+
+      // 1. Lấy thông tin đơn hàng để xác định order_id
+      const [orderRows]: any = await connection.query(
+        "SELECT order_id, user_id FROM subscriptionpendingorders WHERE subscription_code = ? AND status = 'pending'",
         [subscription_code]
       );
 
-      if (result.affectedRows === 0) {
-         res.status(404).json({ error: "Pending order not found or not in deletable state." });
+      if (orderRows.length === 0) {
+        res.status(404).json({ error: "Pending order not found or not in deletable state." });
+        return;
       }
 
-       res.status(200).json({ message: "Pending subscription order deleted successfully." });
+      const orderId = orderRows[0].order_id;
+      const userId = orderRows[0].user_id;
+
+      // 2. Lấy owner_id từ user_id
+      const [ownerRows]: any = await connection.query(
+        "SELECT owner_id FROM owners WHERE user_id = ?", 
+        [userId]
+      );
+
+      if (ownerRows.length > 0) {
+        const ownerId = ownerRows[0].owner_id;
+
+        // 3. Vô hiệu hóa subscription liên quan đến đơn này (nếu có)
+        // Nếu đã có subscription từ đơn hàng này, cập nhật status thành cancelled
+        await connection.query(
+          "UPDATE owner_subscriptions SET status = 'cancelled', updated_at = NOW() WHERE source_pending_order_id = ? AND owner_id = ?",
+          [orderId, ownerId]
+        );
+      }
+
+      // 4. Thay vì xóa đơn hàng pending, cập nhật trạng thái thành cancelled
+      const [result]: any = await connection.query(
+        "UPDATE subscriptionpendingorders SET status = 'cancelled', updated_at = NOW() WHERE subscription_code = ? AND status = 'pending'",
+        [subscription_code]
+      );      await connection.commit();
+      res.status(200).json({ message: "Pending subscription order cancelled successfully." });
     } catch (error) {
+      if (connection) await connection.rollback();
       console.error("Error in deleteSubscriptionPendingOrder:", error);
-       res.status(500).json({ error: "Internal Server Error." });
+      res.status(500).json({ error: "Internal Server Error." });
+    } finally {
+      if (connection) connection.release();
     }
   }
 }

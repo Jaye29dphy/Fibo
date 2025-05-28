@@ -60,7 +60,10 @@ static async getSubscriptionHistory(req: AuthRequest, res: Response): Promise<vo
         sp.max_fields,
         os.start_date,
         os.end_date,
-        os.status,
+        CASE 
+          WHEN os.end_date < NOW() THEN 'expired'
+          ELSE os.status
+        END as status,
         sp.description,
         spo.total_cost
       FROM 
