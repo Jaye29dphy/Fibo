@@ -49,7 +49,7 @@ app.use("/avatars", express.static("D:\\img\\ava"));
 // API Routes
 app.use("/api/auth", authRoutes);
 app.use("/courts", courtRoutes);
-app.use("/api/calendar", calendarRoutes); 
+app.use("/api/calendar", calendarRoutes);
 app.use("/upload-avatar", uploadRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/fields", fieldRoutes);

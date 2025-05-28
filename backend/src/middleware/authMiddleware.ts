@@ -40,12 +40,13 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
         if (!user) {
             res.status(401).json({ error: "Unauthorized: User not found" });
             return;
-        }        req.user = {
+        } req.user = {
             id: user.id,
             role: user.role,
             email: user.email,
         };
-        next();    } catch (err) {
+        next();
+    } catch (err) {
         res.status(401).json({ error: "Unauthorized: Invalid token" });
         return;
     }

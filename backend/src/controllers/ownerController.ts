@@ -57,7 +57,7 @@ export class OwnerController {  // Lấy thông tin hồ sơ của owner
       if (req.user.role !== "owner") {
         res.status(403).json({ error: "Forbidden: Access denied" });
         return;
-      }      
+      }
       const userId = req.user.id;
       const { full_name, email, phone, business_name, address } = req.body;
 
@@ -192,7 +192,7 @@ export class OwnerController {  // Lấy thông tin hồ sơ của owner
       }
 
       const ownerId = owners[0].owner_id;
-      
+
       // Get active subscription information
       const [subscriptions]: any = await pool.execute(
         `SELECT 
@@ -283,18 +283,18 @@ export class OwnerController {  // Lấy thông tin hồ sơ của owner
 
       // Get the plan ID
       const planId = plan === "classic" ? 2 : 3; // Assuming 2=Classic, 3=Pro
-      
+
       // Calculate start and end dates
       const now = new Date();
       const startDate = now.toISOString().slice(0, 19).replace('T', ' ');
-      
+
       const endDate = new Date();
       endDate.setMonth(endDate.getMonth() + parseInt(months.toString()));
       const formattedEndDate = endDate.toISOString().slice(0, 19).replace('T', ' ');
 
       // Transaction to ensure data consistency
       await connection.beginTransaction();
-      
+
       try {
         // Mark any active subscriptions as expired
         await connection.execute(
