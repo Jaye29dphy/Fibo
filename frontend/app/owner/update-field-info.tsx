@@ -298,6 +298,20 @@ export default function UpdateFieldInfo() {
                         />
                     </View>
 
+                                        <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Mô tả</Text>
+                        <TextInput
+                            style={[styles.input, styles.textArea]}
+                            value={formData.description}
+                            onChangeText={(text) => setFormData({ ...formData, description: text })}
+                            placeholder="Nhập mô tả về sân"
+                            placeholderTextColor="#BDC3C7"
+                            multiline={true}
+                            numberOfLines={4}
+                            textAlignVertical="top"
+                        />
+                    </View>
+                    
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Loại thể thao <Text style={styles.required}>*</Text></Text>
                         <TouchableOpacity
@@ -336,19 +350,6 @@ export default function UpdateFieldInfo() {
                         </TouchableOpacity>
                     </View>
 
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Mô tả</Text>
-                        <TextInput
-                            style={[styles.input, styles.textArea]}
-                            value={formData.description}
-                            onChangeText={(text) => setFormData({ ...formData, description: text })}
-                            placeholder="Nhập mô tả về sân"
-                            placeholderTextColor="#BDC3C7"
-                            multiline={true}
-                            numberOfLines={4}
-                            textAlignVertical="top"
-                        />
-                    </View>
                 </View>
 
                 <View style={styles.bottomSpace} />

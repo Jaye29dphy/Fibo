@@ -1,4 +1,6 @@
-export const API_URL = "http://192.168.1.14:5000";
+
+export const API_URL = "http://192.168.1.3:5000";
+
 
 export const GITHUB_REPO = "https://api.github.com/repos/Jaye29dphy/Fibo";
 export const FIELD_IMAGE_BASE_URL = `${API_URL}/fields`;
@@ -39,7 +41,7 @@ export const API_ENDPOINTS = {
   GET_OWNER_FIELD_SUB_FIELDS: `${API_URL}/courts`,
   GET_OWNER_FIELD_SERVICES: `${API_URL}/courts`,
   GET_OWNER_FIELD_TIME_SLOTS: `${API_URL}/courts`,
-  GET_TIME_SLOTS: `${API_URL}/api/fields/timeslots`,
+  GET_TIME_SLOTS: `${API_URL}/api/fields/time-slots`,
   UPDATE_FIELD_STATUS: `${API_URL}/courts/:fieldId/status`,
 
   // Notifications

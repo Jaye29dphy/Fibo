@@ -341,7 +341,7 @@ const SubscriptionsScreen = () => {
                           <View style={styles.planFeatureItem}>
                             <FontAwesome5 name="check-circle" size={14} color="#42ba96" />
                             <Text style={styles.planCardFeature}>
-                              {plan.name?.toLowerCase().includes('standard') ? 'Tối đa 3 sân' : 'Tối đa 5 sân'}
+                              {plan.name?.toLowerCase().includes('standard') ? 'Tối đa 10 sân' : 'Tối đa 30 sân'}
                             </Text>
                           </View>
                           <View style={styles.planFeatureItem}>
@@ -487,7 +487,7 @@ const SubscriptionsScreen = () => {
                     <View style={styles.planFeatureItem}>
                       <FontAwesome5 name="check-circle" size={14} color="#42ba96" />
                       <Text style={styles.planCardFeature}>
-                        {plan.name?.toLowerCase().includes('standard') || plan.name?.toLowerCase().includes('classic') ? 'Tối đa 3 sân' : 'Tối đa 5 sân'}
+                        {plan.name?.toLowerCase().includes('standard') || plan.name?.toLowerCase().includes('classic') ? 'Tối đa 10 sân' : 'Tối đa 30 sân'}
                       </Text>
                     </View>
                     <View style={styles.planFeatureItem}>

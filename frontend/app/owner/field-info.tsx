@@ -195,7 +195,7 @@ export default function FieldInfo() {
   };
   const fetchTimeSlots = async (fieldId: string, token: string): Promise<TimeSlot[]> => {
     try {
-      const response = await fetch(`${API_URL}/courts/${fieldId}/timeslots`, {
+      const response = await fetch(`${API_URL}/courts/${fieldId}/time-slots`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',

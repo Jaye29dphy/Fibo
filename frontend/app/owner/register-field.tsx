@@ -395,6 +395,7 @@ export default function RegisterField() {
       </ScrollView>
 
 
+
       <Modal
         animationType="fade"
         transparent
@@ -408,14 +409,29 @@ export default function RegisterField() {
               modalSuccess ? styles.modalSuccess : styles.modalError,
             ]}
           >
-            <Text style={styles.modalText}>{modalMessage}</Text>
+            {/* Nút ✕ để đóng modal */}
             <TouchableOpacity
-              style={styles.modalButton}
+              style={styles.closeButton}
               onPress={() => setModalVisible(false)}
-              activeOpacity={0.7}
             >
-              <Text style={styles.modalButtonText}>Đóng</Text>
+              <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>
+
+            {/* Nội dung thông báo */}
+            <Text style={styles.modalText}>{modalMessage}</Text>
+
+            {/* Nút nâng cấp gói nếu là lỗi chưa đăng ký gói */}
+            {modalMessage === 'Bạn chưa đăng ký gói dịch vụ nào.' && (
+              <TouchableOpacity
+                style={styles.upgradeButton}
+                onPress={() => {
+                  setModalVisible(false);
+                  router.push('/owner/subscriptions');
+                }}
+              >
+                <Text style={styles.modalButtonText}>Nâng cấp gói</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </Modal>
@@ -807,5 +823,27 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginRight: 4,
     fontWeight: '500',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 10,
+    padding: 5,
+  },
+
+  closeButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+
+  upgradeButton: {
+    marginTop: 20,
+    backgroundColor: '#007bff',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
   },
 });

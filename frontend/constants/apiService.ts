@@ -184,19 +184,19 @@ export const getFields = async (sportType: string) => {
 
 // Lấy danh sách SubFields theo field_id
 export const getSubFields = async (fieldId: string) => {
-  const url = `${API_ENDPOINTS.GET_FIELDS}/${fieldId}/subfields`; // Giả định endpoint
+  const url = `${API_ENDPOINTS.GET_FIELDS}/${fieldId}/subfields`; 
   return fetchAPI(url, "GET");
 };
 
 // Lấy danh sách TimeSlots và giá theo field_id
 export const getTimeSlots = async (fieldId: string) => {
-  const url = `${API_ENDPOINTS.GET_FIELDS}/${fieldId}/timeslots`; // Giả định endpoint
+  const url = `${API_ENDPOINTS.GET_FIELDS}/${fieldId}/time-slots`; 
   return fetchAPI(url, "GET");
 };
 
 // Lấy danh sách Services theo field_id
 export const getServices = async (fieldId: string) => {
-  const url = `${API_ENDPOINTS.GET_FIELDS}/${fieldId}/services`; // Giả định endpoint
+  const url = `${API_ENDPOINTS.GET_FIELDS}/${fieldId}/services`; 
   return fetchAPI(url, "GET");
 };
 

@@ -85,7 +85,7 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
     // Kiểm tra dữ liệu đầu vào
     if (!name || !location || !type || !description || !price) {
       console.log('Missing required fields:', { name, location, type, description, price });
-      res.status(400).json({ message: 'Missing required fields' });
+      res.status(400).json({ message: 'Vui lòng nhập đầy đủ thông tin' });
       return;
     }
 
@@ -93,7 +93,7 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
     const parsedPrice = parseFloat(price.toString().replace(/[^0-9.]/g, ''));
     if (isNaN(parsedPrice)) {
       console.log('Invalid price format:', price);
-      res.status(400).json({ message: 'Invalid price format' });
+      res.status(400).json({ message: 'Hãy nhập giá' });
       return;
     }
 
@@ -168,6 +168,41 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
       ownerId = (ownerCheck[0] as any).owner_id;
       console.log('Found existing owner with ID:', ownerId);
     }
+
+    // === KIỂM TRA GIỚI HẠN SÂN ĐƯỢC PHÉP ===
+    const [subRows] = await pool.execute(`
+  SELECT sp.max_fields
+  FROM fibo.owner_subscriptions os
+  JOIN fibo.subscription_plans sp ON os.plan_id = sp.plan_id
+  WHERE os.owner_id = ?
+  ORDER BY os.created_at DESC
+  LIMIT 1
+`, [ownerId]);
+
+    const typedSubRows = subRows as any[];
+    if (!typedSubRows || typedSubRows.length === 0) {
+      res.status(403).json({ message: 'Bạn chưa đăng ký gói dịch vụ nào.' });
+      return;
+    }
+
+    const maxFields = typedSubRows[0].max_fields;
+
+    const [fieldCountRows] = await pool.execute(`
+  SELECT COUNT(*) AS currentFieldCount
+  FROM fibo.fields
+  WHERE owner_id = ?
+`, [ownerId]);
+
+    const typedFieldCount = fieldCountRows as any[];
+    const currentFieldCount = typedFieldCount[0].currentFieldCount;
+
+    if (currentFieldCount >= maxFields) {
+      res.status(403).json({
+        message: `Bạn đã đạt giới hạn ${maxFields} sân theo gói đăng ký hiện tại.`
+      });
+      return;
+    }
+
 
     // Lưu dữ liệu sân vào bảng fields
     const insertFieldQuery = `
