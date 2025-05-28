@@ -33,6 +33,7 @@ const formatTime = (timeString: string) => {
 
 export default function RegisterField() {
   const router = useRouter();
+  const [showTimeSlots, setShowTimeSlots] = useState(false);
   const {
     fieldData,
     loading,
@@ -59,6 +60,10 @@ export default function RegisterField() {
     await submitField(() => router.push('/owner/dashboard'));
   };
 
+  const toggleTimeSlotsVisibility = () => {
+    setShowTimeSlots(prev => !prev);
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -70,12 +75,12 @@ export default function RegisterField() {
           <Ionicons name="arrow-back" size={28} color="#FFFFFF" />
         </TouchableOpacity>
 
-        
+
         <Text style={styles.title}>Đăng ký sân tập</Text>
 
-       
+
         <View style={styles.formContainer}>
-          
+
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Tên sân</Text>
             <View style={styles.sectionContent}>
@@ -89,7 +94,7 @@ export default function RegisterField() {
             </View>
           </View>
 
-          
+
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Vị trí</Text>
             <View style={styles.sectionContent}>
@@ -103,7 +108,7 @@ export default function RegisterField() {
             </View>
           </View>
 
-          
+
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Loại sân</Text>
             <View style={styles.sectionContent}>
@@ -123,7 +128,7 @@ export default function RegisterField() {
             </View>
           </View>
 
-         
+
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Đặc điểm sân</Text>
             <View style={styles.sectionContent}>
@@ -139,7 +144,7 @@ export default function RegisterField() {
             </View>
           </View>
 
-          
+
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Số lượng sân</Text>
             <View style={styles.sectionContent}>
@@ -174,23 +179,23 @@ export default function RegisterField() {
                   style={styles.countButton}
                   onPress={() => {
                     const currentCount = parseInt(fieldData.subFieldCount || '1');
-                    if (currentCount < 99) {
+                    if (currentCount < 10) {
                       updateFieldData('subFieldCount', (currentCount + 1).toString());
                     }
                   }}
-                  disabled={fieldData.subFieldCount === '99'}
+                  disabled={fieldData.subFieldCount === '10'}
                 >
-                  <Text style={[styles.countButtonText, fieldData.subFieldCount === '99' && styles.disabledText]}>+</Text>
+                  <Text style={[styles.countButtonText, fieldData.subFieldCount === '10' && styles.disabledText]}>+</Text>
                 </TouchableOpacity>
               </View>
             </View>
           </View>
 
-          
+
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Dịch vụ thêm</Text>
             <View style={styles.sectionContent}>
-              
+
               {fieldData.services.map((service, index) => (
                 <View key={index} style={styles.serviceContainer}>
                   <TextInput
@@ -225,7 +230,7 @@ export default function RegisterField() {
                 </View>
               ))}
 
-             
+
               <TouchableOpacity
                 style={styles.addButton}
                 onPress={() => addService()}
@@ -234,94 +239,114 @@ export default function RegisterField() {
                 <Text style={styles.addButtonText}>Thêm dịch vụ mới</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </View>          <View style={styles.sectionContainer}>
+            <TouchableOpacity
+              style={styles.collapsibleHeader}
+              onPress={toggleTimeSlotsVisibility}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.sectionTitle}>Nhập khung giờ & giá sân</Text>
+              <Ionicons
+                name={showTimeSlots ? "chevron-up" : "chevron-down"}
+                size={24}
+                color="#6B7280"
+              />
+            </TouchableOpacity>
 
-          
-          <Text style={styles.label}>Nhập khung giờ & giá sân</Text>
-          <TextInput
-            style={styles.input}
-            value={fieldData.price}
-            onChangeText={(text) => updateDefaultPrice(text)}
-            placeholder="Nhập giá (VD: 250000)"
-            placeholderTextColor="#9CA3AF"
-            keyboardType="numeric"
-          />
+            {showTimeSlots && (
+              <View style={styles.sectionContent}>
+                <TextInput
+                  style={styles.input}
+                  value={fieldData.price}
+                  onChangeText={(text) => updateDefaultPrice(text)}
+                  placeholder="Nhập giá (VD: 250000)"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="numeric"
+                />
 
-         
-          <TouchableOpacity
-            style={styles.checkboxContainer}
-            onPress={() => toggleSyncPrices(!syncPrices)}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.customCheckbox, syncPrices && styles.customCheckboxChecked]}>
-              {syncPrices && (
-                <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-              )}
-            </View>
-            <Text style={styles.checkboxLabel}>Đồng bộ giá sân giữa các khung giờ</Text>
-          </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.checkboxContainer}
+                  onPress={() => toggleSyncPrices(!syncPrices)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.customCheckbox, syncPrices && styles.customCheckboxChecked]}>
+                    {syncPrices && (
+                      <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                    )}
+                  </View>
+                  <Text style={styles.checkboxLabel}>Đồng bộ giá sân giữa các khung giờ</Text>
+                </TouchableOpacity>
 
-          
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#3B82F6" />
-              <Text style={styles.loadingText}>Đang tải danh sách khung giờ...</Text>
-            </View>
-          ) : (
-            <View style={styles.timeSlotsContainer}>
-              {fieldData.timeSlots.map((slot) => (
-                <View key={slot.slot_id} style={styles.timeSlotWrapper}>
-                  <View style={styles.timeSlotBox}>
-                  
-                    <TouchableOpacity
-                      style={styles.timeSlotCheckbox}
-                      onPress={() => toggleTimeSlotSelection(slot.slot_id)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[
-                        styles.customCheckbox,
-                        slot.selected && styles.customCheckboxChecked
-                      ]}>
+                {loading ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#3B82F6" />
+                    <Text style={styles.loadingText}>Đang tải danh sách khung giờ...</Text>
+                  </View>
+                ) : (
+                  <View style={styles.timeSlotsContainer}>
+                    {fieldData.timeSlots.map((slot) => (
+                      <View key={slot.slot_id} style={styles.timeSlotWrapper}>
+                        <View style={styles.timeSlotBox}>
+
+                          <TouchableOpacity
+                            style={styles.timeSlotCheckbox}
+                            onPress={() => toggleTimeSlotSelection(slot.slot_id)}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[
+                              styles.customCheckbox,
+                              slot.selected && styles.customCheckboxChecked
+                            ]}>
+                              {slot.selected && (
+                                <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                              )}
+                            </View>
+                          </TouchableOpacity>
+
+                          <View style={[
+                            styles.timeSlotRow,
+                            slot.selected && styles.selectedTimeSlot
+                          ]}>
+                            <View style={styles.timeSlotInfo}>
+                              <Text style={[
+                                styles.timeSlotText,
+                                slot.selected && styles.selectedTimeSlotText
+                              ]}>
+                                {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+
                         {slot.selected && (
-                          <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                          <TextInput
+                            style={styles.timeSlotPriceInput}
+                            value={slot.price}
+                            onChangeText={(text) => updateTimeSlotPrice(slot.slot_id, text)}
+                            placeholder="Giá sân theo giờ"
+                            placeholderTextColor="#9CA3AF"
+                            keyboardType="numeric"
+                            textAlign="left"
+                          />
                         )}
                       </View>
+                    ))}
+
+                    <TouchableOpacity
+                      style={styles.collapseButton}
+                      onPress={toggleTimeSlotsVisibility}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.collapseButtonText}>Rút gọn</Text>
+                      <Ionicons name="chevron-up" size={16} color="#6B7280" />
                     </TouchableOpacity>
-
-                   
-                    <View style={[
-                      styles.timeSlotRow,
-                      slot.selected && styles.selectedTimeSlot
-                    ]}>
-                      <View style={styles.timeSlotInfo}>
-                        <Text style={[
-                          styles.timeSlotText,
-                          slot.selected && styles.selectedTimeSlotText
-                        ]}>
-                          {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
-                        </Text>
-                      </View>
-                    </View>
                   </View>
+                )}
+              </View>
+            )}
+          </View>
 
-               
-                  {slot.selected && (
-                    <TextInput
-                      style={styles.timeSlotPriceInput}
-                      value={slot.price}
-                      onChangeText={(text) => updateTimeSlotPrice(slot.slot_id, text)}
-                      placeholder="Giá sân theo giờ"
-                      placeholderTextColor="#9CA3AF"
-                      keyboardType="numeric"
-                      textAlign="left"
-                    />
-                  )}
-                </View>
-              ))}
-            </View>
-          )}
 
-       
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Ảnh sân</Text>
             <View style={styles.sectionContent}>
@@ -333,7 +358,7 @@ export default function RegisterField() {
                 <Text style={styles.uploadText}>Tải ảnh lên</Text>
               </TouchableOpacity>
 
-             
+
               <FlatList
                 data={fieldData.images}
                 horizontal
@@ -356,7 +381,7 @@ export default function RegisterField() {
           </View>
         </View>
 
-        
+
         <TouchableOpacity
           style={[styles.submitButton, isSubmitting && styles.disabledButton]}
           onPress={handleSubmit}
@@ -369,7 +394,7 @@ export default function RegisterField() {
         </TouchableOpacity>
       </ScrollView>
 
-    
+
       <Modal
         animationType="fade"
         transparent
@@ -746,8 +771,7 @@ const styles = StyleSheet.create({
   descriptionInput: {
     height: 80,
     textAlignVertical: 'top',
-  },
-  addButton: {
+  }, addButton: {
     backgroundColor: '#3B82F6',
     padding: 16,
     borderRadius: 12,
@@ -758,5 +782,30 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '600',
     fontSize: 16,
+  }, collapsibleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    marginBottom: 16,
+  },
+  collapseButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginTop: 16,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  collapseButtonText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginRight: 4,
+    fontWeight: '500',
   },
 });

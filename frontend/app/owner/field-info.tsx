@@ -2,301 +2,226 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
   StyleSheet,
-  Image,
-  Modal,
-  FlatList,
-  Platform,
   ScrollView,
+  TouchableOpacity,
+  Image,
   ActivityIndicator,
-  Alert
+  Alert,
+  FlatList,
+  Modal,
+  Dimensions,
+  Platform
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { API_ENDPOINTS, API_URL, AVATAR_BASE_URL } from '../../constants/apiConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as ImagePicker from 'expo-image-picker';
-import { API_ENDPOINTS, FIELD_IMAGE_BASE_URL, API_URL, AVATAR_BASE_URL } from '../../constants/apiConfig';
+import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
-// Định nghĩa kiểu dữ liệu
-interface Service {
-  service_id?: number;
+interface FieldImage {
+  image_name: string;
+  image_type: 'main' | 'sub';
+}
+
+interface SubField {
+  subfield_id: number;
+  field_id: number;
   name: string;
-  description: string;
-  price: string;
-  isNew?: boolean;
+  status?: string;
+}
+
+interface Service {
+  service_id: number;
+  field_id: number;
+  name: string;
+  price: number;
+  description?: string;
+  status: string;
 }
 
 interface TimeSlot {
   slot_id: number;
   start_time: string;
   end_time: string;
-  price: string;
-  selected: boolean;
+  price: number;
 }
 
-interface FieldImage {
-  image_id: number;
-  image_name: string;
+interface Review {
+  id?: number;
+  review_id?: number;
+  field_id: number;
+  user_id: number;
+  rating: number;
+  comment: string;
+  created_at: string;
+  full_name?: string;
+  avatar?: string;
 }
 
 interface FieldData {
+  field_id: number;
   name: string;
   location: string;
-  type: string;
-  description: string;
-  subFieldCount: string;
-  services: Service[];
-  price: string;
-  timeSlots: TimeSlot[];
-  images: string[];
+  sport_type: string;
+  price_per_hour: number;
   status: string;
+  description: string;
+  rating: number;
+  images: FieldImage[];
+  subFields?: SubField[];
+  services?: Service[];
+  timeSlots?: TimeSlot[];
 }
-
-// Helper function để format thời gian
-const formatTime = (timeString: string): string => {
-  const hour = parseInt(timeString.substring(0, 2));
-  const minute = timeString.substring(3, 5);
-
-  // Chuyển đổi giờ 24:00 thành 00:00
-  if (hour === 24) {
-    return `00:${minute}`;
-  }
-
-  return `${hour.toString().padStart(2, '0')}:${minute}`;
-};
 
 export default function FieldInfo() {
   const router = useRouter();
-  const { fieldId } = useLocalSearchParams();
+  const { fieldId } = useLocalSearchParams<{ fieldId: string }>();
 
-  // State cho dữ liệu sân
-  const [fieldData, setFieldData] = useState<FieldData>({
-    name: '',
-    location: '',
-    type: 'football',
-    description: '',
-    subFieldCount: '1',
-    services: [],
-    price: '',
-    timeSlots: [],
-    images: [],
-    status: 'available'
-  });
+  const [fieldData, setFieldData] = useState<FieldData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [showReviews, setShowReviews] = useState(false);
+  const [showAllReviews, setShowAllReviews] = useState(false);
+  const [isImageModalVisible, setIsImageModalVisible] = useState(false);
+  const [modalImageIndex, setModalImageIndex] = useState(0);
 
-  // State phụ trợ
-  const [loading, setLoading] = useState<boolean>(true);
-  const [syncPrices, setSyncPrices] = useState<boolean>(false);
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [modalVisible, setModalVisible] = useState<boolean>(false);
-  const [modalMessage, setModalMessage] = useState<string>('');
-  const [modalSuccess, setModalSuccess] = useState<boolean>(false);
-  const [originalImages, setOriginalImages] = useState<FieldImage[]>([]);
-  const [removedImages, setRemovedImages] = useState<(number | string)[]>([]);
-  const [newImages, setNewImages] = useState<string[]>([]);
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [fieldAvgRating, setFieldAvgRating] = useState<number>(0);
-  const [showAllReviews, setShowAllReviews] = useState<boolean>(false);
+  // Get screen dimensions for modal
+  const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
-  // Fetch thông tin sân khi component được load
   useEffect(() => {
-    fetchFieldData();
-    fetchTimeSlots();
-    fetchReviews();
+    if (fieldId) {
+      fetchFieldData();
+      fetchReviews();
+    }
   }, [fieldId]);
-
-  // Lấy thông tin sân từ API
   const fetchFieldData = async () => {
     try {
       setLoading(true);
       const token = await AsyncStorage.getItem('token');
 
       if (!token) {
-        showModal('Vui lòng đăng nhập để tiếp tục', false);
+        Alert.alert('Lỗi', 'Không tìm thấy token xác thực', [
+          {
+            text: 'OK',
+            onPress: () => router.push('/customer')
+          }
+        ]);
+        return;
+      } const response = await fetch(`${API_ENDPOINTS.GET_OWNER_FIELD_DETAIL}/${fieldId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.status === 401) {
+        Alert.alert('Phiên đăng nhập đã hết hạn', 'Vui lòng đăng nhập lại', [
+          {
+            text: 'OK',
+            onPress: () => router.push('/customer')
+          }
+        ]);
         return;
       }
 
-      // Gọi API để lấy thông tin chi tiết của sân
-      const response = await fetch(`${API_ENDPOINTS.GET_FIELD_DETAIL}/${fieldId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.message || 'Không thể lấy thông tin sân');
-      }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      } const data = await response.json();
+      console.log('Field data:', data);
 
-      // Lấy danh sách dịch vụ của sân
-      const servicesResponse = await fetch(`${API_ENDPOINTS.GET_FIELD_SERVICES}/${fieldId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      // Fetch additional data in parallel
+      const [subFieldsRes, servicesRes, timeSlotsRes] = await Promise.allSettled([
+        fetchSubFields(fieldId, token),
+        fetchServices(fieldId, token),
+        fetchTimeSlots(fieldId, token)
+      ]);
 
-      const servicesData = await servicesResponse.json();
+      // Process additional data
+      const subFields = subFieldsRes.status === 'fulfilled' ? subFieldsRes.value : [];
+      const services = servicesRes.status === 'fulfilled' ? servicesRes.value : [];
+      const timeSlots = timeSlotsRes.status === 'fulfilled' ? timeSlotsRes.value : [];
 
-      // Lấy thông tin giá và khung giờ
-      const pricesResponse = await fetch(`${API_ENDPOINTS.GET_FIELD_PRICES}/${fieldId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const pricesData = await pricesResponse.json();
-
-      // Lấy thông tin hình ảnh sân
-      const imagesResponse = await fetch(`${API_ENDPOINTS.GET_FIELD_IMAGES}/${fieldId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const imagesData = await imagesResponse.json();
-
-      // Khởi tạo dữ liệu sân với thông tin lấy được từ API
-      const fieldImages = imagesData && imagesData.images ?
-        imagesData.images.map((img: FieldImage) => `${FIELD_IMAGE_BASE_URL}/${img.image_name}`) : [];
-
-      setOriginalImages(imagesData && imagesData.images ? imagesData.images : []);
-
-      // Cập nhật state với dữ liệu từ API
       setFieldData({
-        name: data.field.name || '',
-        location: data.field.location || '',
-        type: data.field.sport_type || 'football',
-        description: data.field.description || '',
-        subFieldCount: data.field.sub_field_count?.toString() || '1',
-        services: servicesData && servicesData.services ? servicesData.services.map((service: any) => ({
-          name: service.name || '',
-          description: service.description || '',
-          price: service.price?.toString() || '0',
-          service_id: service.service_id
-        })) : [],
-        price: data.field.price_per_hour?.toString() || '',
-        status: data.field.status || 'available',
-        images: fieldImages,
-        timeSlots: [] // Sẽ được cập nhật trong fetchTimeSlots
+        ...data,
+        subFields,
+        services,
+        timeSlots
       });
 
     } catch (error) {
-      console.error('Lỗi khi lấy thông tin sân:', error);
-      showModal('Không thể lấy thông tin sân. Vui lòng thử lại sau.', false);
+      console.error('Error fetching field data:', error);
+      Alert.alert('Lỗi', 'Không thể tải thông tin sân');
     } finally {
       setLoading(false);
     }
-  };
-
-  // Lấy danh sách khung giờ
-  const fetchTimeSlots = async () => {
+  }; const fetchSubFields = async (fieldId: string, token: string): Promise<SubField[]> => {
     try {
-      const token = await AsyncStorage.getItem('token');
-      if (!token) {
-        showModal('Vui lòng đăng nhập để tiếp tục', false);
-        return;
-      }
-
-      // Lấy danh sách tất cả các khung giờ có sẵn
-      const slotsResponse = await fetch(API_ENDPOINTS.GET_TIME_SLOTS, {
-        method: 'GET',
+      const response = await fetch(`${API_URL}/courts/${fieldId}/subfields`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
 
-      // Kiểm tra response status trước khi parse JSON
-      if (!slotsResponse.ok) {
-        console.error('Lỗi khi lấy danh sách khung giờ:', slotsResponse.status, slotsResponse.statusText);
-        const errorText = await slotsResponse.text(); // Đọc response dưới dạng text để debug
-        console.error('Response error:', errorText);
-        throw new Error(`Lỗi khi lấy danh sách khung giờ: ${slotsResponse.status}`);
+      if (response.ok) {
+        return await response.json();
       }
-
-      const slotsData = await slotsResponse.json();
-      // API có thể trả về dữ liệu trực tiếp là mảng khung giờ, không có thuộc tính timeSlots
-      const timeSlots = Array.isArray(slotsData) ? slotsData : (slotsData.timeSlots || []);
-
-      if (!timeSlots || timeSlots.length === 0) {
-        console.warn('Không có dữ liệu khung giờ');
-      }
-
-      // Lấy thông tin khung giờ và giá của sân hiện tại
-      const fieldPricesResponse = await fetch(`${API_ENDPOINTS.GET_FIELD_PRICES}/${fieldId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!fieldPricesResponse.ok) {
-        console.error('Lỗi khi lấy thông tin giá:', fieldPricesResponse.status);
-        throw new Error(`Lỗi khi lấy thông tin giá: ${fieldPricesResponse.status}`);
-      }
-
-      const fieldPricesData = await fieldPricesResponse.json();
-      const fieldPrices = fieldPricesData && fieldPricesData.prices ? fieldPricesData.prices : [];
-
-      // Kết hợp dữ liệu từ API để tạo mảng khung giờ với giá và trạng thái đã chọn
-      const combinedTimeSlots = timeSlots.map((slot: any) => {
-        const matchedPrice = fieldPrices.find((price: any) => price.slot_id === slot.slot_id);
-        return {
-          ...slot,
-          price: matchedPrice ? matchedPrice.price.toString() : fieldData.price || '0',
-          selected: !!matchedPrice
-        };
-      });
-
-      setFieldData(prevData => ({
-        ...prevData,
-        timeSlots: combinedTimeSlots
-      }));
-
+      return [];
     } catch (error) {
-      console.error('Lỗi khi lấy danh sách khung giờ:', error);
-      Alert.alert('Thông báo', 'Không thể lấy danh sách khung giờ, vui lòng thử lại sau.');
+      console.error('Error fetching sub-fields:', error);
+      return [];
+    }
+  };
+  const fetchServices = async (fieldId: string, token: string): Promise<Service[]> => {
+    try {
+      const response = await fetch(`${API_URL}/courts/${fieldId}/services`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        return await response.json();
+      }
+      return [];
+    } catch (error) {
+      console.error('Error fetching services:', error);
+      return [];
+    }
+  };
+  const fetchTimeSlots = async (fieldId: string, token: string): Promise<TimeSlot[]> => {
+    try {
+      const response = await fetch(`${API_URL}/courts/${fieldId}/timeslots`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        return await response.json();
+      }
+      return [];
+    } catch (error) {
+      console.error('Error fetching time slots:', error);
+      return [];
     }
   };
 
-  // Lấy thông tin đánh giá sân từ API
   const fetchReviews = async () => {
     try {
-      if (!fieldId) return;
-      
-      // Gọi API để lấy đánh giá của sân
       const response = await fetch(`${API_URL}/api/reviews/fields/${fieldId}`);
       console.log("Fetching reviews from:", `${API_URL}/api/reviews/fields/${fieldId}`);
-      
-      if (!response.ok) {
-        console.error("Error response from API:", response.status);
-        return;
-      }
-
       const data = await response.json();
       console.log("Reviews API response:", data);
 
       if (Array.isArray(data)) {
         setReviews(data);
         console.log("Reviews set to:", data);
-
-        // Tính toán điểm đánh giá trung bình
-        if (data.length > 0) {
-          const sum = data.reduce((total, item) => total + parseFloat(item.rating), 0);
-          setFieldAvgRating(sum / data.length);
-        }
       } else {
         console.log("Reviews data is not an array:", data);
         setReviews([]);
@@ -305,340 +230,220 @@ export default function FieldInfo() {
       console.error("Error fetching reviews:", error);
       setReviews([]);
     }
+  }; const getImageUrl = (imageName: string) => {
+    // Tạo URL cho ảnh dựa trên tên file
+    return `${API_URL}/fields/${imageName}`;
+  };
+  const getSportTypeText = (sportType: string) => {
+    const sportTypes: { [key: string]: string } = {
+      'football': 'Bóng đá',
+      'basketball': 'Bóng rổ',
+      'badminton': 'Cầu lông',
+      'tennis': 'Tennis',
+      'pickleball': 'Pickleball',
+    };
+    return sportTypes[sportType] || sportType;
+  };
+  const getSportIcon = (sportType: string): keyof typeof Ionicons.glyphMap => {
+    const sportIcons: { [key: string]: keyof typeof Ionicons.glyphMap } = {
+      'football': 'football-outline',
+      'basketball': 'basketball-outline',
+      'badminton': 'tennisball-outline',
+      'tennis': 'tennisball-outline',
+      'pickleball': 'tennisball-outline',
+    };
+    return sportIcons[sportType] || 'fitness-outline';
   };
 
-  // Cập nhật trường dữ liệu
-  const updateFieldData = (field: keyof FieldData, value: string) => {
-    setFieldData(prevData => ({
-      ...prevData,
-      [field]: value
-    }));
-  };
+  const renderStars = (rating: number) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 !== 0;
 
-  // Cập nhật giá mặc định
-  const updateDefaultPrice = (price: string) => {
-    setFieldData(prevData => ({
-      ...prevData,
-      price
-    }));
-
-    // Nếu đồng bộ giá được bật, cập nhật giá cho tất cả khung giờ đã chọn
-    if (syncPrices) {
-      setFieldData(prevData => ({
-        ...prevData,
-        timeSlots: prevData.timeSlots.map(slot =>
-          slot.selected ? { ...slot, price } : slot
-        )
-      }));
-    }
-  };
-
-  // Cập nhật giá cho một khung giờ cụ thể
-  const updateTimeSlotPrice = (slotId: number, price: string) => {
-    setFieldData(prevData => ({
-      ...prevData,
-      timeSlots: prevData.timeSlots.map(slot =>
-        slot.slot_id === slotId ? { ...slot, price } : slot
-      )
-    }));
-  };
-
-  // Bật/tắt chọn một khung giờ
-  const toggleTimeSlotSelection = (slotId: number) => {
-    setFieldData(prevData => {
-      // Tìm khung giờ hiện tại
-      const currentSlot = prevData.timeSlots.find(slot => slot.slot_id === slotId);
-      if (!currentSlot) return prevData;
-
-      const isSelected = !currentSlot.selected;
-
-      return {
-        ...prevData,
-        timeSlots: prevData.timeSlots.map(slot => {
-          if (slot.slot_id === slotId) {
-            return {
-              ...slot,
-              selected: isSelected,
-              // Nếu được chọn và đồng bộ giá được bật, sử dụng giá mặc định
-              price: isSelected && syncPrices ? prevData.price : slot.price
-            };
-          }
-          return slot;
-        })
-      };
-    });
-  };
-
-  // Bật/tắt đồng bộ giá
-  const toggleSyncPrices = (value: boolean) => {
-    setSyncPrices(value);
-
-    // Nếu đồng bộ giá được bật, cập nhật giá cho tất cả khung giờ đã chọn
-    if (value) {
-      setFieldData(prevData => ({
-        ...prevData,
-        timeSlots: prevData.timeSlots.map(slot =>
-          slot.selected ? { ...slot, price: prevData.price } : slot
-        )
-      }));
-    }
-  };
-
-  // Thêm dịch vụ mới
-  const addService = () => {
-    setFieldData(prevData => ({
-      ...prevData,
-      services: [
-        ...prevData.services,
-        { name: '', description: '', price: '', isNew: true }
-      ]
-    }));
-  };
-
-  // Cập nhật thông tin dịch vụ
-  const updateService = (index: number, field: keyof Service, value: string) => {
-    setFieldData(prevData => ({
-      ...prevData,
-      services: prevData.services.map((service, i) =>
-        i === index ? { ...service, [field]: value } : service
-      )
-    }));
-  };
-
-  // Xóa dịch vụ
-  const removeService = (index: number) => {
-    setFieldData(prevData => ({
-      ...prevData,
-      services: prevData.services.filter((_, i) => i !== index)
-    }));
-  };
-
-  // Chọn ảnh từ thư viện
-  const pickImage = async () => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (status !== 'granted') {
-        Alert.alert('Cần quyền truy cập', 'Vui lòng cấp quyền truy cập thư viện ảnh để tiếp tục.');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        // Thêm ảnh mới vào danh sách
-        const newImage = result.assets[0].uri;
-        setFieldData(prevData => ({
-          ...prevData,
-          images: [...prevData.images, newImage]
-        }));
-
-        // Lưu ảnh mới để upload sau
-        setNewImages(prev => [...prev, newImage]);
-      }
-    } catch (error) {
-      console.error('Lỗi khi chọn ảnh:', error);
-      Alert.alert('Lỗi', 'Không thể chọn ảnh. Vui lòng thử lại sau.');
-    }
-  };
-
-  // Xóa ảnh
-  const removeImage = (index: number) => {
-    // Kiểm tra xem đây có phải là ảnh gốc không
-    if (index < originalImages.length) {
-      // Thêm vào danh sách ảnh cần xóa
-      const imageToRemove = originalImages[index];
-      setRemovedImages(prev => [...prev, imageToRemove.image_id]);
-    } else {
-      // Xóa khỏi danh sách ảnh mới
-      const adjustedIndex = index - originalImages.length;
-      setNewImages(prev => prev.filter((_, i) => i !== adjustedIndex));
+    for (let i = 0; i < fullStars; i++) {
+      stars.push(
+        <Ionicons key={i} name="star" size={16} color="#FFD700" />
+      );
     }
 
-    // Xóa khỏi UI
-    setFieldData(prevData => ({
-      ...prevData,
-      images: prevData.images.filter((_, i) => i !== index)
-    }));
-  };
-
-  // Hiển thị modal thông báo
-  const showModal = (message: string, success: boolean) => {
-    setModalMessage(message);
-    setModalSuccess(success);
-    setModalVisible(true);
-  };
-
-  // Chuẩn bị và gửi dữ liệu cập nhật lên server
-  const handleUpdateField = async () => {
-    try {
-      // Kiểm tra thông tin bắt buộc
-      if (!fieldData.name || !fieldData.location || !fieldData.description || !fieldData.price) {
-        showModal('Vui lòng điền đầy đủ thông tin sân', false);
-        return;
-      }
-
-      // Kiểm tra xem có khung giờ nào được chọn không
-      const hasSelectedTimeSlots = fieldData.timeSlots.some(slot => slot.selected);
-      if (!hasSelectedTimeSlots) {
-        showModal('Vui lòng chọn ít nhất một khung giờ', false);
-        return;
-      }
-
-      setIsSubmitting(true);
-      const token = await AsyncStorage.getItem('token');
-
-      // 1. Cập nhật thông tin cơ bản của sân
-      const updateResponse = await fetch(`${API_ENDPOINTS.UPDATE_FIELD}/${fieldId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: fieldData.name,
-          location: fieldData.location,
-          sport_type: fieldData.type,
-          description: fieldData.description,
-          price_per_hour: parseFloat(fieldData.price),
-          sub_field_count: parseInt(fieldData.subFieldCount),
-          status: fieldData.status
-        })
-      });
-
-      const updateData = await updateResponse.json();
-
-      if (!updateResponse.ok) {
-        throw new Error(updateData.message || 'Không thể cập nhật thông tin sân');
-      }
-
-      // 2. Cập nhật khung giờ và giá sân
-      const selectedTimeSlots = fieldData.timeSlots
-        .filter(slot => slot.selected)
-        .map(slot => ({
-          slot_id: slot.slot_id,
-          price: parseFloat(slot.price)
-        }));
-
-      const timeSlotResponse = await fetch(`${API_ENDPOINTS.UPDATE_FIELD_PRICES}/${fieldId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prices: selectedTimeSlots
-        })
-      });
-
-      if (!timeSlotResponse.ok) {
-        const timeSlotError = await timeSlotResponse.json();
-        throw new Error(timeSlotError.message || 'Không thể cập nhật khung giờ và giá sân');
-      }
-
-      // 3. Cập nhật các dịch vụ
-      // - Tạo dịch vụ mới
-      const newServices = fieldData.services.filter(service => service.isNew);
-      if (newServices.length > 0) {
-        const addServicesResponse = await fetch(`${API_ENDPOINTS.ADD_FIELD_SERVICES}/${fieldId}`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            services: newServices.map(service => ({
-              name: service.name,
-              description: service.description,
-              price: parseFloat(service.price)
-            }))
-          })
-        });
-
-        if (!addServicesResponse.ok) {
-          const servicesError = await addServicesResponse.json();
-          throw new Error(servicesError.message || 'Không thể thêm dịch vụ mới');
-        }
-      }
-
-      // - Cập nhật dịch vụ hiện có
-      const existingServices = fieldData.services.filter(service => !service.isNew && service.service_id);
-      for (const service of existingServices) {
-        await fetch(`${API_ENDPOINTS.UPDATE_FIELD_SERVICE}/${service.service_id}`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            name: service.name,
-            description: service.description,
-            price: parseFloat(service.price)
-          })
-        });
-      }
-
-      // 4. Xử lý xóa ảnh
-      if (removedImages.length > 0) {
-        await fetch(`${API_ENDPOINTS.DELETE_FIELD_IMAGES}/${fieldId}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            image_ids: removedImages
-          })
-        });
-      }
-
-      // 5. Upload ảnh mới
-      if (newImages.length > 0) {
-        const formData = new FormData();
-
-        newImages.forEach((uri, index) => {
-          const filename = uri.split('/').pop() || `image_${index}.jpg`;
-          const match = /\.(\w+)$/.exec(filename);
-          const type = match ? `image/${match[1]}` : 'image';
-
-          formData.append('images', {
-            uri,
-            name: filename,
-            type
-          } as any); // Sử dụng as any để tránh lỗi type checking
-        });
-
-        await fetch(`${API_ENDPOINTS.UPLOAD_FIELD_IMAGES}/${fieldId}`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data',
-          },
-          body: formData
-        });
-      }
-
-      showModal('Cập nhật thông tin sân thành công!', true);
-
-      // Quay lại màn hình danh sách sân sau khi cập nhật thành công
-      setTimeout(() => {
-        router.push('/owner/update-field-info');
-      }, 1500);
-
-    } catch (error: any) {
-      console.error('Lỗi khi cập nhật thông tin sân:', error);
-      showModal(`Không thể cập nhật thông tin sân: ${error.message || 'Lỗi không xác định'}`, false);
-    } finally {
-      setIsSubmitting(false);
+    if (hasHalfStar) {
+      stars.push(
+        <Ionicons key="half" name="star-half" size={16} color="#FFD700" />
+      );
     }
+
+    const emptyStars = 5 - Math.ceil(rating);
+    for (let i = 0; i < emptyStars; i++) {
+      stars.push(
+        <Ionicons key={`empty-${i}`} name="star-outline" size={16} color="#FFD700" />
+      );
+    }
+
+    return stars;
   };
 
-  // Loading screen
+  const renderImageGallery = () => {
+    if (!fieldData || !fieldData.images || fieldData.images.length === 0) {
+      return (
+        <View style={styles.noImageContainer}>
+          <Ionicons name="image-outline" size={100} color="#CBD5E1" />
+          <Text style={styles.noImageText}>Không có ảnh</Text>
+        </View>
+      );
+    }
+
+    const images = fieldData.images;
+    const selectedImage = images[selectedImageIndex];
+
+    return (
+      <View style={styles.imageGalleryContainer}>        {/* Ảnh lớn hiển thị chính */}
+        <TouchableOpacity
+          style={styles.mainImageContainer}
+          onPress={() => {
+            setModalImageIndex(selectedImageIndex);
+            setIsImageModalVisible(true);
+          }}
+          activeOpacity={0.8}
+        >
+          <Image
+            source={{ uri: getImageUrl(selectedImage.image_name) }}
+            style={styles.mainImage}
+            resizeMode="cover"
+          />
+          {selectedImage.image_type === 'main' && (
+            <View style={styles.mainImageBadge}>
+              <Text style={styles.mainImageBadgeText}>Ảnh chính</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* Danh sách ảnh nhỏ */}
+        <View style={styles.thumbnailContainer}>
+          <FlatList
+            data={images}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(item, index) => `${item.image_name}-${index}`}
+            renderItem={({ item, index }) => (
+              <TouchableOpacity
+                style={[
+                  styles.thumbnailWrapper,
+                  selectedImageIndex === index && styles.selectedThumbnailWrapper
+                ]}
+                onPress={() => setSelectedImageIndex(index)}
+              >
+                <Image
+                  source={{ uri: getImageUrl(item.image_name) }}
+                  style={styles.thumbnailImage}
+                  resizeMode="cover"
+                />
+                {item.image_type === 'main' && (
+                  <View style={styles.thumbnailMainBadge}>
+                    <Ionicons name="star" size={12} color="#FFD700" />
+                  </View>
+                )}
+                {selectedImageIndex === index && (
+                  <View style={styles.selectedOverlay}>
+                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
+            contentContainerStyle={styles.thumbnailList}
+          />
+        </View>        {/* Modal for full-screen image */}
+        <Modal
+          visible={isImageModalVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setIsImageModalVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <TouchableOpacity
+              style={styles.modalBackground}
+              onPress={() => setIsImageModalVisible(false)}
+              activeOpacity={1}
+            >
+              <View style={styles.modalContent}>
+                {/* Close Button */}
+                <TouchableOpacity
+                  style={styles.modalCloseButton}
+                  onPress={() => setIsImageModalVisible(false)}
+                >
+                  <Ionicons name="close" size={24} color="#FFFFFF" />
+                </TouchableOpacity>                {/* Image Container with Swipe Gesture */}
+                <GestureHandlerRootView style={{ flex: 1, width: '100%' }}>
+                  <GestureDetector
+                    gesture={Gesture.Pan()
+                      .onEnd((e) => {
+                        // Swipe left to see next image
+                        if (e.translationX < -50) {
+                          setModalImageIndex((prevIndex) =>
+                            (prevIndex + 1) % fieldData.images.length
+                          );
+                        }
+                        // Swipe right to see previous image
+                        else if (e.translationX > 50) {
+                          setModalImageIndex((prevIndex) =>
+                            prevIndex === 0 ? fieldData.images.length - 1 : prevIndex - 1
+                          );
+                        }
+                      })
+                    }
+                  >
+                    <View style={styles.modalImageContainer}>
+                      <Image
+                        source={{ uri: getImageUrl(fieldData.images[modalImageIndex].image_name) }}
+                        style={styles.modalImage}
+                        resizeMode="contain"
+                      />
+
+                      {/* Navigation Buttons */}
+                      <TouchableOpacity
+                        style={[styles.modalNavButton, styles.modalNavButtonLeft]}
+                        onPress={() => {
+                          // Navigate to previous image or loop back to last image
+                          setModalImageIndex((prevIndex) =>
+                            prevIndex === 0 ? fieldData.images.length - 1 : prevIndex - 1
+                          );
+                        }}
+                      >
+                        <Ionicons name="chevron-back" size={30} color="#FFFFFF" />
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.modalNavButton, styles.modalNavButtonRight]}
+                        onPress={() => {
+                          // Navigate to next image or loop back to first image
+                          setModalImageIndex((prevIndex) =>
+                            (prevIndex + 1) % fieldData.images.length
+                          );
+                        }}
+                      >
+                        <Ionicons name="chevron-forward" size={30} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  </GestureDetector>
+                </GestureHandlerRootView>
+
+                {/* Image Info */}
+                <View style={styles.modalImageInfo}>
+                  <Text style={styles.modalImageInfoText}>
+                    {modalImageIndex + 1} / {fieldData.images.length}
+                    {fieldData.images[modalImageIndex].image_type === 'main' && ' - Ảnh chính'}
+                  </Text>
+                  <Text style={styles.modalImageInfoText}>
+                    Nhấn vào ảnh để xem ảnh tiếp theo • Nhấn ra ngoài để đóng
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </Modal>
+      </View>
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -648,369 +453,126 @@ export default function FieldInfo() {
     );
   }
 
+  if (!fieldData) {
+    return (
+      <View style={styles.errorContainer}>
+        <Ionicons name="alert-circle-outline" size={50} color="#EF4444" />
+        <Text style={styles.errorText}>Không thể tải thông tin sân</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={fetchFieldData}>
+          <Text style={styles.retryButtonText}>Thử lại</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Back Button */}
+      {/* Header */}
+      <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
-          activeOpacity={0.7}
         >
-          <Ionicons name="arrow-back" size={28} color="#FFFFFF" />
+          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
+        <Text style={styles.headerTitle}>Thông tin sân</Text>        <TouchableOpacity
+          style={styles.editButton}
+          onPress={() => {
+            console.log('Edit button pressed, fieldId:', fieldId);
+            router.push({
+              pathname: './update-field-info',
+              params: { fieldId: fieldId }
+            });
+          }}
+        >
+          <Ionicons name="create-outline" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+      </View>
 
-        {/* Title */}
-        <Text style={styles.title}>Cập nhật thông tin sân</Text>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Image Gallery */}
+        {renderImageGallery()}
 
-        {/* Form Fields */}
-        <View style={styles.formContainer}>
-          {/* Field Name */}
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Tên sân</Text>
-            <View style={styles.sectionContent}>
-              <TextInput
-                style={styles.input}
-                value={fieldData.name}
-                onChangeText={(text) => updateFieldData('name', text)}
-                placeholder="Nhập tên sân"
-                placeholderTextColor="#9CA3AF"
-              />
-            </View>
-          </View>
-
-          {/* Location */}
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Vị trí</Text>
-            <View style={styles.sectionContent}>
-              <TextInput
-                style={styles.input}
-                value={fieldData.location}
-                onChangeText={(text) => updateFieldData('location', text)}
-                placeholder="Nhập vị trí"
-                placeholderTextColor="#9CA3AF"
-              />
-            </View>
-          </View>
-
-          {/* Field Type */}
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Loại sân</Text>
-            <View style={styles.sectionContent}>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={fieldData.type}
-                  style={styles.picker}
-                  onValueChange={(itemValue) => updateFieldData('type', itemValue)}
-                  dropdownIconColor="#6B7280"
-                >
-                  <Picker.Item label="Bóng đá" value="football" />
-                  <Picker.Item label="Bóng rổ" value="basketball" />
-                  <Picker.Item label="Cầu lông" value="badminton" />
-                  <Picker.Item label="Tennis" value="tennis" />
-                </Picker>
+        {/* Field Information */}
+        <View style={styles.infoContainer}>          {/* Field Name */}
+          <View style={styles.infoSection}>
+            <View style={styles.fieldNameContainer}>
+              <Text style={styles.fieldName}>{fieldData.name}</Text>
+              <View style={[
+                styles.statusBadge,
+                { backgroundColor: fieldData.status === 'available' ? '#10B981' : '#EF4444' }
+              ]}>
+                <Text style={styles.statusText}>
+                  {fieldData.status === 'available' ? 'Hoạt động' : 'Ngừng hoạt động'}
+                </Text>
               </View>
             </View>
-          </View>
-
-          {/* Field Status */}
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Trạng thái sân</Text>
-            <View style={styles.sectionContent}>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={fieldData.status}
-                  style={styles.picker}
-                  onValueChange={(itemValue) => updateFieldData('status', itemValue)}
-                  dropdownIconColor="#6B7280"
-                >
-                  <Picker.Item label="Đang hoạt động" value="available" />
-                  <Picker.Item label="Ngừng hoạt động" value="unavailable" />
-                </Picker>
-              </View>
+          </View>          {/* Location */}
+          <View style={styles.infoSection}>
+            <View style={styles.infoRow}>
+              <Ionicons name="location-outline" size={20} color="#6B7280" />
+              <Text style={styles.infoValue}>{fieldData.location}</Text>
+            </View>
+          </View>          {/* Sport Type */}
+          <View style={styles.infoSection}>
+            <View style={styles.infoRow}>
+              <Ionicons name={getSportIcon(fieldData.sport_type)} size={20} color="#6B7280" />
+              <Text style={styles.infoValue}>{getSportTypeText(fieldData.sport_type)}</Text>
             </View>
           </View>
 
           {/* Description */}
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Đặc điểm sân</Text>
-            <View style={styles.sectionContent}>
-              <TextInput
-                style={[styles.input, styles.multilineInput]}
-                value={fieldData.description}
-                onChangeText={(text) => updateFieldData('description', text)}
-                placeholder="Mô tả đặc điểm sân"
-                placeholderTextColor="#9CA3AF"
-                multiline
-                numberOfLines={4}
-              />
+          <View style={styles.infoSection}>
+            <View style={styles.infoRow}>
+              <Ionicons name="document-text-outline" size={20} color="#6B7280" />
+              <Text style={styles.infoLabel}>Mô tả:</Text>
             </View>
-          </View>
-
-          {/* Sub Field Count */}
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Số lượng sân</Text>
-            <View style={styles.sectionContent}>
-              <View style={styles.countContainer}>
-                <TouchableOpacity
-                  style={styles.countButton}
-                  onPress={() => {
-                    const currentCount = parseInt(fieldData.subFieldCount || '1');
-                    if (currentCount > 1) {
-                      updateFieldData('subFieldCount', (currentCount - 1).toString());
-                    }
-                  }}
-                  disabled={fieldData.subFieldCount === '1'}
-                >
-                  <Text style={[styles.countButtonText, fieldData.subFieldCount === '1' && styles.disabledText]}>−</Text>
-                </TouchableOpacity>
-
-                <TextInput
-                  style={styles.countInput}
-                  value={fieldData.subFieldCount}
-                  onChangeText={(text) => {
-                    // Chỉ cho phép nhập số và đảm bảo giá trị tối thiểu là 1
-                    const numericValue = text.replace(/[^0-9]/g, '');
-                    const finalValue = numericValue === '' ? '1' : numericValue;
-                    updateFieldData('subFieldCount', finalValue);
-                  }}
-                  keyboardType="numeric"
-                  maxLength={2}
-                />
-
-                <TouchableOpacity
-                  style={styles.countButton}
-                  onPress={() => {
-                    const currentCount = parseInt(fieldData.subFieldCount || '1');
-                    if (currentCount < 99) {
-                      updateFieldData('subFieldCount', (currentCount + 1).toString());
-                    }
-                  }}
-                  disabled={fieldData.subFieldCount === '99'}
-                >
-                  <Text style={[styles.countButtonText, fieldData.subFieldCount === '99' && styles.disabledText]}>+</Text>
-                </TouchableOpacity>
+            <Text style={styles.descriptionText}>{fieldData.description}</Text>
+          </View>          {/* Rating */}
+          <View style={styles.infoSection}>
+            <View style={styles.infoRow}>
+              <Ionicons name="star-outline" size={20} color="#6B7280" />
+              <Text style={styles.infoLabel}>Đánh giá:</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.ratingContainer}
+              onPress={() => setShowReviews(!showReviews)}
+            >
+              <View style={styles.starsContainer}>
+                {renderStars(fieldData.rating || 0)}
               </View>
-            </View>
-          </View>
-
-          {/* Additional Services */}
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Dịch vụ thêm</Text>
-            <View style={styles.sectionContent}>
-              {/* Danh sách dịch vụ */}
-              {fieldData.services.map((service, index) => (
-                <View key={index} style={styles.serviceContainer}>
-                  <TextInput
-                    style={styles.serviceInput}
-                    value={service.name}
-                    onChangeText={(text) => updateService(index, 'name', text)}
-                    placeholder="Tên dịch vụ"
-                    placeholderTextColor="#9CA3AF"
-                  />
-                  <TextInput
-                    style={[styles.serviceInput, styles.descriptionInput]}
-                    value={service.description}
-                    onChangeText={(text) => updateService(index, 'description', text)}
-                    placeholder="Mô tả dịch vụ"
-                    placeholderTextColor="#9CA3AF"
-                    multiline
-                  />
-                  <TextInput
-                    style={styles.serviceInput}
-                    value={service.price}
-                    onChangeText={(text) => updateService(index, 'price', text)}
-                    placeholder="Giá dịch vụ (VNĐ)"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="numeric"
-                  />
-                  <TouchableOpacity
-                    style={styles.removeButton}
-                    onPress={() => removeService(index)}
-                  >
-                    <Text style={styles.removeButtonText}>×</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-
-              {/* Button thêm dịch vụ */}
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => addService()}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.addButtonText}>Thêm dịch vụ mới</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Time Slots and Prices */}
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Khung giờ & Giá sân</Text>
-
-            <View style={styles.sectionContent}>
-              <Text style={styles.label}>Giá mặc định (VNĐ/giờ)</Text>
-              <TextInput
-                style={styles.input}
-                value={fieldData.price}
-                onChangeText={(text) => updateDefaultPrice(text)}
-                placeholder="Nhập giá (VD: 250000)"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="numeric"
+              <Text style={styles.ratingText}>
+                {(fieldData.rating || 0).toFixed(1)} / 5.0
+              </Text>
+              <Text style={styles.reviewCount}>
+                ({reviews.length} đánh giá)
+              </Text>
+              <Ionicons
+                name={showReviews ? "chevron-up" : "chevron-down"}
+                size={20}
+                color="#6B7280"
+                style={styles.chevronIcon}
               />
-
-              {/* Sync Prices Checkbox */}
-              <TouchableOpacity
-                style={styles.checkboxContainer}
-                onPress={() => toggleSyncPrices(!syncPrices)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.customCheckbox, syncPrices && styles.customCheckboxChecked]}>
-                  {syncPrices && (
-                    <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                  )}
-                </View>
-                <Text style={styles.checkboxLabel}>Đồng bộ giá sân giữa các khung giờ</Text>
-              </TouchableOpacity>
-
-              {/* Time Slots List */}
-              {loading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color="#3B82F6" />
-                  <Text style={styles.loadingText}>Đang tải danh sách khung giờ...</Text>
-                </View>
-              ) : (
-                <View style={styles.timeSlotsContainer}>
-                  {fieldData.timeSlots.map((slot) => (
-                    <View key={slot.slot_id} style={styles.timeSlotWrapper}>
-                      <View style={styles.timeSlotBox}>
-                        {/* Checkbox và thông tin khung giờ */}
-                        <TouchableOpacity
-                          style={styles.timeSlotCheckbox}
-                          onPress={() => toggleTimeSlotSelection(slot.slot_id)}
-                          activeOpacity={0.7}
-                        >
-                          <View style={[
-                            styles.customCheckbox,
-                            slot.selected && styles.customCheckboxChecked
-                          ]}>
-                            {slot.selected && (
-                              <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                            )}
-                          </View>
-                        </TouchableOpacity>
-
-                        {/* Hiển thị khung giờ */}
-                        <View style={[
-                          styles.timeSlotRow,
-                          slot.selected && styles.selectedTimeSlot
-                        ]}>
-                          <View style={styles.timeSlotInfo}>
-                            <Text style={[
-                              styles.timeSlotText,
-                              slot.selected && styles.selectedTimeSlotText
-                            ]}>
-                              {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-
-                      {/* Phần nhập giá sân theo giờ */}
-                      {slot.selected && (
-                        <TextInput
-                          style={styles.timeSlotPriceInput}
-                          value={slot.price}
-                          onChangeText={(text) => updateTimeSlotPrice(slot.slot_id, text)}
-                          placeholder="Giá sân theo giờ"
-                          placeholderTextColor="#9CA3AF"
-                          keyboardType="numeric"
-                          textAlign="left"
-                        />
-                      )}
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
+            </TouchableOpacity>
           </View>
 
-          {/* Image Upload */}
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Ảnh sân</Text>
-            <View style={styles.sectionContent}>
-              <TouchableOpacity
-                style={styles.uploadButton}
-                onPress={pickImage}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.uploadText}>Tải ảnh lên</Text>
-              </TouchableOpacity>
-
-              {/* Image List */}
-              <FlatList
-                data={fieldData.images}
-                horizontal
-                renderItem={({ item, index }) => (
-                  <View style={styles.imageContainer}>
-                    <Image source={{ uri: item }} style={styles.image} />
-                    <TouchableOpacity
-                      style={styles.removeButton}
-                      onPress={() => removeImage(index)}
-                    >
-                      <Text style={styles.removeButtonText}>×</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-                keyExtractor={(item, index) => index.toString()}
-                style={styles.imageList}
-                showsHorizontalScrollIndicator={false}
-                ListEmptyComponent={
-                  <View style={styles.noImagesContainer}>
-                    <Text style={styles.noImagesText}>Chưa có ảnh nào</Text>
-                  </View>
-                }
-              />
-            </View>
-          </View>
-
-          {/* Review and Rating Section */}
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Đánh giá từ khách hàng</Text>
-            <View style={styles.sectionContent}>
-              {/* Overall Rating Display */}
-              <View style={styles.ratingSection}>
-                <Text style={styles.ratingSubTitle}>Đánh giá tổng thể</Text>
-                <View style={styles.overallRating}>
-                  <Text style={styles.ratingScore}>
-                    {typeof fieldAvgRating === 'number' ? fieldAvgRating.toFixed(1) : '0.0'}
-                  </Text>
-                  <View style={styles.starsContainer}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Ionicons
-                        key={star}
-                        name={fieldAvgRating >= star - 0.5 ? "star" : "star-outline"}
-                        size={24}
-                        color="#FFD700"
-                        style={{ marginHorizontal: 2 }}
-                      />
-                    ))}
-                  </View>
-                  <Text style={styles.reviewCount}>({reviews.length} đánh giá)</Text>
-                </View>
+          {/* Reviews Section */}
+          {showReviews && (
+            <View style={styles.reviewsSection}>
+              <View style={styles.reviewsHeader}>
+                <Text style={styles.reviewsTitle}>Tất cả đánh giá</Text>
               </View>
 
-              {/* Reviews List */}
               {reviews.length > 0 ? (
                 <View style={styles.reviewsList}>
-                  {(showAllReviews ? reviews : reviews.slice(0, 3)).map((item, index) => (
+                  {(showAllReviews ? reviews : reviews.slice(0, 5)).map((item, index) => (
                     <View key={`${item.id || item.review_id || index}`} style={styles.reviewContainer}>
                       <View style={styles.reviewHeader}>
                         <View style={styles.userInfo}>
                           <Image
                             source={{
                               uri: item.avatar
-                                ? `${AVATAR_BASE_URL}/${item.avatar}`
+                                ? `${AVATAR_BASE_URL}/${item.avatar}?t=${Date.now()}`
                                 : `${AVATAR_BASE_URL}/default-ava.jpg`
                             }}
                             style={styles.avatar}
@@ -1024,7 +586,9 @@ export default function FieldInfo() {
                               {new Date(item.created_at).toLocaleDateString('vi-VN', {
                                 day: '2-digit',
                                 month: '2-digit',
-                                year: 'numeric'
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
                               })}
                             </Text>
                           </View>
@@ -1036,7 +600,6 @@ export default function FieldInfo() {
                               name={item.rating >= star ? "star" : "star-outline"}
                               size={16}
                               color="#FFD700"
-                              style={{ marginHorizontal: 1 }}
                             />
                           ))}
                         </View>
@@ -1046,70 +609,132 @@ export default function FieldInfo() {
                   ))}
                 </View>
               ) : (
-                <View style={styles.emptyReviewContainer}>
-                  <Ionicons name="chatbox-ellipses-outline" size={40} color="#CBD5E1" />
-                  <Text style={styles.emptyReviewText}>Chưa có đánh giá nào</Text>
+                <View style={styles.noReviewsContainer}>
+                  <Text style={styles.noReviewsText}>Chưa có đánh giá nào</Text>
                 </View>
               )}
 
-              {/* Button to show/hide all reviews */}
-              {reviews.length > 3 && (
-                <TouchableOpacity 
+              {reviews.length > 5 && (
+                <TouchableOpacity
                   style={styles.viewAllReviewsButton}
                   onPress={() => setShowAllReviews(!showAllReviews)}
                 >
                   <Text style={styles.viewAllReviewsText}>
-                    {showAllReviews ? "Ẩn bớt" : `Xem tất cả đánh giá (${reviews.length})`}
+                    {showAllReviews ? (
+                      <>
+                        <Ionicons name="chevron-up" size={16} color="#3B82F6" /> Ẩn bớt
+                      </>
+                    ) : (
+                      <>
+                        <Ionicons name="chevron-down" size={16} color="#3B82F6" /> Xem tất cả đánh giá ({reviews.length})
+                      </>
+                    )}
                   </Text>
-                  <Ionicons 
-                    name={showAllReviews ? "chevron-up" : "chevron-down"} 
-                    size={16} 
-                    color="#16A34A" 
-                  />
                 </TouchableOpacity>
               )}
             </View>
+          )}{/* Sub-fields Information */}
+          <View style={styles.infoSection}>
+            <View style={styles.infoRow}>
+              <Ionicons name="grid-outline" size={20} color="#6B7280" />
+              <Text style={styles.infoLabel}>Sân con:</Text>
+            </View>
+            {fieldData.subFields && fieldData.subFields.length > 0 ? (
+              <View style={styles.subFieldsContainer}>
+                <Text style={styles.subFieldsCount}>
+                  Tổng số: {fieldData.subFields.length} sân con
+                </Text>
+                <View style={styles.subFieldsList}>
+                  {fieldData.subFields.map((subField, index) => (
+                    <View key={subField.subfield_id} style={styles.subFieldItem}>
+                      <Text style={styles.subFieldName}>{subField.name}</Text>
+                      <View style={[
+                        styles.subFieldStatus,
+                        { backgroundColor: subField.status === 'available' ? '#10B981' : '#EF4444' }
+                      ]}>
+                        <Text style={styles.subFieldStatusText}>
+                          {subField.status === 'available' ? 'Hoạt động' : 'Ngừng hoạt động'}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : (
+              <Text style={styles.infoValue}>Chưa có thông tin sân con</Text>
+            )}
+          </View>
+
+          {/* Services Information */}
+          <View style={styles.infoSection}>
+            <View style={styles.infoRow}>
+              <Ionicons name="settings-outline" size={20} color="#6B7280" />
+              <Text style={styles.infoLabel}>Dịch vụ thêm:</Text>
+            </View>
+            {fieldData.services && fieldData.services.length > 0 ? (
+              <View style={styles.servicesContainer}>
+                {fieldData.services.map((service) => (
+                  <View key={service.service_id} style={styles.serviceItem}>
+                    <View style={styles.serviceInfo}>
+                      <Text style={styles.serviceName}>{service.name}</Text>
+                      {service.description && (
+                        <Text style={styles.serviceDescription}>{service.description}</Text>
+                      )}
+                    </View>
+                    <View style={styles.servicePriceContainer}>
+                      <Text style={styles.servicePrice}>
+                        {new Intl.NumberFormat('vi-VN', {
+                          style: 'currency',
+                          currency: 'VND'
+                        }).format(service.price)}
+                      </Text>
+                      <View style={[
+                        styles.serviceStatus,
+                        { backgroundColor: service.status === 'available' ? '#10B981' : '#EF4444' }
+                      ]}>
+                        <Text style={styles.serviceStatusText}>
+                          {service.status === 'available' ? 'Có sẵn' : 'Ngừng cung cấp'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.infoValue}>Chưa có dịch vụ thêm</Text>
+            )}
+          </View>
+
+          {/* Time Slots Information */}
+          <View style={styles.infoSection}>
+            <View style={styles.infoRow}>
+              <Ionicons name="time-outline" size={20} color="#6B7280" />
+              <Text style={styles.infoLabel}>Bảng giá theo giờ:</Text>
+            </View>
+            {fieldData.timeSlots && fieldData.timeSlots.length > 0 ? (
+              <View style={styles.timeSlotsContainer}>
+                {fieldData.timeSlots.map((slot) => (
+                  <View key={slot.slot_id} style={styles.timeSlotItem}>
+                    <View style={styles.timeSlotInfo}>
+                      <Text style={styles.timeSlotTime}>
+                        {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
+                      </Text>
+                    </View>
+                    <Text style={styles.timeSlotPrice}>
+                      {new Intl.NumberFormat('vi-VN', {
+                        style: 'currency',
+                        currency: 'VND'
+                      }).format(slot.price)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.infoValue}>Chưa có thông tin khung giờ</Text>
+            )}
           </View>
         </View>
-
-        {/* Update Button */}
-        <TouchableOpacity
-          style={[styles.submitButton, isSubmitting && styles.disabledButton]}
-          onPress={handleUpdateField}
-          disabled={isSubmitting}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.submitText}>
-            {isSubmitting ? 'Đang xử lý...' : 'Cập nhật'}
-          </Text>
-        </TouchableOpacity>
       </ScrollView>
-
-      {/* Modal */}
-      <Modal
-        animationType="fade"
-        transparent
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View
-            style={[
-              styles.modalContent,
-              modalSuccess ? styles.modalSuccess : styles.modalError,
-            ]}
-          >
-            <Text style={styles.modalText}>{modalMessage}</Text>
-            <TouchableOpacity
-              style={styles.modalButton}
-              onPress={() => setModalVisible(false)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.modalButtonText}>Đóng</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -1117,434 +742,408 @@ export default function FieldInfo() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F8FAFC',
   },
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingVertical: Platform.OS === 'ios' ? 60 : 40,
-    paddingBottom: 40,
-  },
-  backButton: {
-    padding: 12,
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     backgroundColor: '#3B82F6',
-    borderRadius: 50,
-    alignSelf: 'flex-start',
-    marginBottom: 24,
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 50 : 30,
+    paddingBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 32,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-  },
-  formContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowRadius: 4,
     elevation: 3,
   },
-  sectionContainer: {
-    marginBottom: 24,
+  backButton: {
+    padding: 8,
   },
-  sectionTitle: {
+  headerTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#3B82F6',
-    marginBottom: 16,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-  sectionContent: {
-    paddingHorizontal: 4,
-  },
-  label: {
-    fontSize: 14,
     fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  input: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#1E293B',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: 20,
-  },
-  multilineInput: {
-    height: 120,
-    textAlignVertical: 'top',
-  },
-  pickerContainer: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: 20,
-    overflow: 'hidden',
-    minHeight: 60,
-  },
-  picker: {
-    fontSize: 16,
-    color: '#1E293B',
-    height: 60,
-    paddingVertical: 10,
-  },
-  countContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  countButton: {
-    backgroundColor: '#3B82F6',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  countButtonText: {
-    fontSize: 18,
-    fontWeight: '700',
     color: '#FFFFFF',
   },
-  disabledText: {
-    color: '#9CA3AF',
+  editButton: {
+    padding: 8,
   },
-  countInput: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#1E293B',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    textAlign: 'center',
-    width: 80,
-  },
-  checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  customCheckbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  customCheckboxChecked: {
-    backgroundColor: '#3B82F6',
-  },
-  checkboxLabel: {
-    fontSize: 16,
-    color: '#1E293B',
-    marginLeft: 8,
+  scrollView: {
+    flex: 1,
   },
   loadingContainer: {
-    alignItems: 'center',
+    flex: 1,
     justifyContent: 'center',
-    padding: 20,
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
     color: '#6B7280',
   },
-  timeSlotsContainer: {
-    marginTop: 10,
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    padding: 20,
+  },
+  errorText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 16,
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  imageGalleryContainer: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  mainImageContainer: {
+    position: 'relative',
+    height: 250,
+  },
+  mainImage: {
+    width: '100%',
+    height: '100%',
+  },
+  mainImageBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(16, 185, 129, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  mainImageBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  thumbnailContainer: {
+    backgroundColor: '#F8FAFC',
+    padding: 12,
+  },
+  thumbnailList: {
+    paddingHorizontal: 4,
+  },
+  thumbnailWrapper: {
+    position: 'relative',
+    marginHorizontal: 4,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  selectedThumbnailWrapper: {
+    borderColor: '#10B981',
+  },
+  thumbnailImage: {
+    width: 60,
+    height: 60,
+  },
+  thumbnailMainBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 10,
+    padding: 2,
+  },
+  selectedOverlay: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 10,
+    padding: 2,
+  },
+  noImageContainer: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 12,
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 200,
+  },
+  noImageText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#9CA3AF',
+  },
+  infoContainer: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 20,
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  }, infoSection: {
     marginBottom: 20,
   },
-  timeSlotWrapper: {
-    marginBottom: 16,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+  fieldNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
   },
-  timeSlotBox: {
+  fieldName: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1E293B',
+    flex: 1,
+    marginRight: 12,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    paddingBottom: 8,
   },
-  timeSlotCheckbox: {
-    marginRight: 10,
+  infoLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginLeft: 8,
   },
-  timeSlotRow: {
-    flex: 1,
+  infoValue: {
+    fontSize: 16,
+    color: '#6B7280',
+    lineHeight: 24,
+  },
+  descriptionText: {
+    fontSize: 16,
+    color: '#6B7280',
+    lineHeight: 24,
+    textAlign: 'justify',
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    marginRight: 8,
+  },
+  ratingText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+  }, placeholderSection: {
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    paddingTop: 20,
+    marginTop: 20,
+  },
+  placeholderText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginBottom: 8,
+  },
+  // Sub-fields styles
+  subFieldsContainer: {
+    marginTop: 8,
+  },
+  subFieldsCount: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  subFieldsList: {
+    gap: 8,
+  },
+  subFieldItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 10,
-    borderRadius: 6,
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  selectedTimeSlot: {
-    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+  subFieldName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  subFieldStatus: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  subFieldStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  // Services styles
+  servicesContainer: {
+    marginTop: 8,
+    gap: 12,
+  },
+  serviceItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    padding: 16,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  serviceInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  serviceName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 4,
+  },
+  serviceDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+  },
+  servicePriceContainer: {
+    alignItems: 'flex-end',
+  },
+  servicePrice: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#059669',
+    marginBottom: 4,
+  },
+  serviceStatus: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  serviceStatusText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  // Time slots styles
+  timeSlotsContainer: {
+    marginTop: 8,
+    gap: 8,
+  },
+  timeSlotItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   timeSlotInfo: {
     flex: 1,
   },
-  timeSlotText: {
-    fontSize: 16,
-    color: '#1F2937',
-    fontWeight: '500',
-  },
-  selectedTimeSlotText: {
-    fontWeight: 'bold',
-    color: '#3B82F6',
-  },
-  timeSlotPriceInput: {
-    marginTop: 4,
-    padding: 12,
-    height: 48,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 8,
+  timeSlotTime: {
     fontSize: 16,
     fontWeight: '500',
-    textAlign: 'left',
-  },
-  uploadButton: {
-    backgroundColor: '#3B82F6',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  uploadText: {
+    color: '#374151',
+  }, timeSlotPrice: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    textTransform: 'uppercase',
+    fontWeight: '700',
+    color: '#059669',
   },
-  imageList: {
-    marginBottom: 20,
-  },
-  imageContainer: {
-    position: 'relative',
-    marginRight: 12,
-  },
-  image: {
-    width: 96,
-    height: 96,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  noImagesContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  noImagesText: {
-    color: '#9CA3AF',
+  // Reviews styles
+  reviewCount: {
     fontSize: 14,
-    textAlign: 'center',
+    color: '#6B7280',
+    marginLeft: 4,
   },
-  removeButton: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: '#EF4444',
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
+  chevronIcon: {
+    marginLeft: 8,
   },
-  removeButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-    lineHeight: 24,
-  },
-  submitButton: {
-    backgroundColor: '#10B981',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  disabledButton: {
-    backgroundColor: '#6B7280',
-    opacity: 0.7,
-  },
-  submitText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    textTransform: 'uppercase',
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-  },
-  modalContent: {
-    width: '80%',
-    maxWidth: 400,
-    padding: 24,
-    borderRadius: 16,
-    alignItems: 'center',
-  },
-  modalSuccess: {
-    backgroundColor: '#D1FAE5',
-  },
-  modalError: {
-    backgroundColor: '#FEE2E2',
-  },
-  modalText: {
-    fontSize: 16,
-    color: '#1E293B',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  modalButton: {
-    backgroundColor: '#3B82F6',
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-  },
-  modalButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  serviceContainer: {
+  reviewsSection: {
+    marginTop: 16,
+    padding: 16,
     backgroundColor: '#F8FAFC',
-    padding: 16,
-    marginBottom: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    position: 'relative',
-  },
-  serviceInput: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: '#1E293B',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: 12,
+    borderColor: '#E5E7EB',
   },
-  descriptionInput: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  addButton: {
-    backgroundColor: '#3B82F6',
-    padding: 16,
-    borderRadius: 12,
+  reviewsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
-  addButtonText: {
-    color: 'white',
+  reviewsTitle: {
+    fontSize: 18,
     fontWeight: '600',
-    fontSize: 16,
-  },
-  ratingSection: {
-    marginVertical: 10,
-  },
-  ratingSubTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 8,
+    color: '#374151',
   },
   overallRating: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 10,
-    backgroundColor: '#F8FAFC',
-    padding: 15,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   ratingScore: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginRight: 12,
-    color: '#16A34A',
-  },
-  starsContainer: {
-    flexDirection: 'row',
-    marginRight: 10,
-  },
-  reviewCount: {
-    color: '#64748B',
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginLeft: 8,
   },
   reviewsList: {
-    marginTop: 16,
-    marginBottom: 20,
+    gap: 12,
   },
   reviewContainer: {
-    backgroundColor: '#F8FAFC',
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#16A34A',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    padding: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#E5E7EB',
   },
   reviewHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
@@ -1554,23 +1153,22 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     marginRight: 8,
   },
   nameAndDate: {
-    marginLeft: 8,
+    flex: 1,
   },
   reviewerName: {
-    fontWeight: 'bold',
     fontSize: 14,
-    color: '#1E293B',
+    fontWeight: '600',
+    color: '#374151',
   },
   reviewDate: {
     fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
+    color: '#6B7280',
   },
   reviewRating: {
     flexDirection: 'row',
@@ -1578,39 +1176,94 @@ const styles = StyleSheet.create({
   },
   reviewText: {
     fontSize: 14,
-    color: '#334155',
-    marginTop: 8,
+    color: '#6B7280',
     lineHeight: 20,
   },
-  viewAllReviewsButton: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+  noReviewsContainer: {
     alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-    padding: 12,
-    borderRadius: 8,
-    marginVertical: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    padding: 20,
+  },
+  noReviewsText: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  viewAllReviewsButton: {
+    marginTop: 12,
+    alignItems: 'center',
   },
   viewAllReviewsText: {
-    color: '#16A34A',
     fontSize: 14,
-    fontWeight: '600',
-    marginRight: 4,
-  },
-  emptyReviewContainer: {
-    alignItems: 'center',
+    fontWeight: '500',
+    color: '#3B82F6',
+  },  // Modal styles
+  modalContainer: {
+    flex: 1,
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
-    padding: 30,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
   },
-  emptyReviewText: {
-    fontSize: 16,
-    color: '#94A3B8',
-    marginTop: 8,
+  modalBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '95%',
+    height: '80%',
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    position: 'relative',
+  },
+  modalImageContainer: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalImage: {
+    width: '100%',
+    height: '100%',
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    padding: 8,
+    zIndex: 10,
+  },
+  modalImageInfo: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 8,
+    padding: 12,
+    zIndex: 10,
+  }, modalImageInfoText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  modalNavButton: {
+    position: 'absolute',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 25,
+    padding: 8,
+    zIndex: 10,
+  },
+  modalNavButtonLeft: {
+    left: 15,
+  },
+  modalNavButtonRight: {
+    right: 15,
   },
 });

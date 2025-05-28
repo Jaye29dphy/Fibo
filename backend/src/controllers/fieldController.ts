@@ -70,7 +70,8 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
   try {
     console.log('=== REGISTER FIELD API CALLED ===');
     console.log('Received request body:', req.body);
-    console.log('Received files:', req.files);
+    console.log('Received files count:', Array.isArray(req.files) ? req.files.length : 'Not an array');
+    console.log('Files details:', req.files);
 
     // Log headers để debug
     console.log('Request headers:', {
@@ -252,13 +253,22 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
 
         console.log(`Added price ${slotPrice} for slot ID ${slot.slot_id} of field ID ${fieldId}`);
       }
-    }
-
-    // Lưu ảnh vào thư mục và bảng field_images
+    }    // Lưu ảnh vào thư mục và bảng field_images
     if (!images || images.length === 0) {
       console.log('No images provided, skipping image upload');
+      console.log('req.files type:', typeof req.files);
+      console.log('req.files:', req.files);
     } else {
       console.log('Processing images:', images.length);
+      console.log('Images array details:', images.map((img, idx) => ({
+        index: idx,
+        fieldname: img.fieldname,
+        originalname: img.originalname,
+        mimetype: img.mimetype,
+        size: img.size,
+        hasBuffer: !!img.buffer,
+        bufferLength: img.buffer?.length
+      })));
       for (const [index, image] of images.entries()) {
         console.log(`Processing image ${index}:`, {
           fieldname: image.fieldname,
@@ -279,24 +289,41 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
           const mimeExt = image.mimetype.split('/')[1];
           fileExtension = mimeExt ? `.${mimeExt}` : '.jpg';
         }
-        if (!fileExtension) fileExtension = '.jpg';
-
-        const imageName = `${fieldId}_${index}${fileExtension}`;
+        if (!fileExtension) fileExtension = '.jpg'; const imageName = `${fieldId}_${index}${fileExtension}`;
         const imagePath = path.join(basePath, imageName);
+
+        console.log('=== IMAGE PROCESSING DETAILS ===');
+        console.log('Field ID:', fieldId);
+        console.log('Image index:', index);
+        console.log('File extension:', fileExtension);
+        console.log('Image name:', imageName);
+        console.log('Full image path:', imagePath);
+        console.log('Base path exists:', fs.existsSync(basePath));
+        console.log('Buffer size:', image.buffer?.length);
 
         try {
           console.log('Saving image:', imageName, 'to:', imagePath);
+          console.log('basePath from env:', basePath);
+          console.log('Directory exists before save:', fs.existsSync(basePath));
+
+          // Đảm bảo thư mục tồn tại trước khi lưu file
+          if (!fs.existsSync(basePath)) {
+            console.log('Creating directory:', basePath);
+            fs.mkdirSync(basePath, { recursive: true });
+          }
+
           // Lưu file ảnh vào thư mục
           await writeFileAsync(imagePath, image.buffer);
+          console.log('File write completed');
 
           // Kiểm tra xem file đã được lưu thành công chưa
           if (!fs.existsSync(imagePath)) {
-            console.log('Failed to save image:', imagePath);
+            console.error('Failed to save image - file does not exist after write:', imagePath);
             continue; // Skip to next image
           }
-          console.log('Image saved successfully:', imagePath);
 
-          // Xác định image_type (main cho ảnh đầu tiên, sub cho các ảnh còn lại)
+          const stats = fs.statSync(imagePath);
+          console.log('Image saved successfully:', imagePath, 'Size:', stats.size, 'bytes');          // Xác định image_type (main cho ảnh đầu tiên, sub cho các ảnh còn lại)
           const imageType = index === 0 ? 'main' : 'sub';
 
           // Lưu thông tin ảnh vào bảng field_images
@@ -304,13 +331,19 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
             INSERT INTO fibo.field_images (field_id, image_name, image_type, upload_date)
             VALUES (?, ?, ?, ?)
           `;
+
+          // Tạo timestamp với múi giờ UTC+7 (Việt Nam)
+          const vietnamTime = new Date();
+          vietnamTime.setHours(vietnamTime.getHours() + 7); // Chuyển sang UTC+7
+          const uploadDate = vietnamTime.toISOString().slice(0, 19).replace('T', ' ');
+
           const imageValues = [
             fieldId,
             imageName,
             imageType,
-            new Date().toISOString().slice(0, 19).replace('T', ' '),
+            uploadDate,
           ];
-          console.log('Inserting image with values:', imageValues);
+          console.log('Inserting image with Vietnam time values:', imageValues);
           await pool.execute(insertImageQuery, imageValues);
         } catch (imgError) {
           console.error(`Error processing image ${index}:`, imgError);
@@ -494,5 +527,80 @@ export const getFieldById = async (req: Request, res: Response): Promise<void> =
   } catch (error: any) {
     console.error('Error in getFieldById:', error.message, error.stack);
     res.status(500).json({ message: 'Đã có lỗi xảy ra.', error: error.message });
+  }
+};
+
+// Cập nhật thông tin sân
+export const updateField = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const fieldId = req.params.id;
+    const { name, location, sport_type, price_per_hour, status, description } = req.body;    // Lấy user_id từ token
+    const userId = getUserIdFromToken(req);
+    if (!userId) {
+      res.status(401).json({ message: 'Token không hợp lệ hoặc không tồn tại' });
+      return;
+    } console.log('Updating field:', { fieldId, userId, name, location, sport_type, price_per_hour, status, description });
+
+    // Kiểm tra xem sân có tồn tại và thuộc về user này không
+    const checkQuery = `
+      SELECT f.field_id, f.owner_id, o.user_id 
+      FROM fibo.fields f
+      INNER JOIN fibo.owners o ON f.owner_id = o.owner_id
+      WHERE f.field_id = ? AND o.user_id = ?
+    `;
+
+    const [checkResult] = await pool.execute(checkQuery, [fieldId, userId]);
+    const fields = checkResult as any[]; if (fields.length === 0) {
+      res.status(404).json({ message: 'Không tìm thấy sân hoặc bạn không có quyền cập nhật sân này' });
+      return;
+    }    // Validate input
+    if (!name || !location || !sport_type || !price_per_hour) {
+      res.status(400).json({ message: 'Vui lòng cung cấp đầy đủ thông tin: tên sân, địa chỉ, loại thể thao, giá thuê' });
+      return;
+    } if (isNaN(Number(price_per_hour)) || Number(price_per_hour) <= 0) {
+      res.status(400).json({ message: 'Giá thuê phải là số và lớn hơn 0' });
+      return;
+    }    // Cập nhật thông tin sân
+    const updateQuery = `
+      UPDATE fibo.fields 
+      SET name = ?, location = ?, sport_type = ?, price_per_hour = ?, status = ?, description = ?, updated_at = NOW()
+      WHERE field_id = ?
+    `;
+
+    const [updateResult] = await pool.execute(updateQuery, [
+      name.trim(),
+      location.trim(),
+      sport_type,
+      Number(price_per_hour),
+      status || 'active',
+      description?.trim() || '',
+      fieldId
+    ]);
+
+    const result = updateResult as any; if (result.affectedRows === 0) {
+      res.status(404).json({ message: 'Không thể cập nhật sân' });
+      return;
+    }
+
+    // Lấy thông tin sân đã cập nhật
+    const getUpdatedQuery = `
+      SELECT field_id, name, location, sport_type, price_per_hour, status, description, rating, created_at, updated_at
+      FROM fibo.fields 
+      WHERE field_id = ?
+    `;
+
+    const [updatedResult] = await pool.execute(getUpdatedQuery, [fieldId]);
+    const updatedField = (updatedResult as any[])[0];
+
+    console.log('Field updated successfully:', updatedField);
+
+    res.status(200).json({
+      message: 'Cập nhật thông tin sân thành công',
+      field: updatedField
+    });
+
+  } catch (error: any) {
+    console.error('Error in updateField:', error.message, error.stack);
+    res.status(500).json({ message: 'Đã có lỗi xảy ra khi cập nhật sân.', error: error.message });
   }
 };

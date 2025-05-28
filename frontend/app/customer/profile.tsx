@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import * as FileSystem from "expo-file-system"; 
+import * as FileSystem from "expo-file-system";
 import { Platform } from "react-native";
 import {
   View,
@@ -18,7 +18,7 @@ import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { AntDesign, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
-import { getUserInfo, uploadAvatar, fetchLatestRelease , updateUserInfo } from "@/constants/apiService";
+import { getUserInfo, uploadAvatar, fetchLatestRelease, updateUserInfo } from "@/constants/apiService";
 import { AVATAR_BASE_URL } from "@/constants/apiConfig";
 
 type User = {
@@ -90,20 +90,20 @@ export default function ProfileScreen() {
       Alert.alert("Lỗi", "Không thể upload ảnh vì thông tin user không hợp lệ.");
       return;
     }
-  
+
     setUploading(true);
     setTempAvatar(imageUri);
     console.log("Đã set tempAvatar:", imageUri);
-  
+
     try {
       // Create the FormData object
       const formData = new FormData();
-      
+
       // Add the image to FormData with appropriate metadata
       const filename = imageUri.split('/').pop() || `avatar_${Date.now()}.jpg`;
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : 'image/jpeg';
-      
+
       // Prepare the file object in a format Expo & React Native can handle
       // @ts-ignore - Type definition mismatch with React Native's FormData
       formData.append('avatar', {
@@ -111,15 +111,15 @@ export default function ProfileScreen() {
         name: filename,
         type
       });
-      
+
       // Add user_id as a separate field
       formData.append("user_id", user.user_id.toString());
-      
+
       console.log("FormData đã tạo với các trường:", Object.fromEntries(formData));
-  
+
       const response = await uploadAvatar(formData);
       console.log("API response:", response);
-      
+
       if (response.avatar) {
         setUser((prevUser) =>
           prevUser ? { ...prevUser, avatar: response.avatar } : null
@@ -143,28 +143,28 @@ export default function ProfileScreen() {
       const permissionResult = useCamera
         ? await ImagePicker.requestCameraPermissionsAsync()
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
-  
+
       if (!permissionResult.granted) {
         Alert.alert("Lỗi", "Ứng dụng cần quyền truy cập để tiếp tục!");
         return;
       }
-  
+
       const result = useCamera
         ? await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 1,
-          })
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 1,
+        })
         : await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 1,
-          });
-  
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 1,
+        });
+
       console.log("ImagePicker result:", result);
-  
+
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const imageUri = result.assets[0].uri;
         console.log("Selected image URI:", imageUri);
@@ -190,14 +190,14 @@ export default function ProfileScreen() {
 
   const handleEditUser = async () => {
     if (!editedUser) return;
-  
+
     try {
       await updateUserInfo(editedUser.user_id, {
         full_name: editedUser.full_name,
         email: editedUser.email,
         phone: editedUser.phone,
       });
-  
+
       const freshUser = await getUserInfo(); // gọi lại API để lấy dữ liệu mới nhất
       setUser(freshUser); // cập nhật lại giao diện
       Alert.alert("Thành công", "Thông tin đã được cập nhật!");
@@ -207,7 +207,7 @@ export default function ProfileScreen() {
       Alert.alert("Lỗi", "Không thể cập nhật thông tin.");
     }
   };
-  
+
 
   return (
     <ScrollView style={styles.container}>
@@ -281,13 +281,13 @@ export default function ProfileScreen() {
           <Text style={styles.value}>
             {user?.created_at
               ? new Date(user.created_at).toLocaleString("vi-VN", {
-                  year: "numeric",
-                  month: "2-digit",
-                  day: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                })
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })
               : "N/A"}
           </Text>
         </View>

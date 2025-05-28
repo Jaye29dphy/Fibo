@@ -9,7 +9,7 @@ router.post("/", authenticate, createCourt);
 router.get("/", getFields);
 router.get("/:field_id", getFieldDetail);
 router.get("/:fieldId/subfields", getSubFields);
-router.get("/:fieldId/timeslots", getTimeSlots);
+router.get("/:fieldId/time-slots", getTimeSlots);
 router.get("/:fieldId/services", getServices);
 router.post("/bookings", authenticate, createBooking);
 router.get("/:fieldId/images", getFieldImages);
