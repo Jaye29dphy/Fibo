@@ -192,8 +192,7 @@ export class OwnerController {  // Lấy thông tin hồ sơ của owner
       }
 
       const ownerId = owners[0].owner_id;
-      
-      // Get active subscription information
+        // Get active subscription information with expired check
       const [subscriptions]: any = await pool.execute(
         `SELECT 
           os.subscription_id, 
@@ -204,7 +203,10 @@ export class OwnerController {  // Lấy thông tin hồ sơ của owner
           sp.max_fields,
           os.start_date,
           os.end_date,
-          os.status,
+          CASE 
+            WHEN os.end_date < NOW() THEN 'expired'
+            ELSE os.status
+          END as status,
           sp.description
         FROM 
           owner_subscriptions os

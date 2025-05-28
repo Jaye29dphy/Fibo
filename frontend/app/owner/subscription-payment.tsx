@@ -18,6 +18,7 @@ import {
   getOwnerSubscription,
   createSubscriptionPendingOrder,
   updateSubscriptionOrderStatus,
+  deleteSubscriptionPendingOrder,
 } from "@/constants/apiService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AntDesign } from "@expo/vector-icons";
@@ -257,24 +258,24 @@ const SubscriptionPayment = () => {
   }
 };
 
-
   const handleCancelPayment = async () => {
   if (loading) return;
 
-  if (!currentOrderId) {
+  if (!subscriptionCode) {
     if (Platform.OS === "android") {
-      ToastAndroid.show("Không tìm thấy ID đơn hàng để hủy.", ToastAndroid.SHORT);
+      ToastAndroid.show("Không tìm thấy mã đơn hàng để hủy.", ToastAndroid.SHORT);
     } else {
-      console.log("Không tìm thấy ID đơn hàng để hủy.");
+      console.log("Không tìm thấy mã đơn hàng để hủy.");
     }
     return;
   }
 
   setLoading(true);
   try {
-    console.log("[SubscriptionPayment] handleCancelPayment: Calling updateSubscriptionOrderStatus with 'cancelled' for order ID:", currentOrderId);
+    console.log("[SubscriptionPayment] handleCancelPayment: Deleting pending subscription order with code:", subscriptionCode);
     
-    await updateSubscriptionOrderStatus(currentOrderId.toString(), 'cancelled');
+    // Sử dụng API xóa đơn hàng thay vì chỉ cập nhật trạng thái
+    await deleteSubscriptionPendingOrder(subscriptionCode);
     
     // Thông báo thành công
     if (Platform.OS === "android") {

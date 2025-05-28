@@ -14,6 +14,6 @@ const deleteSubscriptionPendingOrder = SubscriptionOrderController.deleteSubscri
 router.post("/pending", createSubscriptionPendingOrder);
 router.get("/status/:order_id", getSubscriptionOrderStatus);
 router.post("/update-status/:order_id", updateSubscriptionOrderStatus);
-router.delete("/delete-pending/:order_id", deleteSubscriptionPendingOrder);
+router.delete("/delete-pending/:subscription_code", deleteSubscriptionPendingOrder);
 
 export default router;
