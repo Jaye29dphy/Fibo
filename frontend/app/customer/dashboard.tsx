@@ -21,7 +21,7 @@ export default function Dashboard() {
         showsVerticalScrollIndicator={Platform.OS === "web"} // Hiển thị thanh cuộn trên web
       >
         <View style={styles.logoContainer}>
-          <Image source={require("../../assets/images/react-logo.png")} style={styles.logo} />
+          <Image source={require("../../assets/images/logosieuchat.png")} style={styles.logo} />
         </View>
 
         <Text style={styles.headerText}>Kết nối đam mê, đặt sân mọi lúc!</Text>

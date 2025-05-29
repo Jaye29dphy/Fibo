@@ -10,16 +10,18 @@ import {
   Modal,
   Dimensions,
 } from "react-native";
-import { PieChart } from "react-native-chart-kit"; // Thay BarChart bằng PieChart
+import { PieChart } from "react-native-chart-kit";
 import { getAllOwnerSubscriptions, formatServicePr } from "@/constants/apiService";
-import { API_ENDPOINTS } from "@/constants/apiConfig";
 
 interface Revenue {
   revenue_id: number;
   owner_id: number;
   owner_name: string;
   owner_email: string;
-  total_revenue: number | string;
+  plan_name: string; // Tên gói
+  plan_price_per_month: number; // Giá tiền theo tháng
+  months_subscribed: number; // Số tháng đăng ký
+  total_revenue: number; // Tổng doanh thu
   month: number;
   year: number;
   last_updated: string;
@@ -38,10 +40,11 @@ const ManageRevenue = () => {
     setLoading(true);
     try {
       const data = await getAllOwnerSubscriptions();
-      // Chuyển đổi total_revenue thành số
       const formattedData = data.map((revenue: Revenue) => ({
         ...revenue,
         total_revenue: parseFloat(revenue.total_revenue.toString()) || 0,
+        plan_price_per_month: parseFloat(revenue.plan_price_per_month.toString()) || 0,
+        months_subscribed: parseInt(revenue.months_subscribed.toString()) || 0,
       }));
       setRevenues(formattedData);
       filterRevenues(formattedData, selectedYear, searchKeyword);
@@ -66,7 +69,8 @@ const ManageRevenue = () => {
         (revenue) =>
           revenue.owner_name.toLowerCase().includes(lowerKeyword) ||
           revenue.owner_email.toLowerCase().includes(lowerKeyword) ||
-          revenue.revenue_id.toString().includes(lowerKeyword)
+          revenue.revenue_id.toString().includes(lowerKeyword) ||
+          revenue.plan_name.toLowerCase().includes(lowerKeyword)
       );
     }
 
@@ -86,12 +90,11 @@ const ManageRevenue = () => {
       <Text style={styles.id}>ID: {item.revenue_id}</Text>
       <Text style={styles.info}>Chủ sân: {item.owner_name}</Text>
       <Text style={styles.info}>Email: {item.owner_email}</Text>
-      <Text style={styles.info}>
-        Doanh thu: {formatServicePr(item.total_revenue || 0)}
-      </Text>
-      <Text style={styles.info}>
-        Tháng/Năm: {item.month}/{item.year}
-      </Text>
+      <Text style={styles.info}>Gói: {item.plan_name}</Text>
+      <Text style={styles.info}>Giá/tháng: {formatServicePr(item.plan_price_per_month)}</Text>
+      <Text style={styles.info}>Số tháng: {item.months_subscribed}</Text>
+      <Text style={styles.info}>Tổng doanh thu: {formatServicePr(item.total_revenue)}</Text>
+      <Text style={styles.info}>Tháng/Năm: {item.month}/{item.year}</Text>
       <Text style={styles.info}>
         Cập nhật lần cuối: {new Date(item.last_updated).toLocaleString()}
       </Text>
@@ -106,19 +109,21 @@ const ManageRevenue = () => {
   ];
 
   const getStatistics = () => {
-    // Lọc các bản ghi hợp lệ
     const validRevenues = revenues.filter(
-      (revenue) => revenue.total_revenue != null && revenue.owner_name != null
+      (revenue) =>
+        revenue.total_revenue != null &&
+        revenue.owner_name != null &&
+        revenue.plan_name != null
     );
 
     const totalRevenues = validRevenues.length;
     const totalRevenueAmount = validRevenues.reduce(
-      (sum, revenue) => sum + (parseFloat(revenue.total_revenue.toString()) || 0),
+      (sum, revenue) => sum + (revenue.total_revenue || 0),
       0
     );
 
     const revenueByYear = validRevenues.reduce((acc, revenue) => {
-      acc[revenue.year] = (acc[revenue.year] || 0) + (parseFloat(revenue.total_revenue.toString()) || 0);
+      acc[revenue.year] = (acc[revenue.year] || 0) + (revenue.total_revenue || 0);
       return acc;
     }, {} as Record<string, number>);
     const topYears = Object.entries(revenueByYear)
@@ -127,10 +132,19 @@ const ManageRevenue = () => {
       .map(([year, total]) => ({ year, total }));
 
     const revenueByOwner = validRevenues.reduce((acc, revenue) => {
-      acc[revenue.owner_name] = (acc[revenue.owner_name] || 0) + (parseFloat(revenue.total_revenue.toString()) || 0);
+      acc[revenue.owner_name] = (acc[revenue.owner_name] || 0) + (revenue.total_revenue || 0);
       return acc;
     }, {} as Record<string, number>);
     const topOwners = Object.entries(revenueByOwner)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name, total]) => ({ name, total }));
+
+    const revenueByPlan = validRevenues.reduce((acc, revenue) => {
+      acc[revenue.plan_name] = (acc[revenue.plan_name] || 0) + (revenue.total_revenue || 0);
+      return acc;
+    }, {} as Record<string, number>);
+    const topPlans = Object.entries(revenueByPlan)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
       .map(([name, total]) => ({ name, total }));
@@ -140,6 +154,7 @@ const ManageRevenue = () => {
       totalRevenueAmount,
       topYears,
       topOwners,
+      topPlans,
     };
   };
 
@@ -157,11 +172,10 @@ const ManageRevenue = () => {
 
   const stats = getStatistics();
 
-  // Chuẩn bị dữ liệu cho PieChart (phân bổ doanh thu theo top 3 owners)
-  const pieChartData = stats.topOwners.map((owner, index) => ({
-    name: owner.name,
-    population: owner.total, // Sử dụng total_revenue làm giá trị
-    color: `rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, 0.6)`, // Màu ngẫu nhiên
+  const pieChartData = stats.topPlans.map((plan, index) => ({
+    name: plan.name,
+    population: plan.total,
+    color: `rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, 0.6)`,
     legendFontColor: "#000",
     legendFontSize: 12,
   }));
@@ -181,7 +195,7 @@ const ManageRevenue = () => {
       </View>
 
       <TextInput
-        placeholder="Tìm theo ID, tên chủ sân hoặc email..."
+        placeholder="Tìm theo ID, tên chủ sân, email hoặc gói..."
         style={styles.searchInput}
         value={searchKeyword}
         onChangeText={setSearchKeyword}
@@ -250,7 +264,7 @@ const ManageRevenue = () => {
                   accessor={"population"}
                   backgroundColor={"transparent"}
                   paddingLeft={"15"}
-                  absolute // Hiển thị giá trị tuyệt đối
+                  absolute
                   style={styles.chart}
                 />
               ) : (
@@ -277,6 +291,18 @@ const ManageRevenue = () => {
                 stats.topOwners.map((owner, index) => (
                   <Text key={index} style={styles.modalText}>
                     {index + 1}. {owner.name}: {formatServicePr(owner.total)}
+                  </Text>
+                ))
+              ) : (
+                <Text style={styles.modalText}>Chưa có dữ liệu</Text>
+              )}
+              <Text style={styles.modalSubTitle}>
+                Top 3 gói có doanh thu cao nhất:
+              </Text>
+              {stats.topPlans.length > 0 ? (
+                stats.topPlans.map((plan, index) => (
+                  <Text key={index} style={styles.modalText}>
+                    {index + 1}. {plan.name}: {formatServicePr(plan.total)}
                   </Text>
                 ))
               ) : (
