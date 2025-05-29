@@ -22,9 +22,7 @@ const PickField: React.FC = () => {
         console.log("Fields data in pickField:", fieldsData);
         if (Array.isArray(fieldsData)) {
           setFields(fieldsData);
-          // Chỉ giữ các sân có status là 'available' trong filteredFields
-          const availableFields = fieldsData.filter((field) => field.status === "available");
-          setFilteredFields(availableFields);
+          setFilteredFields(fieldsData);
         } else {
           console.error("Fields data is not an array:", fieldsData);
           setFields([]);
@@ -42,13 +40,10 @@ const PickField: React.FC = () => {
   const handleSearch = (query: string) => {
     setSearchQuery(query);
     if (query.trim() === "") {
-      // Khi không có query, chỉ hiển thị sân available
-      setFilteredFields(fields.filter((field) => field.status === "available"));
+      setFilteredFields(fields);
     } else {
-      const filtered = fields.filter(
-        (field) =>
-          field.name.toLowerCase().includes(query.toLowerCase()) &&
-          field.status === "available"
+      const filtered = fields.filter((field) =>
+        field.name.toLowerCase().includes(query.toLowerCase())
       );
       setFilteredFields(filtered);
     }
@@ -78,21 +73,19 @@ const PickField: React.FC = () => {
       <ScrollView style={styles.content}>
         <Text style={styles.sectionTitle}>Tất cả các sân</Text>
         <View style={styles.fieldsList}>
-          {fields.length === 0 ? (
+          {filteredFields.length === 0 ? (
             <Text>Không có sân nào được tìm thấy.</Text>
           ) : (
-            fields.map((field) => {
+            filteredFields.map((field) => {
               const imageUrl = field.image_name
                 ? `${FIELD_IMAGE_BASE_URL}/${field.image_name}?t=${Date.now()}`
                 : "https://via.placeholder.com/150";
-              console.log(`Main image URL for field ${field.field_id}:`, imageUrl);
-
               const isAvailable = field.status === "available";
 
               return (
                 <TouchableOpacity
                   key={field.field_id}
-                  disabled={!isAvailable} // Vô hiệu hóa nhấn nếu sân không available
+                  disabled={!isAvailable}
                   onPress={
                     isAvailable
                       ? () =>
@@ -113,7 +106,7 @@ const PickField: React.FC = () => {
                   <View
                     style={[
                       styles.fieldCard,
-                      !isAvailable && styles.unavailableCard, // Áp dụng style cho sân unavailable
+                      !isAvailable && styles.unavailableCard,
                     ]}
                   >
                     <View style={styles.imageContainer}>
