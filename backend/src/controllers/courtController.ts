@@ -119,6 +119,59 @@ export const getTimeSlots = async (req: Request, res: Response): Promise<void> =
   }
 };
 
+export const getOccupiedSlots = async (req: Request, res: Response): Promise<void> => {
+  const { fieldId } = req.params;
+  const { date } = req.query;
+
+  console.log("➡️ API /occupied-slots được gọi với:");
+  console.log("   fieldId:", fieldId);
+  console.log("   date:", date);
+
+  try {
+    const [rows] = await pool.execute(
+      `
+      SELECT start_time, end_time
+      FROM bookings
+      WHERE field_id = ? AND DATE(start_time) = ? AND status = 'confirmed'
+
+      UNION
+
+      SELECT 
+        jt.startTime AS start_time,
+        jt.endTime AS end_time
+      FROM pendingorders,
+        JSON_TABLE(time_slots, '$[*]'
+          COLUMNS (
+            startTime VARCHAR(30) PATH '$.startTime',
+            endTime VARCHAR(30) PATH '$.endTime'
+          )
+        ) AS jt
+      WHERE field_id = ? AND date = ? AND status IN ('pending', 'paid')
+      `,
+      [fieldId, date, fieldId, date]
+    );
+
+    console.log("🧾 Raw rows trả về từ SQL:", rows);
+
+    const occupiedSlots = (rows as any[])
+      .filter(r => r.start_time && r.end_time)
+      .map(r =>
+        `${String(r.start_time).slice(11, 16)} - ${String(r.end_time).slice(11, 16)}`
+      );
+
+    console.log("🕒 occupiedSlots sau xử lý:", occupiedSlots);
+
+    res.json(occupiedSlots);
+  } catch (err) {
+    console.error("❌ Lỗi khi truy vấn occupied slots:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+
+
+
+
 export const getServices = async (req: Request, res: Response): Promise<void> => {
   try {
     const { fieldId } = req.params;
@@ -165,7 +218,7 @@ export const createBooking = async (req: AuthRequest, res: Response): Promise<vo
       }
     }
 
-    res.status(201).json({ message: "Booking created successfully", booking_id: bookingId });
+    res.status(201).json({ message: "Booking created successfully"});
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Internal server error" });

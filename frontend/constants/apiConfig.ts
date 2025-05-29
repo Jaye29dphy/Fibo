@@ -30,6 +30,8 @@ export const API_ENDPOINTS = {
   DELETE_PENDING_ORDER: `${API_URL}/courts/orders/delete-pending`,
   GET_ORDER_STATUS: `${API_URL}/courts/orders/status`,
   UPDATE_ORDER_STATUS: `${API_URL}/courts/orders/update-status`,
+  GET_OCCUPIED_SLOTS: (fieldId: string, date: string) => `${API_URL}/courts/fields/${fieldId}/occupied-slots?date=${date}`,
+
 
   // Owner endpoints (fields) - New endpoints for Owner app
   REGISTER_FIELD: `${API_URL}/api/fields/register`,
@@ -62,4 +64,6 @@ export const API_ENDPOINTS = {
   DELETE_SUBSCRIPTION_PENDING_ORDER: `${API_URL}/api/subscription-orders/delete-pending`,
   GET_SUBSCRIPTION_ORDER_STATUS: `${API_URL}/api/subscription-orders/status`,
   UPDATE_SUBSCRIPTION_ORDER_STATUS: `${API_URL}/api/subscription-orders/update-status`,
+
+
 };

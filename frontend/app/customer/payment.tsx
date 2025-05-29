@@ -3,7 +3,15 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from "rea
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import moment from "moment";
-import { getSubFields, getTimeSlots, getServices, formatCurrency, getStringParam, formatServicePr } from "@/constants/apiService";
+import {
+  getSubFields,
+  getTimeSlots,
+  getServices,
+  getOccupiedSlots,
+  formatCurrency,
+  getStringParam,
+  formatServicePr,
+} from "@/constants/apiService";
 
 const BookingScreen = () => {
   const router = useRouter();
@@ -11,6 +19,7 @@ const BookingScreen = () => {
   const [subFields, setSubFields] = useState<any[]>([]);
   const [timeSlots, setTimeSlots] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
+  const [disabledSlots, setDisabledSlots] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedFieldType, setSelectedFieldType] = useState<string | null>(null);
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
@@ -50,6 +59,30 @@ const BookingScreen = () => {
     fetchData();
   }, [field_id]);
 
+  useEffect(() => {
+    const fetchDisabledSlots = async () => {
+      if (!field_id || !selectedDate) return;
+      try {
+        const yyyyMMdd = convertDateToYYYYMMDD(selectedDate);
+        const slots = await getOccupiedSlots(field_id as string, yyyyMMdd);
+        setDisabledSlots(slots);
+      } catch (err) {
+        console.error("Lỗi khi tải occupied slots:", err);
+      }
+    };
+    fetchDisabledSlots();
+  }, [field_id, selectedDate]);
+
+  const convertDateToYYYYMMDD = (ddmm: string) => {
+    const [day, month] = ddmm.split("/");
+    const year = moment().year();
+    return `${year}-${month}-${day}`;
+  };
+
+  const formatSlot = (start: string, end: string) => {
+    return `${start.slice(0, 5)} - ${end.slice(0, 5)}`;
+  };
+
   const toggleService = (service: { name: string; id: number }) => {
     setSelectedServices((prev) =>
       prev.some((s) => s.id === service.id)
@@ -59,6 +92,7 @@ const BookingScreen = () => {
   };
 
   const toggleSlot = (slot: string) => {
+    if (disabledSlots.includes(slot)) return;
     setSelectedSlots((prev) =>
       prev.includes(slot) ? prev.filter((s) => s !== slot) : [...prev, slot]
     );
@@ -71,7 +105,7 @@ const BookingScreen = () => {
     }
 
     const selectedSlotsData = timeSlots.filter((slot) =>
-      selectedSlots.includes(`${slot.start_time} - ${slot.end_time}`)
+      selectedSlots.includes(formatSlot(slot.start_time, slot.end_time))
     );
     const totalSlotPrice = selectedSlotsData.reduce(
       (total, slot) => total + parseFloat(slot.price || "0"),
@@ -117,10 +151,7 @@ const BookingScreen = () => {
           {subFields.map((field) => (
             <TouchableOpacity
               key={field.sub_field_id}
-              style={[
-                styles.optionItem,
-                selectedFieldType === field.name && styles.selectedOption,
-              ]}
+              style={[styles.optionItem, selectedFieldType === field.name && styles.selectedOption]}
               onPress={() => setSelectedFieldType(field.name)}
             >
               <Text style={styles.optionText}>{field.name}</Text>
@@ -133,10 +164,7 @@ const BookingScreen = () => {
           {dates.map((item, index) => (
             <TouchableOpacity
               key={index}
-              style={[
-                styles.dateItem,
-                selectedDate === item.date && styles.selectedOption,
-              ]}
+              style={[styles.dateItem, selectedDate === item.date && styles.selectedOption]}
               onPress={() => setSelectedDate(item.date)}
             >
               <Text style={styles.dateText}>{item.dayOfWeek}</Text>
@@ -148,14 +176,13 @@ const BookingScreen = () => {
         <Text style={styles.sectionTitle}>Chọn khung giờ</Text>
         <View style={styles.gridContainer}>
           {timeSlots.map((slot) => {
-            const slotString = `${slot.start_time} - ${slot.end_time}`;
+            const slotString = formatSlot(slot.start_time, slot.end_time);
+            const isDisabled = disabledSlots.includes(slotString);
             return (
               <TouchableOpacity
                 key={slot.slot_id}
-                style={[
-                  styles.optionItem,
-                  selectedSlots.includes(slotString) && styles.selectedOption,
-                ]}
+                disabled={isDisabled}
+                style={[styles.optionItem, selectedSlots.includes(slotString) && styles.selectedOption, isDisabled && styles.disabledOption]}
                 onPress={() => toggleSlot(slotString)}
               >
                 <Text style={styles.optionText}>{slotString}</Text>
@@ -170,10 +197,7 @@ const BookingScreen = () => {
           {services.map((service) => (
             <TouchableOpacity
               key={service.service_id}
-              style={[
-                styles.optionItem,
-                selectedServices.some((s) => s.id === service.service_id) && styles.selectedOption,
-              ]}
+              style={[styles.optionItem, selectedServices.some((s) => s.id === service.service_id) && styles.selectedOption]}
               onPress={() => toggleService({ name: service.name, id: service.service_id })}
             >
               <Text style={styles.optionText}>
@@ -195,86 +219,21 @@ const BookingScreen = () => {
 export default BookingScreen;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F3F4F6",
-    padding: 16,
-  },
-  content: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginLeft: 8,
-  },
-  fieldPrice: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#16A34A",
-    marginBottom: 8,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  horizontalScroll: {
-    marginBottom: 16,
-  },
-  dateItem: {
-    width: 80,
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: "#E5E7EB",
-    alignItems: "center",
-    marginHorizontal: 5,
-  },
-  dateText: {
-    fontSize: 14,
-    fontWeight: "bold",
-  },
-  gridContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-  },
-  optionItem: {
-    width: "48%",
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: "#E5E7EB",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  selectedOption: {
-    backgroundColor: "#16A34A",
-  },
-  optionText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "black",
-  },
-  slotPrice: {
-    fontSize: 14,
-    color: "#6B7280",
-  },
-  payButton: {
-    backgroundColor: "#16A34A",
-    padding: 14,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 20,
-  },
-  payText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
+  container: { flex: 1, backgroundColor: "#F3F4F6", padding: 16 },
+  content: { flex: 1 },
+  header: { flexDirection: "row", alignItems: "center", padding: 16 },
+  title: { fontSize: 18, fontWeight: "bold", marginLeft: 8 },
+  fieldPrice: { fontSize: 16, fontWeight: "bold", color: "#16A34A", marginBottom: 8 },
+  sectionTitle: { fontSize: 16, fontWeight: "bold", marginTop: 8, marginBottom: 8 },
+  horizontalScroll: { marginBottom: 16 },
+  dateItem: { width: 80, padding: 12, borderRadius: 8, backgroundColor: "#E5E7EB", alignItems: "center", marginHorizontal: 5 },
+  dateText: { fontSize: 14, fontWeight: "bold" },
+  gridContainer: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
+  optionItem: { width: "48%", padding: 12, borderRadius: 8, backgroundColor: "#E5E7EB", alignItems: "center", marginBottom: 10 },
+  selectedOption: { backgroundColor: "#16A34A" },
+  disabledOption: { backgroundColor: "#F87171", opacity: 0.6 },
+  optionText: { fontSize: 16, fontWeight: "bold", color: "black" },
+  slotPrice: { fontSize: 14, color: "#6B7280" },
+  payButton: { backgroundColor: "#16A34A", padding: 14, borderRadius: 8, alignItems: "center", marginTop: 20 },
+  payText: { color: "white", fontSize: 16, fontWeight: "bold" },
 });

@@ -471,3 +471,9 @@ export const getSubscriptionHistory = async () => {
     return [];
   }
 };
+
+export const getOccupiedSlots = async (fieldId: string, date: string): Promise<string[]> => {
+  const endpoint = API_ENDPOINTS.GET_OCCUPIED_SLOTS(fieldId, date);
+  return fetchAPI(endpoint, "GET");
+};
+

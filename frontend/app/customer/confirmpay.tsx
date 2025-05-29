@@ -28,7 +28,11 @@ const ConfirmPay = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const isUnmountedRef = useRef(false); // Thêm dòng này để đánh dấu rời màn
+  const isUnmountedRef = useRef(false);
+  const confirmingRef = useRef(false);
+  const pendingCreatedRef = useRef(false);
+  const hasNavigatedRef = useRef(false); // ✅ New: để chặn gọi hàm sau khi đã chuyển màn
+
   const [countdown, setCountdown] = useState(30);
   const [isPaid, setIsPaid] = useState(false);
   const [bookingCreated, setBookingCreated] = useState(false);
@@ -62,12 +66,17 @@ const ConfirmPay = () => {
 
   useEffect(() => {
     (async () => {
+      if (pendingCreatedRef.current) return;
+      pendingCreatedRef.current = true;
+
       const token = await AsyncStorage.getItem("token");
       if (!token) return;
+
       const user = await getUserInfo();
       const services = extraService
         ? extraService.split(", ").map(s => ({ serviceId: parseInt(s.split("-")[1] || "0"), quantity: 1 }))
         : [];
+
       try {
         await createPendingOrder(
           fieldId,
@@ -80,7 +89,11 @@ const ConfirmPay = () => {
           "vnpay"
         );
       } catch (e: any) {
-        if (!e.message.includes("Duplicate entry")) console.error(e);
+        if (e.message?.includes("Duplicate entry")) {
+          console.log("⚠️ Đơn hàng đã tồn tại. Bỏ qua việc tạo lại.");
+        } else {
+          console.error("❌ Lỗi khác khi tạo đơn:", e);
+        }
       }
     })();
   }, []);
@@ -90,7 +103,7 @@ const ConfirmPay = () => {
       setCountdown(t => {
         if (t <= 1) {
           clearInterval(timerRef.current!);
-          if (!isUnmountedRef.current) onExpire(); // chỉ gọi khi chưa unmounted
+          if (!isUnmountedRef.current && !hasNavigatedRef.current) onExpire();
           return 0;
         }
         return t - 1;
@@ -99,7 +112,7 @@ const ConfirmPay = () => {
 
     return () => {
       clearInterval(timerRef.current!);
-      isUnmountedRef.current = true; // đánh dấu đã rời màn
+      isUnmountedRef.current = true;
     };
   }, []);
 
@@ -109,18 +122,21 @@ const ConfirmPay = () => {
   };
 
   const onExpire = async () => {
-    if (expiredHandled || bookingCreated) return;
+    if (expiredHandled || bookingCreated || isUnmountedRef.current || confirmingRef.current || hasNavigatedRef.current) return;
     setExpiredHandled(true);
     try {
       const { status } = await getOrderStatus(bookingCode);
-      if (status === "paid") await confirmBooking();
-      else {
+      if (status === "paid") {
+        if (!bookingCreated) await confirmBooking();
+      } else {
         await deletePendingOrder(bookingCode);
         Alert.alert("⏰ Hết thời gian", "Đơn hàng đã bị huỷ.");
+        hasNavigatedRef.current = true;
         router.push('/customer/dashboard');
       }
     } catch {
       Alert.alert("Lỗi", "Không thể xử lý hết thời gian.");
+      hasNavigatedRef.current = true;
       router.push('/customer/dashboard');
     }
   };
@@ -154,6 +170,8 @@ const ConfirmPay = () => {
   };
 
   const confirmBooking = async () => {
+    if (bookingCreated || confirmingRef.current) return;
+    confirmingRef.current = true;
     try {
       const user = await getUserInfo();
       const services = extraService
@@ -175,10 +193,13 @@ const ConfirmPay = () => {
       );
       setBookingCreated(true);
       Alert.alert('✅ Thành công', 'Đặt sân thành công.');
+      hasNavigatedRef.current = true;
       router.push('/customer/dashboard');
     } catch (e) {
       console.error('Booking error', e);
       Alert.alert('Lỗi', 'Không thể tạo booking.');
+    } finally {
+      confirmingRef.current = false;
     }
   };
 
@@ -205,12 +226,14 @@ const ConfirmPay = () => {
                         } catch (e) {
                           console.error("Lỗi huỷ đơn:", e);
                         }
+                        hasNavigatedRef.current = true;
                         router.push('/customer/dashboard');
                       },
                     },
                   ]
                 );
               } else {
+                hasNavigatedRef.current = true;
                 router.back();
               }
             }}
