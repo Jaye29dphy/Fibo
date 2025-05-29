@@ -58,7 +58,7 @@ export default function NotificationScreen() {
 
   // Hàm xử lý sự kiện quay lại màn hình Dashboard
   const handleBack = () => {
-    router.push("/customer/dashboard");
+    router.push("/owner/dashboard");
   };
 
   // Render mỗi thông báo
