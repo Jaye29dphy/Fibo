@@ -8,7 +8,7 @@ import {
   ScrollView,
   Platform,
   ToastAndroid,
-  Alert
+  Alert,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import {
@@ -28,6 +28,7 @@ const ConfirmPay = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const isUnmountedRef = useRef(false); // Thêm dòng này để đánh dấu rời màn
   const [countdown, setCountdown] = useState(30);
   const [isPaid, setIsPaid] = useState(false);
   const [bookingCreated, setBookingCreated] = useState(false);
@@ -89,18 +90,22 @@ const ConfirmPay = () => {
       setCountdown(t => {
         if (t <= 1) {
           clearInterval(timerRef.current!);
-          onExpire();
+          if (!isUnmountedRef.current) onExpire(); // chỉ gọi khi chưa unmounted
           return 0;
         }
         return t - 1;
       });
     }, 1000);
-    return () => clearInterval(timerRef.current!);
+
+    return () => {
+      clearInterval(timerRef.current!);
+      isUnmountedRef.current = true; // đánh dấu đã rời màn
+    };
   }, []);
 
   const notify = (msg: string) => {
     if (Platform.OS === "android") ToastAndroid.show(msg, ToastAndroid.SHORT);
-    else Alert.alert(msg);
+    else Alert.alert("Thông báo", msg);
   };
 
   const onExpire = async () => {
@@ -181,9 +186,38 @@ const ConfirmPay = () => {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity
+            onPress={() => {
+              if (!isPaid && !bookingCreated) {
+                Alert.alert(
+                  '⚠️ Chưa thanh toán',
+                  'Đơn hàng của bạn chưa được thanh toán. Bạn có muốn huỷ đơn không?',
+                  [
+                    { text: 'Tiếp tục thanh toán', style: 'cancel' },
+                    {
+                      text: 'Huỷ đơn',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          clearInterval(timerRef.current!);
+                          isUnmountedRef.current = true;
+                          await deletePendingOrder(bookingCode);
+                        } catch (e) {
+                          console.error("Lỗi huỷ đơn:", e);
+                        }
+                        router.push('/customer/dashboard');
+                      },
+                    },
+                  ]
+                );
+              } else {
+                router.back();
+              }
+            }}
+          >
             <AntDesign name="arrowleft" size={24} color="green" />
           </TouchableOpacity>
+
           <Text style={styles.title}>Xác nhận thanh toán</Text>
         </View>
 
@@ -200,13 +234,12 @@ const ConfirmPay = () => {
             <Text style={styles.price}>Giá dịch vụ: {formatCurrency(extraPrice)}</Text>
           </>}
           <Text style={styles.totalPrice}>Tổng tiền: {formatCurrency(totalPrice)}</Text>
-          
         </View>
 
-        
-
         <View style={styles.qrContainer}>
-        <Text style={styles.sectionTitle}>Thời gian còn lại: {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, "0")}</Text>
+          <Text style={styles.sectionTitle}>
+            Thời gian còn lại: {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, "0")}
+          </Text>
           <Text style={styles.qrTitle}>Quét mã QR để thanh toán</Text>
           <Image source={{ uri: qrCodeUrl }} style={styles.qrCode} />
         </View>
