@@ -50,6 +50,25 @@ export default function ProfileScreen() {
   const [release, setRelease] = useState<GitHubRelease | null>(null);
   const [releaseLoading, setReleaseLoading] = useState(true);
   const [tempAvatar, setTempAvatar] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+
+ const isValidEmail = (email: string) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  if (!emailRegex.test(email)) return false;
+
+  // Bắt buộc phải là @gmail.com
+  const allowedDomain = "gmail.com";
+  const domain = email.split("@")[1]?.toLowerCase();
+  if (domain !== allowedDomain) return false;
+
+  return true;
+};
+
+  const isValidPhone = (phone: string) => {
+    const phoneRegex = /^0\d{9}$/;
+    return phoneRegex.test(phone);
+  };
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -366,10 +385,7 @@ export default function ProfileScreen() {
       <Modal visible={editModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={[styles.modalTitle, { alignSelf: "center" }]}>
-              Chỉnh sửa thông tin
-            </Text>
-
+            <Text style={[styles.modalTitle, { alignSelf: "center" }]}>Chỉnh sửa thông tin</Text>
             <Text style={styles.modalLabel}>Tên đầy đủ:</Text>
             <TextInput
               style={styles.input}
@@ -385,27 +401,29 @@ export default function ProfileScreen() {
             <TextInput
               style={styles.input}
               value={editedUser?.email}
-              onChangeText={(text) =>
-                setEditedUser((prev) =>
-                  prev ? { ...prev, email: text } : null
-                )
-              }
+              onChangeText={(text) => {
+                setEmailError(isValidEmail(text) ? null : "Email không hợp lệ");
+                setEditedUser((prev) => (prev ? { ...prev, email: text } : null));
+              }}
             />
+            {emailError && <Text style={{ color: "red", marginBottom: 8 }}>{emailError}</Text>}
 
             <Text style={styles.modalLabel}>Số điện thoại:</Text>
             <TextInput
               style={styles.input}
+              keyboardType="phone-pad"
               value={editedUser?.phone}
-              onChangeText={(text) =>
-                setEditedUser((prev) =>
-                  prev ? { ...prev, phone: text } : null
-                )
-              }
+              onChangeText={(text) => {
+                setPhoneError(isValidPhone(text) ? null : "Số điện thoại không hợp lệ");
+                setEditedUser((prev) => (prev ? { ...prev, phone: text } : null));
+              }}
             />
+            {phoneError && <Text style={{ color: "red", marginBottom: 8 }}>{phoneError}</Text>}
 
             <TouchableOpacity
-              style={[styles.saveButton, { alignSelf: "center" }]}
+              style={[styles.saveButton, { alignSelf: "center", opacity: emailError || phoneError ? 0.5 : 1 }]}
               onPress={handleEditUser}
+              disabled={!!emailError || !!phoneError}
             >
               <Text style={styles.saveButtonText}>Lưu</Text>
             </TouchableOpacity>
