@@ -5,7 +5,13 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { sendEmail } from "../utils/sendEmail";
 import fs from "fs";
+
+import path from 'path';
+import os from 'os';
 import { AuthRequest } from "../middleware/authMiddleware";
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 
 // export const sendOtp = async (req: Request, res: Response): Promise<void> => {
@@ -232,81 +238,87 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 };
 
 
+// Interface cho network interface (TypeScript)
+interface NetworkInterface {
+  address: string;
+  netmask: string;
+  family: string;
+  mac: string;
+  internal: boolean;
+  cidr: string;
+}
+
 export const getUser = async (req: Request, res: Response): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      res.status(401).json({ error: "Unauthorized: No token provided" });
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ error: 'Unauthorized: No token provided' });
       return;
     }
 
-    const token = authHeader.split(" ")[1];
-    console.log("Token nhận được:", token); // Kiểm tra token có đúng không
-    const decoded: any = jwt.verify(token, process.env.JWT_SECRET || "secret");
-    // Lấy thông tin từ bảng users
+    const token = authHeader.split(' ')[1];
+    const decoded: any = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+
+    // Lấy thông tin user
     const [users]: any = await pool.execute(
-      "SELECT user_id, full_name, email, phone, role, status, created_at, avatar FROM users WHERE user_id = ?",
-      [decoded.id] // Lấy user_id từ token
+      'SELECT user_id, full_name, email, phone, role, status, created_at, avatar FROM users WHERE user_id = ?',
+      [decoded.id]
     );
 
     if (!Array.isArray(users) || users.length === 0) {
-      res.status(404).json({ error: "User not found" });
+      res.status(404).json({ error: 'User not found' });
       return;
     }
 
     let user = users[0];
-    
-    // Nếu người dùng là owner, lấy thêm thông tin business_name và address từ bảng owners
+
+    // Nếu là owner => lấy thêm thông tin từ bảng owners
     if (user.role === 'owner') {
       const [owners]: any = await pool.execute(
-        "SELECT owner_id, business_name, address FROM owners WHERE user_id = ?",
+        'SELECT owner_id, business_name, address FROM owners WHERE user_id = ?',
         [decoded.id]
       );
-      
+
       if (Array.isArray(owners) && owners.length > 0) {
         user = {
           ...user,
           owner_id: owners[0].owner_id,
           business_name: owners[0].business_name,
-          address: owners[0].address
+          address: owners[0].address,
         };
       }
     }
 
-    // 🔹 Tạo đường dẫn ảnh đầy đủ
-    const networkInterfaces = require('os').networkInterfaces();
-    
-    interface NetworkInterface {
-      address: string;
-      netmask: string;
-      family: string;
-      mac: string;
-      internal: boolean;
-      cidr: string;
-    }
-    
-    const localIP = Object.values(networkInterfaces)
-      .flat()
-      .find((iface): iface is NetworkInterface => {
-        if (!iface) return false;
-        const netIface = iface as NetworkInterface;
-        return netIface.family === "IPv4" && 
-               !netIface.internal && 
-               netIface.address.startsWith("192.168.");
-      })?.address || 'localhost';
-    
+    // 🔹 Lấy IP cục bộ để hiển thị ảnh chính xác
+    const localIP =
+  Object.values(os.networkInterfaces())
+    .flat()
+    .find((iface) => {
+      const netIface = iface as any;
+      return (
+        netIface &&
+        netIface.family === 'IPv4' &&
+        !netIface.internal &&
+        netIface.address?.startsWith('192.168.')
+      );
+    })?.address || 'localhost';
+
+
+    // 🔹 Dùng biến môi trường AVATAR_IMAGE_PATH
+    const avatarBasePath = process.env.AVATAR_IMAGE_PATH || 'F:\\img\\avatar';
+
+    // 🔹 Xử lý đường dẫn ảnh
     if (user.avatar) {
-      // Thay đổi đường dẫn kiểm tra từ ./public/avatars/ sang D:\img\ava
-      const avatarPath = `D:\\img\\ava\\${user.avatar}`;
+      const avatarFilePath = path.join(avatarBasePath, user.avatar);
       try {
-        if (fs.existsSync(avatarPath)) {
+        if (fs.existsSync(avatarFilePath)) {
           user.avatar = `http://${localIP}:5000/avatars/${user.avatar}`;
         } else {
-          console.log(`Avatar file not found: ${avatarPath}`);
+          console.warn(`❗ Avatar file not found: ${avatarFilePath}`);
           user.avatar = `http://${localIP}:5000/avatars/default-avatar.jpg`;
         }
-      } catch (error) {
-        console.error(`Error checking avatar file: ${error}`);
+      } catch (err) {
+        console.error('Lỗi kiểm tra file avatar:', err);
         user.avatar = `http://${localIP}:5000/avatars/default-avatar.jpg`;
       }
     } else {
@@ -315,8 +327,8 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
 
     res.json(user);
   } catch (error) {
-    console.error("JWT Error:", error); // In lỗi chi tiết
-    res.status(500).json({ error: "Invalid token" });
+    console.error('JWT Error:', error);
+    res.status(500).json({ error: 'Invalid token' });
   }
 };
 

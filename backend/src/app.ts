@@ -41,10 +41,10 @@ app.get('/api/health', (req, res) => {
 });
 
 // Sử dụng middleware để xử lý route /fields
-app.use("/fields", imageMiddleware, express.static("D:\\img\\field"));
+app.use("/fields", imageMiddleware, express.static(process.env.FIELD_IMAGE_PATH || "F:\\img\\field"));
 
 // Sử dụng middleware để xử lý route /avatars
-app.use("/avatars", express.static("D:\\img\\ava"));
+app.use("/avatars", express.static(process.env.AVATAR_IMAGE_PATH || "F:\\img\\avatar"));
 
 // API Routes
 app.use("/api/auth", authRoutes);
