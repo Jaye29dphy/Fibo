@@ -46,12 +46,6 @@ export default function Dashboard() {
             onPress={() => router.push({ pathname: "/customer/pickfield", params: { sport_type: "badminton" } })}
           />
           <OptionButton
-            label="Pickle ball"
-            color="#9C27B0"
-            icon="volleyball"
-            onPress={() => router.push({ pathname: "/customer/pickfield", params: { sport_type: "volleyball" } })}
-          />
-          <OptionButton
             label="Tennis"
             color="#CDDC39"
             icon="tennis"

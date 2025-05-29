@@ -12,7 +12,8 @@ import {
   Dimensions,
 } from "react-native";
 import { PieChart } from "react-native-chart-kit";
-import { getNotification, sendNotificationToAllUsers } from "@/constants/apiService";
+import { getNotification, sendNotificationToUsers } from "@/constants/apiService";
+import { Picker } from "@react-native-picker/picker";
 
 interface Notification {
   notification_id: number;
@@ -33,6 +34,7 @@ const ManageNotifications = () => {
   const [showStats, setShowStats] = useState<boolean>(false);
   const [showSendNotification, setShowSendNotification] = useState<boolean>(false);
   const [notificationMessage, setNotificationMessage] = useState<string>("");
+  const [selectedUserGroup, setSelectedUserGroup] = useState<"all" | "owner" | "customer">("all");
 
   const fetchNotifications = async () => {
     setLoading(true);
@@ -82,8 +84,8 @@ const ManageNotifications = () => {
 
     try {
       setLoading(true);
-      await sendNotificationToAllUsers(notificationMessage);
-      Alert.alert("Thành công", "Thông báo đã được gửi đến tất cả người dùng.");
+      await sendNotificationToUsers(notificationMessage, selectedUserGroup);
+      Alert.alert("Thành công", `Thông báo đã được gửi đến ${selectedUserGroup === 'all' ? 'tất cả người dùng' : selectedUserGroup === 'owner' ? 'các owner' : 'các customer'}.`);
       setNotificationMessage("");
       setShowSendNotification(false);
       await fetchNotifications();
@@ -121,6 +123,12 @@ const ManageNotifications = () => {
     { label: "Tất cả", value: "all" },
     { label: "Đã đọc", value: "read" },
     { label: "Chưa đọc", value: "unread" },
+  ];
+
+  const userGroups = [
+    { label: "Tất cả người dùng", value: "all" },
+    { label: "Owner", value: "owner" },
+    { label: "Customer", value: "customer" },
   ];
 
   const getStatistics = () => {
@@ -241,7 +249,7 @@ const ManageNotifications = () => {
               {chartData.length > 0 ? (
                 <PieChart
                   data={chartData}
-                  width={screenWidth * 0.7} // Responsive width
+                  width={screenWidth * 0.7}
                   height={220}
                   chartConfig={{
                     color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
@@ -275,7 +283,19 @@ const ManageNotifications = () => {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Gửi thông báo đến tất cả người dùng</Text>
+            <Text style={styles.modalTitle}>Gửi thông báo</Text>
+            <View style={styles.filterContainer}>
+              <Text style={styles.label}>Gửi đến:</Text>
+              <Picker
+                selectedValue={selectedUserGroup}
+                style={styles.picker}
+                onValueChange={(itemValue) => setSelectedUserGroup(itemValue as "all" | "owner" | "customer")}
+              >
+                {userGroups.map((group) => (
+                  <Picker.Item key={group.value} label={group.label} value={group.value} />
+                ))}
+              </Picker>
+            </View>
             <TextInput
               placeholder="Nhập nội dung thông báo..."
               style={[styles.searchInput, { marginBottom: 16 }]}
@@ -344,6 +364,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginBottom: 12,
     width: "100%",
+    fontSize: 16,
   },
   filterContainer: {
     flexDirection: "row",
@@ -417,13 +438,49 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     padding: 20,
     borderRadius: 12,
-    width: "95%",
-    alignItems: "center",
+    width: "90%",
+    maxWidth: 400,
+    alignItems: "stretch",
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    marginBottom: 16,
+    marginBottom: 20,
+    textAlign: "center",
+    color: "#333",
+  },
+  formGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#333",
+    marginBottom: 8,
+  },
+  pickerWrapper: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    overflow: "hidden", // Đảm bảo không bị tràn nội dung
+  },
+  picker: {
+    height: 50,
+    width: "100%",
+    color: "#333",
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 20,
+    textAlignVertical: "top",
+    minHeight: 120,
+    fontSize: 16,
+    color: "#333",
+    backgroundColor: "#fff",
   },
   statsContainer: {
     marginBottom: 20,
@@ -449,17 +506,26 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "flex-end",
     width: "100%",
+    gap: 10, // Khoảng cách giữa các nút
   },
   closeButton: {
     backgroundColor: "#4CAF50",
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 12,
+    flex: 1,
+    alignItems: "center",
+  },
+  cancelButton: {
+    backgroundColor: "#E0E0E0",
   },
   closeButtonText: {
     color: "#fff",
     fontWeight: "600",
     fontSize: 16,
+  },
+  cancelButtonText: {
+    color: "#333",
   },
 });
 

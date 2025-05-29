@@ -65,34 +65,44 @@ export const getNotification = async (_req: Request, res: Response): Promise<voi
   }
 };
 
-export const sendNotificationToAllUsers = async (req: Request, res: Response): Promise<void> => {
-  const { message } = req.body;
+export const sendNotificationToUsers = async (req: Request, res: Response): Promise<void> => {
+  const { message, userGroup } = req.body;
 
   if (!message || typeof message !== 'string' || message.trim() === '') {
     res.status(400).json({ message: "Nội dung thông báo không hợp lệ" });
     return;
   }
 
+  if (!['all', 'owner', 'customer'].includes(userGroup)) {
+    res.status(400).json({ message: "Nhóm người dùng không hợp lệ. Chọn 'all', 'owner', hoặc 'customer'." });
+    return;
+  }
+
   try {
-    // Lấy danh sách tất cả người dùng
-    const [users] = await db.execute('SELECT user_id FROM users') as [{ user_id: number }[], any];
+    // Lấy danh sách người dùng dựa trên nhóm
+    let query = 'SELECT user_id FROM users';
+    if (userGroup !== 'all') {
+      query += ` WHERE role = ?`;
+    }
+
+    const [users] = await db.execute(query, userGroup !== 'all' ? [userGroup] : []) as [{ user_id: number }[], any];
 
     if (!users.length) {
-      res.status(404).json({ message: "Không tìm thấy người dùng nào" });
+      res.status(404).json({ message: `Không tìm thấy ${userGroup === 'all' ? 'người dùng' : userGroup} nào` });
       return;
     }
 
     // Tạo thông báo cho từng người dùng
     const values = users.map(user => [user.user_id, message, 0, new Date()]);
-    const query = `
+    const insertQuery = `
       INSERT INTO notifications (user_id, message, is_read, created_at)
       VALUES ?;
     `;
 
-    await db.query(query, [values]);
-    console.log(`Đã gửi thông báo đến ${users.length} người dùng`);
+    await db.query(insertQuery, [values]);
+    console.log(`Đã gửi thông báo đến ${users.length} ${userGroup === 'all' ? 'người dùng' : userGroup}`);
 
-    res.status(200).json({ message: "Thông báo đã được gửi đến tất cả người dùng" });
+    res.status(200).json({ message: `Thông báo đã được gửi đến ${users.length} ${userGroup === 'all' ? 'người dùng' : userGroup}` });
   } catch (error: any) {
     console.error("Lỗi khi gửi thông báo:", error.message, error.stack);
     res.status(500).json({ message: "Lỗi server", error: error.message });

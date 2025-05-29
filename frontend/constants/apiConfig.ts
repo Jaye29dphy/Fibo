@@ -1,5 +1,4 @@
-
-export const API_URL = "http://192.168.1.3:5000";
+export const API_URL = "http://192.168.2.4:5000";
 
 
 export const GITHUB_REPO = "https://api.github.com/repos/Jaye29dphy/Fibo";
@@ -49,7 +48,7 @@ export const API_ENDPOINTS = {
   // Notifications
   GET_NOTIFICATIONS: `${API_URL}/api/auth/notifications`,
   GET_NOTIFICATION: `${API_URL}/api/notifications/notifications`,
-  SEND_NOTIFICATION_ALL: `${API_URL}/api/notifications/send-all`,
+  SEND_NOTIFICATION: `${API_URL}/api/notifications/send`,
 
   // Reviews
   GET_REVIEWS: `${API_URL}/api/reviews/fields`,
@@ -64,6 +63,5 @@ export const API_ENDPOINTS = {
   DELETE_SUBSCRIPTION_PENDING_ORDER: `${API_URL}/api/subscription-orders/delete-pending`,
   GET_SUBSCRIPTION_ORDER_STATUS: `${API_URL}/api/subscription-orders/status`,
   UPDATE_SUBSCRIPTION_ORDER_STATUS: `${API_URL}/api/subscription-orders/update-status`,
-
-
+  GET_ALL_SUBSCRIPTIONS: `${API_URL}/api/subscriptions/all`,
 };

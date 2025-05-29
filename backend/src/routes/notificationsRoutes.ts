@@ -1,14 +1,13 @@
 import { Router, RequestHandler } from 'express';
-import { getNotification, sendNotificationToAllUsers, markNotificationAsRead } from '../controllers/notificationsController';
-
+import { getNotification, sendNotificationToUsers, markNotificationAsRead } from '../controllers/notificationsController';
 const router = Router();
 
 const getNotificationHandler: RequestHandler = getNotification;
-const sendNotificationHandler: RequestHandler = sendNotificationToAllUsers;
+const sendNotificationHandler: RequestHandler = sendNotificationToUsers;
 const markNotificationAsReadHandler: RequestHandler = markNotificationAsRead;
 
 router.get('/notifications', getNotificationHandler);
-router.post('/send-all', sendNotificationHandler);
+router.post('/send', sendNotificationHandler);
 router.put('/notifications/:notification_id/read', markNotificationAsReadHandler);
 
 export default router;

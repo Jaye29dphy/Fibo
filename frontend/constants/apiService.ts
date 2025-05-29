@@ -244,9 +244,9 @@ export const getNotification = async () => {
 }
 
 
-export const sendNotificationToAllUsers = async (message: string) => {
-  const url = `${API_URL}/api/notifications/send-all`;
-  return fetchAPI(url, "POST", { message });
+export const sendNotificationToUsers = async (message: string, userGroup: 'all' | 'owner' | 'customer') => {
+  const url = `${API_URL}/api/notifications/send`;
+  return fetchAPI(url, "POST", { message, userGroup });
 };
 
 export const createPendingOrder = async (
@@ -475,5 +475,18 @@ export const getSubscriptionHistory = async () => {
 export const getOccupiedSlots = async (fieldId: string, date: string): Promise<string[]> => {
   const endpoint = API_ENDPOINTS.GET_OCCUPIED_SLOTS(fieldId, date);
   return fetchAPI(endpoint, "GET");
+};
+
+
+export const getAllOwnerSubscriptions = async () => {
+  try {
+    console.log("Calling getAllOwnerSubscriptions API...");
+    const response = await fetchAPI(`${API_ENDPOINTS.GET_ALL_SUBSCRIPTIONS}`, "GET");
+    console.log("Subscriptions API response:", response);
+    return response;
+  } catch (error) {
+    console.error("Error fetching subscriptions:", error);
+    throw error;
+  }
 };
 
