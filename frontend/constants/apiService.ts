@@ -3,7 +3,12 @@ import { API_ENDPOINTS, API_URL, AVATAR_BASE_URL } from "./apiConfig";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 
-export const fetchAPI = async (endpoint: string, method = "GET", body?: any, isFormData = false) => {
+export const fetchAPI = async (
+  endpoint: string,
+  method = "GET",
+  body?: any,
+  isFormData = false
+) => {
   const token = await AsyncStorage.getItem("token");
 
   const headers: HeadersInit = {};
@@ -22,15 +27,17 @@ export const fetchAPI = async (endpoint: string, method = "GET", body?: any, isF
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || "Lỗi khi gọi API");
+      // ✅ Ưu tiên lấy message nếu có
+      throw new Error(data.message || data.error || "Lỗi khi gọi API");
     }
 
     return data;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching API:", error);
-    throw error;
+    throw new Error(error.message || "Lỗi hệ thống");
   }
 };
+
 
 export const uploadAvatar = async (formData: FormData): Promise<{ avatar: string }> => {
   try {

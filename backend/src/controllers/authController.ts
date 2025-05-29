@@ -113,8 +113,12 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
   const { email, newPassword, otp } = req.body;
 
   try {
-    // Kiểm tra xem email có tồn tại trong cơ sở dữ liệu không
-    const [users]: [any[], any] = await pool.execute("SELECT * FROM users WHERE email = ?", [email]);
+    // Lấy user theo email
+    const [users]: [any[], any] = await pool.execute(
+      "SELECT * FROM users WHERE email = ?",
+      [email]
+    );
+
     if (!users.length) {
       res.status(404).json({ message: "Email không tồn tại!" });
       return;
@@ -123,22 +127,32 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
     const user = users[0];
     const currentTime = new Date();
 
-    // Kiểm tra xem OTP có đúng và chưa hết hạn không
+    // Kiểm tra OTP hết hạn hoặc không tồn tại
     if (user.otp === null || new Date(user.otp_expiry) < currentTime) {
       res.status(400).json({ message: "OTP không hợp lệ hoặc đã hết hạn!" });
       return;
     }
 
-    // So sánh OTP nhập vào với OTP đã lưu trong cơ sở dữ liệu (bằng bcrypt)
+    // So sánh OTP (mã hóa) với OTP nhập
     const isOtpValid = await bcrypt.compare(otp, user.otp);
     if (!isOtpValid) {
       res.status(400).json({ message: "OTP không hợp lệ!" });
       return;
     }
 
-    // Cập nhật mật khẩu mới
+    // Kiểm tra mật khẩu mới có trùng với mật khẩu cũ không
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      res.status(400).json({ message: "Mật khẩu mới không được trùng với mật khẩu cũ!"});
+      return;
+    }
+
+    // Hash và cập nhật mật khẩu mới
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await pool.execute("UPDATE users SET password = ?, otp = NULL, otp_expiry = NULL WHERE email = ?", [hashedPassword, email]);
+    await pool.execute(
+      "UPDATE users SET password = ?, otp = NULL, otp_expiry = NULL WHERE email = ?",
+      [hashedPassword, email]
+    );
 
     res.status(200).json({ message: "Mật khẩu đã được thay đổi thành công!" });
   } catch (error) {
