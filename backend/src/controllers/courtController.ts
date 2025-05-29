@@ -149,30 +149,12 @@ export const createBooking = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    // Kiểm tra khung giờ đã được đặt chưa
-    const [existingBookings] = await pool.execute(
-      "SELECT * FROM Bookings WHERE field_id = ? AND ((start_time <= ? AND end_time > ?) OR (start_time < ? AND end_time >= ?)) AND status != 'cancelled'",
-      [field_id, start_time, start_time, end_time, end_time]
-    );
-
-    if (Array.isArray(existingBookings) && existingBookings.length > 0) {
-      res.status(400).json({ error: "Khung giờ này đã được đặt." });
-      return;
-    }
-
     // Tạo booking
     const [bookingResult] = await pool.execute(
       "INSERT INTO Bookings (user_id, field_id, start_time, end_time, total_cost, booking_code, payment_method, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       [user_id, field_id, start_time, end_time, total_cost, booking_code, payment_method, 'confirmed']
     );
     const bookingId = (bookingResult as any).insertId;
-
-    // Tạo payment
-    // const [paymentResult] = await pool.execute(
-    //   "INSERT INTO Payments (booking_id, amount, payment_method, status) VALUES (?, ?, ?, 'completed')",
-    //   [bookingId, total_cost, payment_method]
-    // );
-
     // Thêm dịch vụ nếu có
     if (services && services.length > 0) {
       for (const service of services) {
