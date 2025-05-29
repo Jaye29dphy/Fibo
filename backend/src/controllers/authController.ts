@@ -273,7 +273,6 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
     const token = authHeader.split(' ')[1];
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET || 'secret');
 
-    // Lấy thông tin user
     const [users]: any = await pool.execute(
       'SELECT user_id, full_name, email, phone, role, status, created_at, avatar FROM users WHERE user_id = ?',
       [decoded.id]
@@ -286,7 +285,7 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
 
     let user = users[0];
 
-    // Nếu là owner, lấy thêm thông tin từ bảng owners
+    // Nếu là owner, lấy thêm business info
     if (user.role === 'owner') {
       const [owners]: any = await pool.execute(
         'SELECT owner_id, business_name, address FROM owners WHERE user_id = ?',
@@ -303,7 +302,7 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
       }
     }
 
-    // 🔹 Lấy IP nội bộ
+    // ✅ Lấy IP cục bộ
     const localIP =
       Object.values(os.networkInterfaces())
         .flat()
@@ -319,32 +318,30 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
 
     const avatarBasePath = process.env.AVATAR_IMAGE_PATH || 'F:\\img\\avatar';
 
-    // 🔍 Avatar
+    // ✅ Xử lý ảnh avatar có ?t=timestamp để tránh cache
+    const timestamp = Date.now();
+
     if (user.avatar) {
       const avatarFilePath = path.join(avatarBasePath, user.avatar);
 
       try {
-        const exists = fs.existsSync(avatarFilePath);
-        console.log("👉 Avatar file path:", avatarFilePath);
-        console.log("🔍 File exists:", exists);
-
-        if (exists) {
-          user.avatar = `http://${localIP}:5000/avatars/${user.avatar}`;
+        if (fs.existsSync(avatarFilePath)) {
+          user.avatar = `http://${localIP}:5000/avatars/${user.avatar}?t=${timestamp}`;
         } else {
-          console.warn(`❗ Avatar file not found: ${avatarFilePath}`);
-          user.avatar = `http://${localIP}:5000/avatars/default-avatar.jpg?t=${Date.now()}`;
+          console.warn(`❗ Avatar not found: ${avatarFilePath}`);
+          user.avatar = `http://${localIP}:5000/avatars/default-avatar.jpg?t=${timestamp}`;
         }
       } catch (err) {
-        console.error('Lỗi kiểm tra file avatar:', err);
-        user.avatar = `http://${localIP}:5000/avatars/default-avatar.jpg?t=${Date.now()}`;
+        console.error("Lỗi kiểm tra file avatar:", err);
+        user.avatar = `http://${localIP}:5000/avatars/default-avatar.jpg?t=${timestamp}`;
       }
     } else {
-      user.avatar = `http://${localIP}:5000/avatars/default-avatar.jpg?t=${Date.now()}`;
+      user.avatar = `http://${localIP}:5000/avatars/default-avatar.jpg?t=${timestamp}`;
     }
 
     res.json(user);
   } catch (error) {
-    console.error('JWT Error:', error);
+    console.error("JWT Error:", error);
     res.status(500).json({ error: 'Invalid token' });
   }
 };
