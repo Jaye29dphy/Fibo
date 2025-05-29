@@ -286,7 +286,7 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
 
     let user = users[0];
 
-    // Nếu là owner => lấy thêm thông tin từ bảng owners
+    // Nếu là owner, lấy thêm thông tin từ bảng owners
     if (user.role === 'owner') {
       const [owners]: any = await pool.execute(
         'SELECT owner_id, business_name, address FROM owners WHERE user_id = ?',
@@ -303,40 +303,43 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
       }
     }
 
-    // 🔹 Lấy IP cục bộ để hiển thị ảnh chính xác
+    // 🔹 Lấy IP nội bộ
     const localIP =
-  Object.values(os.networkInterfaces())
-    .flat()
-    .find((iface) => {
-      const netIface = iface as any;
-      return (
-        netIface &&
-        netIface.family === 'IPv4' &&
-        !netIface.internal &&
-        netIface.address?.startsWith('192.168.')
-      );
-    })?.address || 'localhost';
+      Object.values(os.networkInterfaces())
+        .flat()
+        .find((iface) => {
+          const netIface = iface as any;
+          return (
+            netIface &&
+            netIface.family === 'IPv4' &&
+            !netIface.internal &&
+            netIface.address?.startsWith('192.168.')
+          );
+        })?.address || 'localhost';
 
-
-    // 🔹 Dùng biến môi trường AVATAR_IMAGE_PATH
     const avatarBasePath = process.env.AVATAR_IMAGE_PATH || 'F:\\img\\avatar';
 
-    // 🔹 Xử lý đường dẫn ảnh
+    // 🔍 Avatar
     if (user.avatar) {
       const avatarFilePath = path.join(avatarBasePath, user.avatar);
+
       try {
-        if (fs.existsSync(avatarFilePath)) {
+        const exists = fs.existsSync(avatarFilePath);
+        console.log("👉 Avatar file path:", avatarFilePath);
+        console.log("🔍 File exists:", exists);
+
+        if (exists) {
           user.avatar = `http://${localIP}:5000/avatars/${user.avatar}`;
         } else {
           console.warn(`❗ Avatar file not found: ${avatarFilePath}`);
-          user.avatar = `http://${localIP}:5000/avatars/default-avatar.jpg`;
+          user.avatar = `http://${localIP}:5000/avatars/default-avatar.jpg?t=${Date.now()}`;
         }
       } catch (err) {
         console.error('Lỗi kiểm tra file avatar:', err);
-        user.avatar = `http://${localIP}:5000/avatars/default-avatar.jpg`;
+        user.avatar = `http://${localIP}:5000/avatars/default-avatar.jpg?t=${Date.now()}`;
       }
     } else {
-      user.avatar = `http://${localIP}:5000/avatars/default-avatar.jpg`;
+      user.avatar = `http://${localIP}:5000/avatars/default-avatar.jpg?t=${Date.now()}`;
     }
 
     res.json(user);

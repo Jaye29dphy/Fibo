@@ -27,7 +27,7 @@ export const fetchAPI = async (
     const data = await response.json();
 
     if (!response.ok) {
-      // ✅ Ưu tiên lấy message nếu có
+  
       throw new Error(data.message || data.error || "Lỗi khi gọi API");
     }
 
