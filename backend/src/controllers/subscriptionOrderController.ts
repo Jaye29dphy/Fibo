@@ -46,7 +46,7 @@ export class SubscriptionOrderController {
       }
 
       const planDetails = planRows[0];
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+      const expiresAt = new Date(Date.now() + 60 * 1000);
 
       const [result]: any = await connection.query(
         `INSERT INTO subscriptionpendingorders 
@@ -111,10 +111,18 @@ static async updateSubscriptionOrderStatus(req: Request, res: Response): Promise
   let connection;
   try {
     const { order_id } = req.params;
-    const { status = 'paid' } = req.body;
+    const { new_status } = req.body; // Changed from 'status' and removed default 'paid'
+
+    // Validate new_status
+    if (!new_status || !['paid', 'expired', 'cancelled'].includes(new_status)) {
+      res.status(400).json({ error: "Trạng thái mới không hợp lệ hoặc bị thiếu. Phải là 'paid', 'expired', hoặc 'cancelled'." });
+      return;
+    }
 
     connection = await pool.getConnection();
-    await connection.beginTransaction(); // ⚠️ thêm transaction
+    await connection.beginTransaction();
+
+    console.log(`🔄 Cập nhật trạng thái đơn hàng: ID ${order_id}, Trạng thái mới: ${new_status}`);
 
     const [orderRows]: any = await connection.query(
       "SELECT * FROM subscriptionpendingorders WHERE order_id = ?",
@@ -122,43 +130,46 @@ static async updateSubscriptionOrderStatus(req: Request, res: Response): Promise
     );
 
     if (orderRows.length === 0) {
+      await connection.rollback();
       res.status(404).json({ error: "Không tìm thấy đơn hàng." });
       return;
-    }    const order = orderRows[0];
-    const userId = order.user_id;
+    }
 
-    // 👉 Đầu tiên cập nhật trạng thái đơn
+    const order = orderRows[0];
+
+    // Prevent updating to 'paid' if already 'expired'
+    if (order.status === 'expired' && new_status === 'paid') {
+        await connection.rollback();
+        res.status(400).json({ error: `Đơn hàng ID ${order_id} đã hết hạn, không thể cập nhật thành 'paid'.` });
+        return;
+    }
+    
+    if (order.status === 'paid' && new_status !== 'paid') {
+        console.warn(`Đơn hàng ID ${order_id} đã được thanh toán, đang được cập nhật thành '${new_status}'.`);
+    }
+
     await connection.query(
-      `UPDATE subscriptionpendingorders SET status = ?, updated_at = NOW() WHERE order_id = ?`,
-      [status, order_id]
+      "UPDATE subscriptionpendingorders SET status = ?, updated_at = NOW() WHERE order_id = ?",
+      [new_status, order_id]
     );
 
-    // Chỉ xử lý gói đăng ký khi trạng thái là 'paid'
-    if (status === 'paid') {
-      // 👉 gọi xử lý gói đăng ký
-      await SubscriptionOrderController.activateOrUpdateOwnerSubscription(connection, userId, order.order_id);
-    } else if (status === 'cancelled' || status === 'expired') {
-      // Tìm và vô hiệu hóa subscription liên quan nếu có
-      const [ownerRows]: any = await connection.query(
-        "SELECT owner_id FROM owners WHERE user_id = ?", 
-        [userId]
-      );
-      
-      if (ownerRows.length > 0) {
-        const ownerId = ownerRows[0].owner_id;
-        await connection.query(
-          "UPDATE owner_subscriptions SET status = ?, updated_at = NOW() WHERE source_pending_order_id = ? AND owner_id = ?",
-          [status, order_id, ownerId]
-        );
+    if (new_status === 'paid') {
+      if (!order.user_id) {
+        await connection.rollback();
+        console.error(`Lỗi: user_id không tồn tại cho order_id ${order_id} khi cố gắng kích hoạt gói.`);
+        res.status(500).json({ error: "Lỗi server: Thiếu thông tin người dùng để kích hoạt gói." });
+        return;
       }
+      await SubscriptionOrderController.activateOrUpdateOwnerSubscription(connection, order.user_id, parseInt(order_id, 10));
     }
 
     await connection.commit();
-    res.status(200).json({ message: "Cập nhật trạng thái đơn hàng và đăng ký thành công." });
+    res.status(200).json({ message: `Cập nhật trạng thái đơn hàng ID ${order_id} thành ${new_status} thành công.` });
+
   } catch (error) {
     if (connection) await connection.rollback();
-    console.error("❌ Lỗi khi cập nhật trạng thái:", error);
-    res.status(500).json({ error: "Lỗi server khi cập nhật trạng thái đơn hàng." });
+    console.error("❌ Lỗi khi cập nhật trạng thái đơn hàng:", error);
+    res.status(500).json({ error: "Lỗi server khi cập nhật trạng thái." });
   } finally {
     if (connection) connection.release();
   }
@@ -239,12 +250,12 @@ static async activateOrUpdateOwnerSubscription(connection: any, userId: number, 
 
       // 1. Lấy thông tin đơn hàng để xác định order_id
       const [orderRows]: any = await connection.query(
-        "SELECT order_id, user_id FROM subscriptionpendingorders WHERE subscription_code = ? AND status = 'pending'",
+        "SELECT order_id, user_id FROM subscriptionpendingorders WHERE subscription_code = ? AND (status = 'pending' OR status = 'expired')",
         [subscription_code]
       );
 
       if (orderRows.length === 0) {
-        res.status(404).json({ error: "Pending order not found or not in deletable state." });
+        res.status(404).json({ error: "Order not found or not in a cancellable state (must be pending or expired)." });
         return;
       }
 
@@ -270,14 +281,13 @@ static async activateOrUpdateOwnerSubscription(connection: any, userId: number, 
 
       // 4. Thay vì xóa đơn hàng pending, cập nhật trạng thái thành cancelled
       const [result]: any = await connection.query(
-        "UPDATE subscriptionpendingorders SET status = 'cancelled', updated_at = NOW() WHERE subscription_code = ? AND status = 'pending'",
+        "UPDATE subscriptionpendingorders SET status = 'cancelled', updated_at = NOW() WHERE subscription_code = ? AND (status = 'pending' OR status = 'expired')",
         [subscription_code]
       );      await connection.commit();
       res.status(200).json({ message: "Pending subscription order cancelled successfully." });
     } catch (error) {
-      if (connection) await connection.rollback();
-      console.error("Error in deleteSubscriptionPendingOrder:", error);
-      res.status(500).json({ error: "Internal Server Error." });
+      console.error("❌ Lỗi khi hủy đơn hàng đăng ký tạm thời:", error);
+      res.status(500).json({ error: "Lỗi server khi hủy đơn hàng." });
     } finally {
       if (connection) connection.release();
     }

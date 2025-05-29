@@ -19,7 +19,9 @@ import {
   createSubscriptionPendingOrder,
   updateSubscriptionOrderStatus,
   deleteSubscriptionPendingOrder,
+  fetchAPI,
 } from "@/constants/apiService";
+import { API_ENDPOINTS } from "@/constants/apiConfig";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AntDesign } from "@expo/vector-icons";
 
@@ -27,8 +29,11 @@ const SubscriptionPayment = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const [countdown, setCountdown] = useState(300); // 5 phút
+  const fetchOrderPromiseRef = useRef<Promise<number | null> | null>(null); // Store promise resolving to order_id or null
+ 
   const [isPaid, setIsPaid] = useState(false);
+  const [isExpired, setIsExpired] = useState(false);
+  const [countdown, setCountdown] = useState(60); // 1 minute countdown
   const [subscriptionPurchased, setSubscriptionPurchased] = useState(false);
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -40,35 +45,42 @@ const SubscriptionPayment = () => {
   // Correctly get and parse parameters
   const planId = getParam(params.planId);
   const planName = getParam(params.planName);
-  const planCode = getParam(params.planCode); // This should be "classic" or "pro"
+  const planCode = getParam(params.planCode); 
   const monthsParam = getParam(params.months);
   const priceParam = getParam(params.price) || "0";
   
   const months = parseInt(monthsParam, 10);
   const price = parseInt(priceParam, 10);
   const totalPrice = price * months;
-  const subscriptionCode = useMemo(() => `SUB${Date.now()}`, []);
+  const subscriptionCode = useMemo(() => `SUB${Date.now()}`, [planId, months, price]); // Regenerate if key params change
 
   // Thông tin ngân hàng và mã QR
   const bankId = "970436";  // Agribank
   const accountNo = "1031505171";
   const accountName = "LaanLee";
   const qrCodeUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact.png?amount=${totalPrice}&addInfo=${subscriptionCode}&accountName=${accountName}`;
-
+  
   useEffect(() => {
-    const fetchUserInfoAndCreateOrder = async () => {
+    // Reset states for a new payment session
+    setIsPaid(false);
+    setIsExpired(false);
+    setSubscriptionPurchased(false);
+    setLoading(false);
+    setCurrentOrderId(null);
+    setCountdown(60); // Reset countdown (e.g., 1 minute)
+
+    const fetchUserInfoAndCreateOrder = async (): Promise<number | null> => {
       try {
         const token = await AsyncStorage.getItem("token");
         if (token) {
-          const userInfo = await getUserInfo(); // Assuming getUserInfo fetches logged-in user's details
+          const userInfo = await getUserInfo();
           if (userInfo && userInfo.user_id) {
             setUserId(userInfo.user_id.toString());
-            // Create pending order
             const pendingOrderPayload = {
               user_id: userInfo.user_id,
               subscription_code: subscriptionCode,
-              plan: planCode, // 'classic' or 'pro'
-              plan_display_name: planName, // <<< ADDED: Pass planName as plan_display_name
+              plan: planCode, 
+              plan_display_name: planName, 
               months: months,
               total_cost: totalPrice,
               payment_method: 'banking'
@@ -78,7 +90,7 @@ const SubscriptionPayment = () => {
               pendingOrderPayload.user_id.toString(),
               pendingOrderPayload.subscription_code,
               pendingOrderPayload.plan,
-              pendingOrderPayload.plan_display_name, // <<< ADDED: Pass plan_display_name
+              pendingOrderPayload.plan_display_name, 
               pendingOrderPayload.months,
               pendingOrderPayload.total_cost,
               pendingOrderPayload.payment_method
@@ -86,55 +98,78 @@ const SubscriptionPayment = () => {
             console.log('Pending order created for subscription code:', subscriptionCode, 'Order ID:', createdOrder.order_id);
             if (createdOrder && createdOrder.order_id) {
               setCurrentOrderId(createdOrder.order_id); // Store the order_id
+              return createdOrder.order_id; // Return order_id
             } else {
               Alert.alert("Lỗi", "Không nhận được ID đơn hàng từ máy chủ.");
               router.back();
-              return; // Stop further execution if order_id is not received
+              return null; // Return null on failure
             }
           } else {
             Alert.alert("Lỗi", "Không thể lấy thông tin người dùng để tạo đơn hàng.");
             router.back();
+            return null; // Return null on failure
           }
         } else {
           Alert.alert("Lỗi", "Bạn chưa đăng nhập.");
           router.replace("/customer"); // Or your login screen
+          return null; // Return null on failure
         }
       } catch (error) {
         console.error("Error fetching user info or creating pending order:", error);
         Alert.alert("Lỗi", "Không thể khởi tạo đơn hàng. Vui lòng thử lại.");
         router.back();
+        return null; // Return null on failure
       }
     };
 
-    fetchUserInfoAndCreateOrder();
+    fetchOrderPromiseRef.current = fetchUserInfoAndCreateOrder();
 
     // Bắt đầu đếm ngược
+    if (timerRef.current) clearInterval(timerRef.current); // Clear existing timer
     timerRef.current = setInterval(() => {
       setCountdown(t => {
         if (t <= 1) {
           clearInterval(timerRef.current!);
-          onExpire();
+          onExpire(); 
           return 0;
         }
         return t - 1;
       });
     }, 1000);
+
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, []);
+  }, [planId, planName, planCode, monthsParam, priceParam, subscriptionCode]); // Added subscriptionCode and other relevant params
 
   const notify = (msg: string) => {
     if (Platform.OS === "android") ToastAndroid.show(msg, ToastAndroid.SHORT);
     else Alert.alert("Thông báo", msg);
   };
-
   const onExpire = async () => {
     if (subscriptionPurchased) return;
     
-    if (!currentOrderId) {
-      console.warn("onExpire: currentOrderId is null, cannot update status to expired.");
-      // Optionally, still show the alert to the user
+    setIsExpired(true);
+    let orderIdToUpdate: number | null = null;
+
+    if (fetchOrderPromiseRef.current) {
+      try {
+        console.log("onExpire: Awaiting fetchOrderPromiseRef.current");
+        orderIdToUpdate = await fetchOrderPromiseRef.current;
+        console.log("onExpire: fetchOrderPromiseRef.current resolved with:", orderIdToUpdate);
+      } catch (e) {
+        console.error("onExpire: Error awaiting fetchOrderPromiseRef.current:", e);
+      }
+    }
+
+    // If orderIdToUpdate is still null, try getting it from state as a fallback,
+    // though ideally, the promise should provide it.
+    if (!orderIdToUpdate) {
+        orderIdToUpdate = currentOrderId; 
+    }
+    
+    if (!orderIdToUpdate) {
+      console.warn("onExpire: orderIdToUpdate is null after awaiting promise and checking state. Cannot update status to expired.");
       Alert.alert(
         "Hết thời gian thanh toán", 
         "Phiên thanh toán đã hết hạn. Bạn có muốn tạo phiên thanh toán mới không?",
@@ -162,15 +197,32 @@ const SubscriptionPayment = () => {
         ]
       );
       return;
-    }
-
-    try {
-      // Update order status to 'expired' using order_id
-      await updateSubscriptionOrderStatus(currentOrderId.toString(), 'expired');
-      console.log('Subscription order expired:', currentOrderId);
+    }    try {
+      console.log('Attempting to update order status to expired for order ID:', orderIdToUpdate);
+      // Update order status to 'expired' using order_id with correct parameter name
+      const response = await fetchAPI(`${API_ENDPOINTS.UPDATE_SUBSCRIPTION_ORDER_STATUS}/${orderIdToUpdate}`, "POST", { new_status: 'expired' });
+      console.log('Subscription order expired:', orderIdToUpdate, 'Response:', response);
+      
+      // Đảm bảo trạng thái đã được cập nhật thành công
+      if (!response || response.error) {
+        console.error("Failed to update order status to expired:", response?.error || "No response");
+        // Thử lại một lần nữa nếu có lỗi
+        try {
+          const retryResponse = await fetchAPI(`${API_ENDPOINTS.UPDATE_SUBSCRIPTION_ORDER_STATUS}/${orderIdToUpdate}`, "POST", { new_status: 'expired' });
+          console.log('Second attempt to expire subscription succeeded:', retryResponse);
+        } catch (retryErr) {
+          console.error("Second attempt to update order status failed:", retryErr);
+        }
+      }
     } catch (error) {
       console.error("Error updating order status to expired:", error);
-      // Continue with user notification even if API call fails
+      // Thử lại một lần nữa ngay cả khi lần đầu thất bại
+      try {
+        const retryResponse = await fetchAPI(`${API_ENDPOINTS.UPDATE_SUBSCRIPTION_ORDER_STATUS}/${orderIdToUpdate}`, "POST", { new_status: 'expired' });
+        console.log('Second attempt to expire subscription succeeded after error:', retryResponse);
+      } catch (retryErr) {
+        console.error("Second attempt to update order status failed after error:", retryErr);
+      }
     }
 
     Alert.alert(
@@ -199,10 +251,16 @@ const SubscriptionPayment = () => {
         }
       ]
     );
-  };
-
-  const handleMarkAsPaid = async () => {
-  if (isPaid || loading) return;
+  };  const handleMarkAsPaid = async () => {
+  // Check if payment is already made, loading, or expired
+  if (isPaid || loading || isExpired) {
+    if (isExpired && Platform.OS === "android") {
+      ToastAndroid.show("Đơn hàng đã hết hạn, không thể thanh toán", ToastAndroid.SHORT);
+    } else if (isExpired) {
+      console.log("Đơn hàng đã hết hạn, không thể thanh toán");
+    }
+    return;
+  }
 
   if (!currentOrderId) {
     if (Platform.OS === "android") {
@@ -224,11 +282,10 @@ const SubscriptionPayment = () => {
       } else {
         console.log(`Gói không hợp lệ: ${planCode}`);
       }
+      setLoading(false);
       return;
-    }
-
-    // Gọi API cập nhật trạng thái đơn hàng
-    const response = await updateSubscriptionOrderStatus(currentOrderId.toString(), 'paid');
+    }    // Gọi API cập nhật trạng thái đơn hàng
+    const response = await fetchAPI(`${API_ENDPOINTS.UPDATE_SUBSCRIPTION_ORDER_STATUS}/${currentOrderId}`, "POST", { new_status: 'paid' });
     console.log("[handleMarkAsPaid] API response:", response);
 
     setSubscriptionPurchased(true);
@@ -339,31 +396,29 @@ const SubscriptionPayment = () => {
           <Text style={styles.instructionText}>3. Xác nhận thanh toán số tiền {formatPrice(totalPrice)}</Text>
           <Text style={styles.instructionText}>4. Chọn "Xác nhận đã thanh toán" bên dưới</Text>
           <Text style={styles.instructionText}>5. Hoặc chọn "Hủy thanh toán" nếu bạn không muốn tiếp tục.</Text>
-        </View>
-
-        <TouchableOpacity 
+        </View>        <TouchableOpacity 
           onPress={handleMarkAsPaid} 
           style={[
             styles.payButton,
-            (isPaid || loading) && styles.disabledButton // Disable if already paid or loading
+            (isPaid || loading || isExpired) && styles.disabledButton // Disable if already paid, loading, or expired
           ]}
-          disabled={isPaid || loading} // Disable if already paid or loading
+          disabled={isPaid || loading || isExpired} // Disable if already paid, loading, or expired
         >
           {loading && !isPaid ? (
             <ActivityIndicator color="#fff" size="small" />
+          ) : isExpired ? (
+            <Text style={styles.payButtonText}>Hết thời gian thanh toán</Text>
           ) : (
             <Text style={styles.payButtonText}>Xác nhận đã thanh toán</Text>
           )}
-        </TouchableOpacity>
-
-        {!isPaid && (
+        </TouchableOpacity>{!isPaid && (
           <TouchableOpacity 
             onPress={handleCancelPayment} 
             style={[
               styles.cancelButton,
-              loading && styles.disabledButton
+              loading && styles.disabledButton // Chỉ vô hiệu hóa khi loading, không vô hiệu hóa khi isExpired
             ]}
-            disabled={loading}
+            disabled={loading} // Chỉ vô hiệu hóa khi loading, KHÔNG vô hiệu hóa khi isExpired
           >
             {loading ? (
               <ActivityIndicator color="#dc3545" size="small" />

@@ -1,4 +1,4 @@
-export const API_URL = "http://192.168.1.3:5000";
+export const API_URL = "http://192.168.1.113:5000";
 
 
 export const GITHUB_REPO = "https://api.github.com/repos/Jaye29dphy/Fibo";
