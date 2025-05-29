@@ -171,9 +171,19 @@ const SubscriptionsScreen = () => {
     return new Date(dateString).toLocaleDateString("vi-VN");
   };
 
-  const formatPrice = (price: number) => {
-    return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".") + " VND";
-  };
+  const formatPrice = (price: number | string | null | undefined) => {
+  const num = typeof price === "string" ? parseFloat(price) : price;
+
+  if (typeof num !== 'number' || isNaN(num)) return "--";
+
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(num);
+};
+
+
 
   const calculateRemainingDays = (endDateString: string | null) => {
     if (!endDateString) return 0;
@@ -434,7 +444,7 @@ const SubscriptionsScreen = () => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.replace("/owner/profile")}>
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Quản lý gói đăng ký</Text>
