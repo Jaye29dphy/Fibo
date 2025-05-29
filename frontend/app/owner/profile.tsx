@@ -67,6 +67,24 @@ export default function ProfileScreen() {
   const [tempAvatar, setTempAvatar] = useState<string | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(true);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+
+  const isValidEmail = (email: string) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  if (!emailRegex.test(email)) return false;
+
+  const allowedDomain = "gmail.com";
+  const domain = email.split("@")[1]?.toLowerCase();
+  if (domain !== allowedDomain) return false;
+
+  return true;
+};
+
+  const isValidPhone = (phone: string) => {
+    const phoneRegex = /^0\d{9}$/;
+    return phoneRegex.test(phone);
+  };
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -499,23 +517,25 @@ export default function ProfileScreen() {
 
             <Text style={styles.modalLabel}>Email:</Text>
             <TextInput
-              style={styles.input}
-              value={editedUser?.email}
-              onChangeText={(text) =>
-                setEditedUser((prev) =>
-                  prev ? { ...prev, email: text } : null
-                )
-              }
-            />            <Text style={styles.modalLabel}>Số điện thoại:</Text>
+                          style={styles.input}
+                          value={editedUser?.email}
+                          onChangeText={(text) => {
+                            setEmailError(isValidEmail(text) ? null : "Email không hợp lệ");
+                            setEditedUser((prev) => (prev ? { ...prev, email: text } : null));
+                          }}
+                        />
+                        {emailError && <Text style={{ color: "red", marginBottom: 8 }}>{emailError}</Text>}          
+            <Text style={styles.modalLabel}>Số điện thoại:</Text>
             <TextInput
-              style={styles.input}
-              value={editedUser?.phone}
-              onChangeText={(text) =>
-                setEditedUser((prev) =>
-                  prev ? { ...prev, phone: text } : null
-                )
-              }
-            />
+                          style={styles.input}
+                          keyboardType="phone-pad"
+                          value={editedUser?.phone}
+                          onChangeText={(text) => {
+                            setPhoneError(isValidPhone(text) ? null : "Số điện thoại không hợp lệ");
+                            setEditedUser((prev) => (prev ? { ...prev, phone: text } : null));
+                          }}
+                        />
+                        {phoneError && <Text style={{ color: "red", marginBottom: 8 }}>{phoneError}</Text>}
 
             <Text style={styles.modalLabel}>Tên doanh nghiệp:</Text>
             <TextInput
@@ -542,8 +562,9 @@ export default function ProfileScreen() {
             />
 
             <TouchableOpacity
-              style={[styles.saveButton, { alignSelf: "center" }]}
+              style={[styles.saveButton, { alignSelf: "center", opacity: emailError || phoneError ? 0.5 : 1 }]}
               onPress={handleEditUser}
+              disabled={!!emailError || !!phoneError}
             >
               <Text style={styles.saveButtonText}>Lưu</Text>
             </TouchableOpacity>

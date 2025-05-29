@@ -57,7 +57,6 @@ export default function ProfileScreen() {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
   if (!emailRegex.test(email)) return false;
 
-  // Bắt buộc phải là @gmail.com
   const allowedDomain = "gmail.com";
   const domain = email.split("@")[1]?.toLowerCase();
   if (domain !== allowedDomain) return false;
