@@ -219,11 +219,7 @@ export default function ProfileScreen() {
   };
 
   const handleBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.push("/owner/dashboard"); // fallback nếu người dùng đi thẳng vào
-    }
+      router.replace("/owner/dashboard"); 
   };
 
   const handleEditUser = async () => {
