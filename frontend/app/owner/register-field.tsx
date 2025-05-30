@@ -361,40 +361,40 @@ export default function RegisterField() {
               </TouchableOpacity>
 
 
-             <FlatList
-  data={fieldData.images}
-  horizontal
-  keyExtractor={(item, index) => {
-    const key = typeof item === 'string' ? `image-${index}-${item}` : `image-${index}`;
-    console.log('[FlatList] keyExtractor:', key, '| item:', item);
-    return key;
-  }}
-  renderItem={({ item, index }) => {
-    console.log('[FlatList] renderItem:', { index, item, type: typeof item });
+              <FlatList
+                data={fieldData.images}
+                horizontal
+                keyExtractor={(item, index) => {
+                  const key = typeof item === 'string' ? `image-${index}-${item}` : `image-${index}`;
+                  console.log('[FlatList] keyExtractor:', key, '| item:', item);
+                  return key;
+                }}
+                renderItem={({ item, index }) => {
+                  console.log('[FlatList] renderItem:', { index, item, type: typeof item });
 
-    if (typeof item !== 'string') {
-      console.warn('[FlatList] Skipped item at index', index, 'because it is not a string:', item);
-      return null;
-    }
+                  if (typeof item !== 'string') {
+                    console.warn('[FlatList] Skipped item at index', index, 'because it is not a string:', item);
+                    return null;
+                  }
 
-    console.log(">>> fieldData", JSON.stringify(fieldData, null, 2));
+                  console.log(">>> fieldData", JSON.stringify(fieldData, null, 2));
 
 
-    return (
-      <View style={styles.imageContainer}>
-        <Image source={{ uri: item }} style={styles.image} />
-        <TouchableOpacity
-          style={styles.removeButton}
-          onPress={() => removeImage(index)}
-        >
-          <Text style={styles.removeButtonText}>×</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }}
-  showsHorizontalScrollIndicator={false}
-  style={styles.imageList}
-/>
+                  return (
+                    <View style={styles.imageContainer}>
+                      <Image source={{ uri: item }} style={styles.image} />
+                      <TouchableOpacity
+                        style={styles.removeButton}
+                        onPress={() => removeImage(index)}
+                      >
+                        <Text style={styles.removeButtonText}>×</Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                }}
+                showsHorizontalScrollIndicator={false}
+                style={styles.imageList}
+              />
 
 
 
@@ -440,7 +440,7 @@ export default function RegisterField() {
             <Text style={styles.modalText}>
               {modalMessage ? modalMessage.toString() : ''}
             </Text>
-            {modalMessage === 'Bạn chưa đăng ký gói dịch vụ nào.' && (
+            {modalMessage?.includes('chưa đăng ký gói') && (
               <TouchableOpacity
                 style={styles.upgradeButton}
                 onPress={() => {
@@ -451,6 +451,7 @@ export default function RegisterField() {
                 <Text style={styles.modalButtonText}>Nâng cấp gói</Text>
               </TouchableOpacity>
             )}
+
           </View>
         </View>
       </Modal>

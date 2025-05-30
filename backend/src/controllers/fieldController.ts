@@ -156,6 +156,9 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
     const [ownerCheck] = await pool.execute('SELECT owner_id FROM fibo.owners WHERE user_id = ?', [userId]);
     let ownerId: number;
 
+
+
+
     if (!Array.isArray(ownerCheck) || ownerCheck.length === 0) {
       console.log('User is not an owner, creating owner record');
 
@@ -167,6 +170,33 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
       // Cast the result to access owner_id property
       ownerId = (ownerCheck[0] as any).owner_id;
       console.log('Found existing owner with ID:', ownerId);
+          // Kiểm tra xem owner đã đăng ký gói chưa và số sân có vượt giới hạn không
+const [subscriptionRows]: any[] = await pool.execute(`
+  SELECT p.max_fields, COUNT(f.field_id) AS current_fields
+  FROM fibo.owners o
+  JOIN fibo.owner_subscriptions s ON o.owner_id = s.owner_id
+  JOIN fibo.subscription_plans p ON s.plan_id = p.plan_id
+  LEFT JOIN fibo.fields f ON f.owner_id = o.owner_id
+  WHERE o.owner_id = ?
+    AND s.status = 'active'
+    AND (s.end_date IS NULL OR s.end_date >= CURRENT_DATE())
+  GROUP BY p.max_fields
+`, [ownerId]);
+
+if (subscriptionRows.length === 0) {
+  res.status(403).json({ message: 'Bạn chưa đăng ký gói dịch vụ nào hoặc gói đã hết hạn.' });
+  return;
+}
+
+const maxFields = subscriptionRows[0].max_fields;
+const currentFieldCount = subscriptionRows[0].current_fields;
+
+if (currentFieldCount >= maxFields) {
+  res.status(403).json({
+    message: `Bạn đã sử dụng hết ${maxFields} sân theo gói đăng ký hiện tại. Vui lòng nâng cấp gói để đăng thêm sân.`
+  });
+  return;
+}
     }
 
     // Lưu dữ liệu sân vào bảng fields
