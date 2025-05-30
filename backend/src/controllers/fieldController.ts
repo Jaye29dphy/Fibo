@@ -1582,3 +1582,135 @@ export const deleteFieldTimeSlot = async (req: Request, res: Response): Promise<
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
+// Function to get bookings for owner's fields
+export const getOwnerBookings = async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log('=== GET OWNER BOOKINGS API CALLED ===');
+    console.log('Request headers:', req.headers);
+
+    const userId = getUserIdFromToken(req);
+    console.log('User ID from token:', userId);
+
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized: Invalid token' });
+      return;
+    }
+
+    // Lấy tất cả các đặt sân cho các sân thuộc về owner
+    // Query sử dụng JOIN trực tiếp từ user_id sang owner và từ owner sang fields
+    const query = `
+      SELECT 
+        b.booking_id, 
+        b.booking_code, 
+        b.start_time, 
+        b.end_time, 
+        b.status,
+        b.field_id,
+        f.name as field_name,
+        b.user_id,
+        u.full_name as customer_name,
+        b.total_cost,
+        b.payment_method,
+        DATE(b.start_time) as booking_date,
+        CONCAT(f.sport_type, ' - ', f.location) as field_description
+      FROM 
+        fibo.bookings b
+      JOIN 
+        fibo.fields f ON b.field_id = f.field_id
+      LEFT JOIN 
+        fibo.users u ON b.user_id = u.user_id
+      WHERE 
+        f.owner_id IN (SELECT owner_id FROM fibo.owners WHERE user_id = ?)
+      ORDER BY 
+        b.start_time DESC
+    `;
+
+    const [bookings] = await pool.execute(query, [userId]);
+    console.log(`Found ${(bookings as any[]).length} bookings for owner with user ID ${userId}`);
+
+    // Nếu không có đặt sân, trả về mảng rỗng thay vì null
+    if (!Array.isArray(bookings) || (bookings as any[]).length === 0) {
+      console.log('No bookings found for this owner');
+      res.status(200).json([]);
+      return;
+    }
+
+    res.status(200).json(bookings);
+  } catch (error) {
+    console.error('Error fetching owner bookings:', error);
+    res.status(500).json({ message: 'Error fetching bookings data' });
+  }
+};
+
+// Function to update booking status
+export const updateBookingStatus = async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log('=== UPDATE BOOKING STATUS API CALLED ===');
+    console.log('Request params:', req.params);
+    console.log('Request body:', req.body);
+
+    const { booking_code } = req.params;
+    const { status } = req.body;
+    const userId = getUserIdFromToken(req);
+
+    console.log(`Booking code: ${booking_code}, Status: ${status}, User ID: ${userId}`);
+
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized: Invalid token' });
+      return;
+    }
+
+    if (!booking_code) {
+      res.status(400).json({ message: 'Missing booking_code parameter' });
+      return;
+    }
+
+    // Kiểm tra xem trạng thái có hợp lệ không
+    const validStatuses = ['pending', 'confirmed', 'completed', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      res.status(400).json({ message: 'Invalid status value' });
+      return;
+    }
+
+    // Kiểm tra xem booking có thuộc về sân của owner này không
+    // Query trực tiếp từ owners để tránh vấn đề với join
+    const checkOwnershipQuery = `
+      SELECT 
+        b.booking_id
+      FROM 
+        fibo.bookings b
+      JOIN 
+        fibo.fields f ON b.field_id = f.field_id
+      WHERE 
+        b.booking_code = ?
+        AND f.owner_id IN (SELECT owner_id FROM fibo.owners WHERE user_id = ?)
+    `;
+    const [ownershipResult] = await pool.execute(checkOwnershipQuery, [booking_code, userId]);
+
+    if ((ownershipResult as any[]).length === 0) {
+      res.status(403).json({ message: 'You do not have permission to update this booking' });
+      return;
+    }
+
+    // Cập nhật trạng thái booking
+    const updateQuery = `
+      UPDATE fibo.bookings
+      SET status = ?
+      WHERE booking_code = ?
+    `;
+    const [updateResult] = await pool.execute(updateQuery, [status, booking_code]);
+
+    // Kiểm tra xem có hàng nào được cập nhật không
+    if ((updateResult as any).affectedRows === 0) {
+      res.status(404).json({ message: 'Booking not found or already has this status' });
+      return;
+    }
+
+    console.log(`Successfully updated booking ${booking_code} to status ${status}`);
+    res.status(200).json({ message: 'Booking status updated successfully' });
+  } catch (error) {
+    console.error('Error updating booking status:', error);
+    res.status(500).json({ message: 'Failed to update booking status' });
+  }
+};

@@ -68,6 +68,8 @@ export const API_ENDPOINTS = {
   CREATE_SUBSCRIPTION_PENDING_ORDER: `${API_URL}/api/subscription-orders/pending`,
   DELETE_SUBSCRIPTION_PENDING_ORDER: `${API_URL}/api/subscription-orders/delete-pending`,
   GET_SUBSCRIPTION_ORDER_STATUS: `${API_URL}/api/subscription-orders/status`,
-  UPDATE_SUBSCRIPTION_ORDER_STATUS: `${API_URL}/api/subscription-orders/update-status`,
-  GET_ALL_SUBSCRIPTIONS: `${API_URL}/api/subscriptions/all`,
+  UPDATE_SUBSCRIPTION_ORDER_STATUS: `${API_URL}/api/subscription-orders/update-status`, GET_ALL_SUBSCRIPTIONS: `${API_URL}/api/subscriptions/all`,
+  // Owner bookings endpoints
+  GET_OWNER_FIELD_BOOKINGS: `${API_URL}/api/fields/owner/bookings`,
+  UPDATE_BOOKING_STATUS: `${API_URL}/api/fields/owner/bookings`,
 };

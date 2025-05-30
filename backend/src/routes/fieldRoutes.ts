@@ -18,7 +18,9 @@ import {
     updateFieldService,
     deleteFieldService,
     addFieldTimeSlot,
-    deleteFieldTimeSlot
+    deleteFieldTimeSlot,
+    getOwnerBookings,
+    updateBookingStatus
 } from '../controllers/fieldController';
 import { authenticate } from '../middleware/authMiddleware';
 import multer from 'multer';
@@ -32,11 +34,15 @@ const router = Router();
 // Route để lấy danh sách khung giờ
 router.get('/time-slots', getTimeSlots);
 
+// Owner booking routes - đặt trước để tránh conflict với /owner
+router.get('/owner/bookings', authenticate, getOwnerBookings);
+router.post('/owner/bookings/:booking_code/status', authenticate, updateBookingStatus);
+
+// Route để lấy danh sách sân của chủ sân (đặt sau owner/bookings)
+router.get('/owner', authenticate, getOwnerFields);
+
 // Route để đăng ký sân
 router.post('/register', upload.array('images'), registerField);
-
-// Route để lấy danh sách sân của chủ sân
-router.get('/owner', getOwnerFields);
 
 // Route để lấy tất cả các sân
 router.get('/all', getAllFields);

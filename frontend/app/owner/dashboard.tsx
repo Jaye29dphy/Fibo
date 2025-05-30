@@ -38,7 +38,7 @@ export default function OwnerDashboard() {
 
         <TouchableOpacity
           style={styles.actionButton}
-          onPress={() => router.push("/owner/manage-schedule")}
+          onPress={() => router.push("/owner/schedule1")}
         >
           <Ionicons name="calendar-outline" size={24} color="#000" />
           <Text style={styles.buttonText}>Quản lý lịch</Text>
