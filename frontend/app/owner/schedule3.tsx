@@ -219,13 +219,14 @@ export default function BookingDetail() {
               </Text>
             </View>
 
-            <View style={styles.infoRow}>
+            {/* <View style={styles.infoRow}>
               <MaterialIcons name="schedule" size={20} color="#3B82F6" />
               <Text style={styles.infoLabel}>Thời gian:</Text>
               <Text style={styles.infoValue}>
                 {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
               </Text>
-            </View>            <View style={styles.infoRow}>
+            </View>             */}
+            <View style={styles.infoRow}>
               <MaterialIcons name="monetization-on" size={20} color="#3B82F6" />
               <Text style={styles.infoLabel}>Tổng tiền:</Text>
               <Text style={styles.infoValue}>
