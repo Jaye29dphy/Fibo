@@ -21,13 +21,13 @@ export const uploadAvatar = async (req: Request, res: Response): Promise<void> =
     const mimeType = req.file.mimetype; // e.g., "image/png"
     const extension = mimeType.split("/")[1]; // e.g., "png"
     const avatarPath = `${userId}_avatar.${extension}`;
-    
+
     // Đường dẫn tới file tạm và file đích
     const avatarBasePath = process.env.AVATAR_IMAGE_PATH || "F:\\img\\avatar";
-const tempFilePath = path.join(avatarBasePath, req.file.filename);
-const targetFilePath = path.join(avatarBasePath, avatarPath);
+    const tempFilePath = path.join(avatarBasePath, req.file.filename);
+    const targetFilePath = path.join(avatarBasePath, avatarPath);
 
-    
+
     // Đổi tên file từ tên tạm thời sang tên chính thức
     try {
       // Nếu file đích đã tồn tại, xóa nó trước

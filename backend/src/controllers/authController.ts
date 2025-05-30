@@ -39,7 +39,7 @@ dotenv.config();
 
 //     // Lưu OTP mới vào cơ sở dữ liệu
 //     await pool.execute("UPDATE users SET otp = ?, otp_expiry = ? WHERE email = ?", [hashedOtp, expiresAt, email]);
-    
+
 //     // Gửi OTP mới cho người dùng qua email
 //     await sendEmail(email, `Mã OTP của bạn là ${otp}. Hết hạn sau 5 phút.`);
 
@@ -143,7 +143,7 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
     // Kiểm tra mật khẩu mới có trùng với mật khẩu cũ không
     const isSamePassword = await bcrypt.compare(newPassword, user.password);
     if (isSamePassword) {
-      res.status(400).json({ message: "Mật khẩu mới không được trùng với mật khẩu cũ!"});
+      res.status(400).json({ message: "Mật khẩu mới không được trùng với mật khẩu cũ!" });
       return;
     }
 
@@ -355,7 +355,7 @@ export const updateUser = async (req: Request, res: Response): Promise<void> => 
     }
 
     const token = authHeader.split(" ")[1];
-    const decoded: any = jwt.verify(token, process.env.JWT_SECRET || "secret");    const userId = parseInt(req.params.id);
+    const decoded: any = jwt.verify(token, process.env.JWT_SECRET || "secret"); const userId = parseInt(req.params.id);
     if (decoded.id !== userId) {
       res.status(403).json({ error: "Forbidden: Bạn không thể sửa người khác" });
       return;
@@ -371,13 +371,13 @@ export const updateUser = async (req: Request, res: Response): Promise<void> => 
       "UPDATE users SET full_name = ?, email = ?, phone = ? WHERE user_id = ?",
       [full_name, email, phone, userId]
     );
-      // Lấy thông tin role từ database vì có thể không được gửi từ frontend
+    // Lấy thông tin role từ database vì có thể không được gửi từ frontend
     const [userRole]: any = await pool.execute(
       "SELECT role FROM users WHERE user_id = ?",
       [userId]
     );
     const isOwner = Array.isArray(userRole) && userRole.length > 0 && userRole[0].role === 'owner';
-    
+
     // Nếu có thông tin doanh nghiệp và người dùng là owner, cập nhật thêm vào bảng owners
     if ((business_name || address) && isOwner) {
       // Kiểm tra xem đã có bản ghi trong bảng owners chưa
@@ -385,7 +385,7 @@ export const updateUser = async (req: Request, res: Response): Promise<void> => 
         "SELECT owner_id FROM owners WHERE user_id = ?",
         [userId]
       );
-      
+
       if (Array.isArray(owners) && owners.length > 0) {
         // Đã có bản ghi, cập nhật
         await pool.execute(
