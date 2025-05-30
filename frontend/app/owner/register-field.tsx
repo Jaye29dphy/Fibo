@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { LogBox } from 'react-native';
+LogBox.ignoreLogs(['Text strings must be rendered within a <Text> component']);
 import {
   View,
   Text,
@@ -359,24 +361,43 @@ export default function RegisterField() {
               </TouchableOpacity>
 
 
-              <FlatList
-                data={fieldData.images}
-                horizontal
-                renderItem={({ item, index }) => (
-                  <View style={styles.imageContainer}>
-                    <Image source={{ uri: item }} style={styles.image} />
-                    <TouchableOpacity
-                      style={styles.removeButton}
-                      onPress={() => removeImage(index)}
-                    >
-                      <Text style={styles.removeButtonText}>×</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-                keyExtractor={(item, index) => index.toString()}
-                style={styles.imageList}
-                showsHorizontalScrollIndicator={false}
-              />
+             <FlatList
+  data={fieldData.images}
+  horizontal
+  keyExtractor={(item, index) => {
+    const key = typeof item === 'string' ? `image-${index}-${item}` : `image-${index}`;
+    console.log('[FlatList] keyExtractor:', key, '| item:', item);
+    return key;
+  }}
+  renderItem={({ item, index }) => {
+    console.log('[FlatList] renderItem:', { index, item, type: typeof item });
+
+    if (typeof item !== 'string') {
+      console.warn('[FlatList] Skipped item at index', index, 'because it is not a string:', item);
+      return null;
+    }
+
+    console.log(">>> fieldData", JSON.stringify(fieldData, null, 2));
+
+
+    return (
+      <View style={styles.imageContainer}>
+        <Image source={{ uri: item }} style={styles.image} />
+        <TouchableOpacity
+          style={styles.removeButton}
+          onPress={() => removeImage(index)}
+        >
+          <Text style={styles.removeButtonText}>×</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }}
+  showsHorizontalScrollIndicator={false}
+  style={styles.imageList}
+/>
+
+
+
             </View>
           </View>
         </View>
@@ -409,18 +430,16 @@ export default function RegisterField() {
               modalSuccess ? styles.modalSuccess : styles.modalError,
             ]}
           >
-            {/* Nút ✕ để đóng modal */}
+
             <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setModalVisible(false)}
             >
               <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>
-
-            {/* Nội dung thông báo */}
-            <Text style={styles.modalText}>{modalMessage}</Text>
-
-            {/* Nút nâng cấp gói nếu là lỗi chưa đăng ký gói */}
+            <Text style={styles.modalText}>
+              {modalMessage ? modalMessage.toString() : ''}
+            </Text>
             {modalMessage === 'Bạn chưa đăng ký gói dịch vụ nào.' && (
               <TouchableOpacity
                 style={styles.upgradeButton}
