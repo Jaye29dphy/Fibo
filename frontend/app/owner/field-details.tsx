@@ -105,7 +105,7 @@ export default function UpdateFieldInfo() {
         <View style={styles.container}>
 
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()}>
+                <TouchableOpacity onPress={() => router.replace("/owner/dashboard")}>
                     <Ionicons name="arrow-back" size={24} color="#000" />
                 </TouchableOpacity>
                 <Text style={styles.title}>FIBO</Text>
@@ -156,7 +156,8 @@ export default function UpdateFieldInfo() {
                             pathname: "/owner/field-info",
                             params: { fieldId: field.field_id }
                         })}
-                    >                        <Image source={{ uri: `${field.image_url}?t=${Date.now()}` }} style={styles.fieldImage} />
+                    >
+                        <Image source={{ uri: `${field.image_url}?t=${Date.now()}` }} style={styles.fieldImage} />
                         <View style={styles.fieldInfo}>
                             <Text style={styles.fieldName}>{field.name}</Text>
                             <Text style={styles.fieldType}>{getFieldTypeText(field.sport_type)}</Text>
@@ -165,14 +166,17 @@ export default function UpdateFieldInfo() {
                                 <Text style={styles.ratingText}>
                                     {(fieldRatings[field.field_id] || field.rating || 0).toFixed(1)}
                                 </Text>
-                                <View style={styles.statusBadge}>
-                                    <Text style={[
-                                        styles.statusText,
-                                        field.status === 'available' ? styles.availableStatus : styles.unavailableStatus
-                                    ]}>
-                                        {field.status === 'available' ? 'Hoạt động' : 'Ngừng hoạt động'}
-                                    </Text>
-                                </View>
+                                {typeof field.status === "string" && (
+                                    <View style={styles.statusBadge}>
+                                        <Text style={[
+                                            styles.statusText,
+                                            field.status === 'available' ? styles.availableStatus : styles.unavailableStatus
+                                        ]}>
+                                            {field.status === 'available' ? 'Hoạt động' : 'Ngừng hoạt động'}
+                                        </Text>
+                                    </View>
+                                )}
+
                             </View>
                             <Text style={styles.price}>{formatPrice(field.price_per_hour)}</Text>
                         </View>

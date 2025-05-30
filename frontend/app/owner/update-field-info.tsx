@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import useUpdateField from '../../hooks/useUpdateField';
 import { FIELD_IMAGE_BASE_URL } from '../../constants/apiConfig';
 
+
 // Helper function to format time
 const formatTime = (timeString: string) => {
     const hour = parseInt(timeString.substring(0, 2));
@@ -123,11 +124,7 @@ export default function UpdateFieldInfo() {
     return (
         <View style={styles.container}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => router.push('/owner/dashboard')}
-                    activeOpacity={0.7}
-                >
+                <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7}>
                     <Ionicons name="arrow-back" size={28} color="#FFFFFF" />
                 </TouchableOpacity>
 

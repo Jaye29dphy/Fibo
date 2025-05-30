@@ -1,4 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { LogBox } from 'react-native';
+LogBox.ignoreLogs([
+  'VirtualizedLists should never be nested inside plain ScrollViews',
+]);
 import {
   View,
   Text,
