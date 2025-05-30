@@ -47,11 +47,11 @@ const FieldDetail: React.FC = () => {
         console.log("Fetching reviews from:", `${API_URL}/api/reviews/fields/${field_id}`);
         const data = await response.json();
         console.log("Reviews API response:", data);
-        
+
         if (Array.isArray(data)) {
           setReviews(data);
           console.log("Reviews set to:", data);
-          
+
           // Calculate average rating
           if (data.length > 0) {
             const sum = data.reduce((total, item) => total + item.rating, 0);
@@ -75,7 +75,7 @@ const FieldDetail: React.FC = () => {
           setCanReview(false);
           return;
         }
-        
+
         // Gọi API để kiểm tra xem người dùng đã đặt sân này chưa
         const response = await fetch(`${API_URL}/api/calendar/user-bookings/${field_id}`, {
           method: 'GET',
@@ -84,29 +84,29 @@ const FieldDetail: React.FC = () => {
             'Content-Type': 'application/json',
           }
         });
-        
+
         if (!response.ok) {
           console.error("Error response from API:", response.status);
           setCanReview(false);
           return;
         }
-        
+
         const data = await response.json();
         console.log("User booking check response:", data);
-        
+
         // Kiểm tra nếu người dùng có đặt sân thành công
         if (data && Array.isArray(data) && data.length > 0) {
           // Sửa logic: Cho phép đánh giá nếu có bất kỳ đặt sân nào đã được xác nhận hoặc hoàn thành
-          const hasValidBooking = data.some(booking => 
+          const hasValidBooking = data.some(booking =>
             booking.status === 'completed' || booking.status === 'confirmed'
           );
-          
+
           console.log("Can review:", hasValidBooking);
           setCanReview(hasValidBooking);
-          
+
           // Nếu vẫn không thể đánh giá, hãy kiểm tra chi tiết từng đặt sân
           if (!hasValidBooking) {
-            console.log("Booking details that didn't qualify:", 
+            console.log("Booking details that didn't qualify:",
               data.map(b => ({
                 status: b.status
               }))
@@ -137,8 +137,8 @@ const FieldDetail: React.FC = () => {
   const mainImageUrl = mainImage?.image_name
     ? `${FIELD_IMAGE_BASE_URL}/${mainImage.image_name}?t=${Date.now()}`
     : imageString
-    ? `${FIELD_IMAGE_BASE_URL}/${imageString}?t=${Date.now()}`
-    : "https://via.placeholder.com/150";
+      ? `${FIELD_IMAGE_BASE_URL}/${imageString}?t=${Date.now()}`
+      : "https://via.placeholder.com/150";
 
   const openImageModal = (imageName: string) => {
     const imageUrl = imageName
@@ -158,15 +158,15 @@ const FieldDetail: React.FC = () => {
       Alert.alert("Lỗi", "Vui lòng chọn số sao đánh giá");
       return;
     }
-    
+
     if (!comment.trim()) {
       Alert.alert("Lỗi", "Vui lòng nhập nội dung đánh giá");
       return;
     }
-    
+
     try {
       setIsSubmitting(true);
-      
+
       // Get authentication token
       const token = await AsyncStorage.getItem('token');
       if (!token) {
@@ -177,7 +177,7 @@ const FieldDetail: React.FC = () => {
         setIsSubmitting(false);
         return;
       }
-      
+
       // Sửa đường dẫn API để gửi đánh giá đến endpoint đúng
       console.log("Sending review to:", `${API_URL}/api/reviews/fields`, {
         method: "POST",
@@ -187,36 +187,36 @@ const FieldDetail: React.FC = () => {
         },
         body: JSON.stringify({ rating, comment, field_id })
       });
-      
+
       const response = await fetch(`${API_URL}/api/reviews/fields/${field_id}`, {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({ rating, comment, field_id }),
       });
-      
+
       console.log("Response status:", response.status);
-      
+
       const data = await response.json();
       console.log("Review submission response:", data);
-      
+
       if (response.ok) {
         // Add the new review to the list
         const newReview = {
           ...data,
-          full_name: data.full_name || "Khách hàng" 
+          full_name: data.full_name || "Khách hàng"
         };
         setReviews([newReview, ...reviews]);
-        
+
         // Tính lại đánh giá trung bình với đánh giá mới
         const newReviews = [newReview, ...reviews];
         const sum = newReviews.reduce((total, item) => total + parseFloat(item.rating), 0);
         const newAvgRating = sum / newReviews.length;
-        
+
         console.log("New calculated average rating:", newAvgRating);
-        
+
         // Ưu tiên dùng đánh giá từ server nếu có, nếu không dùng giá trị tính toán
         if (data.fieldRating) {
           console.log("Using server rating:", data.fieldRating);
@@ -225,12 +225,12 @@ const FieldDetail: React.FC = () => {
           console.log("Using calculated rating:", newAvgRating);
           setFieldAvgRating(newAvgRating);
         }
-        
+
         // Reset form
         setRating(0);
         setComment("");
         setShowAddReview(false);
-        
+
         Alert.alert("Thành công", "Đánh giá của bạn đã được gửi thành công!");
       } else {
         Alert.alert("Lỗi", data.message || "Không thể gửi đánh giá. Vui lòng thử lại sau.");
@@ -253,15 +253,14 @@ const FieldDetail: React.FC = () => {
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 200 }}>
-        <View style={styles.imageContainer}>
-          <TouchableOpacity onPress={() => openImageModal(mainImage?.image_name || imageString)}>
-            <Image
-              source={{ uri: mainImageUrl }}
-              style={styles.image}
-              onError={(error) => console.log(`Main image load error for field ${field_id}:`, error.nativeEvent)}
-              onLoad={() => console.log(`Main image loaded for field ${field_id}:`, mainImageUrl)}
-            />
-          </TouchableOpacity>
+        <View style={styles.imageContainer}>          <TouchableOpacity onPress={() => openImageModal(mainImage?.image_name || imageString)}>
+          <Image
+            source={{ uri: `${mainImageUrl}?t=${Date.now()}` }}
+            style={styles.image}
+            onError={(error) => console.log(`Main image load error for field ${field_id}:`, error.nativeEvent)}
+            onLoad={() => console.log(`Main image loaded for field ${field_id}:`, `${mainImageUrl}?t=${Date.now()}`)}
+          />
+        </TouchableOpacity>
         </View>
 
         <View style={styles.facilities}>
@@ -320,11 +319,11 @@ const FieldDetail: React.FC = () => {
             </Text>
             <View style={styles.starsContainer}>
               {[1, 2, 3, 4, 5].map((star) => (
-                <Ionicons 
-                  key={star} 
-                  name={fieldAvgRating >= star - 0.5 ? "star" : "star-outline"} 
+                <Ionicons
+                  key={star}
+                  name={fieldAvgRating >= star - 0.5 ? "star" : "star-outline"}
                   size={20}
-                  color="#FFD700" 
+                  color="#FFD700"
                 />
               ))}
             </View>
@@ -333,7 +332,7 @@ const FieldDetail: React.FC = () => {
         </View>
 
         <Text style={styles.descriptionTitle}>Đánh giá khách hàng</Text>
-        
+
         {reviews.length > 0 ? (
           <View style={styles.reviewsList}>
             {(showAllReviews ? reviews : reviews.slice(0, 5)).map((item, index) => (
@@ -341,10 +340,10 @@ const FieldDetail: React.FC = () => {
                 <View style={styles.reviewHeader}>
                   <View style={styles.userInfo}>
                     <Image
-                      source={{ 
-                        uri: item.avatar 
-                          ? `${AVATAR_BASE_URL}/${item.avatar}?t=${Date.now()}` 
-                          : `${AVATAR_BASE_URL}/default-ava.jpg` 
+                      source={{
+                        uri: item.avatar
+                          ? `${AVATAR_BASE_URL}/${item.avatar}?t=${Date.now()}`
+                          : `${AVATAR_BASE_URL}/default-ava.jpg`
                       }}
                       style={styles.avatar}
                       onError={(e) => {
@@ -357,9 +356,9 @@ const FieldDetail: React.FC = () => {
                     <View style={styles.nameAndDate}>
                       <Text style={styles.reviewerName}>{item.full_name || "Khách hàng"}</Text>
                       <Text style={styles.reviewDate}>
-                        {new Date(item.created_at).toLocaleDateString('vi-VN', { 
-                          day: '2-digit', 
-                          month: '2-digit', 
+                        {new Date(item.created_at).toLocaleDateString('vi-VN', {
+                          day: '2-digit',
+                          month: '2-digit',
                           year: 'numeric',
                           hour: '2-digit',
                           minute: '2-digit'
@@ -369,11 +368,11 @@ const FieldDetail: React.FC = () => {
                   </View>
                   <View style={styles.reviewRating}>
                     {[1, 2, 3, 4, 5].map((star) => (
-                      <Ionicons 
-                        key={star} 
-                        name={item.rating >= star ? "star" : "star-outline"} 
+                      <Ionicons
+                        key={star}
+                        name={item.rating >= star ? "star" : "star-outline"}
                         size={16}
-                        color="#FFD700" 
+                        color="#FFD700"
                       />
                     ))}
                   </View>
@@ -411,7 +410,7 @@ const FieldDetail: React.FC = () => {
               <Text style={styles.addReviewText}>{showAddReview ? "Hủy đánh giá" : "Thêm đánh giá"}</Text>
             </TouchableOpacity>
           )}
-          
+
           {!canReview && (
             <View style={styles.reviewNoteContainer}>
               <Text style={styles.reviewNoteText}>
@@ -442,8 +441,8 @@ const FieldDetail: React.FC = () => {
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity 
-              style={[styles.submitButton, isSubmitting && styles.disabledButton]} 
+            <TouchableOpacity
+              style={[styles.submitButton, isSubmitting && styles.disabledButton]}
               onPress={handleSubmitReview}
               disabled={isSubmitting}
             >

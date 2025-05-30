@@ -156,8 +156,7 @@ export default function UpdateFieldInfo() {
                             pathname: "/owner/field-info",
                             params: { fieldId: field.field_id }
                         })}
-                    >
-                        <Image source={{ uri: field.image_url }} style={styles.fieldImage} />
+                    >                        <Image source={{ uri: `${field.image_url}?t=${Date.now()}` }} style={styles.fieldImage} />
                         <View style={styles.fieldInfo}>
                             <Text style={styles.fieldName}>{field.name}</Text>
                             <Text style={styles.fieldType}>{getFieldTypeText(field.sport_type)}</Text>

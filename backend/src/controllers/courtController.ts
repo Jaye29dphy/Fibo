@@ -96,9 +96,14 @@ export const getFieldDetail = async (req: Request, res: Response): Promise<void>
 export const getSubFields = async (req: Request, res: Response): Promise<void> => {
   try {
     const { fieldId } = req.params;
+    console.log('[getSubFields] Fetching subfields for field ID:', fieldId);
+
     const [rows] = await pool.execute("SELECT * FROM SubFields WHERE field_id = ?", [fieldId]);
+    console.log('[getSubFields] Found', Array.isArray(rows) ? rows.length : 0, 'subfields');
+
     res.json(rows);
   } catch (error) {
+    console.error('[getSubFields] Error:', error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -106,15 +111,26 @@ export const getSubFields = async (req: Request, res: Response): Promise<void> =
 export const getTimeSlots = async (req: Request, res: Response): Promise<void> => {
   try {
     const { fieldId } = req.params;
+    console.log('[getTimeSlots] Fetching time slots for field ID:', fieldId);
+
     const [rows] = await pool.execute(
       "SELECT ts.slot_id, ts.start_time, ts.end_time, fp.price " +
-      "FROM TimeSlots ts " +
-      "JOIN Field_Prices fp ON ts.slot_id = fp.slot_id " +
-      "WHERE fp.field_id = ?",
+      "FROM fibo.timeslots ts " +
+      "JOIN fibo.field_prices fp ON ts.slot_id = fp.slot_id " +
+      "WHERE fp.field_id = ? " +
+      "ORDER BY CASE " +
+      "WHEN ts.start_time >= '05:00:00' THEN ts.start_time " +
+      "ELSE CONCAT('24', ts.start_time) " +
+      "END",
       [fieldId]
     );
+
+    console.log('[getTimeSlots] Found', Array.isArray(rows) ? rows.length : 0, 'time slots');
+    console.log('[getTimeSlots] Time slots data:', rows);
+
     res.json(rows);
   } catch (error) {
+    console.error('[getTimeSlots] Error:', error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -171,9 +187,16 @@ export const getOccupiedSlots = async (req: Request, res: Response): Promise<voi
 export const getServices = async (req: Request, res: Response): Promise<void> => {
   try {
     const { fieldId } = req.params;
-    const [rows] = await pool.execute("SELECT * FROM Services WHERE field_id = ?", [fieldId]);
+    console.log('[getServices] Fetching services for field ID:', fieldId);
+
+    const [rows] = await pool.execute("SELECT * FROM fibo.services WHERE field_id = ?", [fieldId]);
+
+    console.log('[getServices] Found', Array.isArray(rows) ? rows.length : 0, 'services');
+    console.log('[getServices] Services data:', rows);
+
     res.json(rows);
   } catch (error) {
+    console.error('[getServices] Error:', error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -468,5 +491,108 @@ export const updateFieldStatus = async (req: AuthRequest, res: Response): Promis
   } catch (error) {
     console.error("Lỗi khi cập nhật trạng thái sân:", error);
     res.status(500).json({ error: "Lỗi server" });
+  }
+};
+
+// New API endpoint to add subfield
+export const addSubField = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { fieldId } = req.params;
+    const { name } = req.body;
+
+    console.log('[addSubField] Adding new subfield to field:', fieldId);
+
+    // Validate input
+    if (!name) {
+      res.status(400).json({ error: "Name is required" });
+      return;
+    }
+
+    // Insert new subfield
+    const [result] = await pool.execute(
+      "INSERT INTO SubFields (field_id, name, status) VALUES (?, ?, 'available')",
+      [fieldId, name]
+    );
+
+    const insertId = (result as any).insertId;
+
+    // Get the newly created subfield
+    const [rows] = await pool.execute(
+      "SELECT * FROM SubFields WHERE sub_field_id = ?",
+      [insertId]
+    );
+
+    console.log('[addSubField] Subfield created with ID:', insertId);
+
+    res.status(201).json((rows as any[])[0]);
+  } catch (error) {
+    console.error('[addSubField] Error:', error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const updateSubFieldStatus = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { fieldId, subFieldId } = req.params;
+    const { status } = req.body;
+
+    console.log('[updateSubFieldStatus] Updating subfield:', subFieldId, 'of field:', fieldId, 'to status:', status);
+
+    // Validate input
+    if (!status || !['available', 'unavailable'].includes(status)) {
+      res.status(400).json({ error: "Trạng thái không hợp lệ" });
+      return;
+    }
+
+    // Update subfield status
+    const [result]: any = await pool.execute(
+      "UPDATE SubFields SET status = ? WHERE sub_field_id = ? AND field_id = ?",
+      [status, subFieldId, fieldId]
+    );
+
+    if (result.affectedRows === 0) {
+      res.status(404).json({ error: "Không tìm thấy sân con" });
+      return;
+    }
+
+    console.log('[updateSubFieldStatus] Subfield updated successfully');
+
+    // Get the updated subfield
+    const [rows] = await pool.execute(
+      "SELECT * FROM SubFields WHERE sub_field_id = ?",
+      [subFieldId]
+    );
+
+    res.status(200).json((rows as any[])[0]);
+  } catch (error) {
+    console.error('[updateSubFieldStatus] Error:', error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// New API endpoint to delete subfield
+export const deleteSubField = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { fieldId, subFieldId } = req.params;
+
+    console.log('[deleteSubField] Deleting subfield:', subFieldId, 'from field:', fieldId);
+
+    // Delete the subfield
+    const [result]: any = await pool.execute(
+      "DELETE FROM SubFields WHERE sub_field_id = ? AND field_id = ?",
+      [subFieldId, fieldId]
+    );
+
+    if (result.affectedRows === 0) {
+      res.status(404).json({ error: "Không tìm thấy sân con" });
+      return;
+    }
+
+    console.log('[deleteSubField] Subfield deleted successfully');
+
+    res.status(200).json({ message: "Đã xóa sân con thành công" });
+  } catch (error) {
+    console.error('[deleteSubField] Error:', error);
+    res.status(500).json({ error: "Internal server error" });
   }
 };

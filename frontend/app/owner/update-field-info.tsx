@@ -2,448 +2,595 @@ import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
-    StyleSheet,
-    ScrollView,
-    TouchableOpacity,
     TextInput,
-    Alert,
+    TouchableOpacity,
+    StyleSheet,
     Image,
-    ActivityIndicator,
     Modal,
-    FlatList
+    FlatList,
+    Platform,
+    ScrollView,
+    Switch,
+    ActivityIndicator,
+    Alert,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_URL, API_ENDPOINTS } from '../../constants/apiConfig';
-import * as ImagePicker from 'expo-image-picker';
+import useUpdateField from '../../hooks/useUpdateField';
+import { FIELD_IMAGE_BASE_URL } from '../../constants/apiConfig';
 
-interface FieldImage {
-    image_id: number;
-    image_name: string;
-    uploaded_at: string;
-}
+// Helper function to format time
+const formatTime = (timeString: string) => {
+    const hour = parseInt(timeString.substring(0, 2));
+    const minute = timeString.substring(3, 5);
 
-interface SubField {
-    sub_field_id: number;
-    name: string;
-    status: string;
-}
+    // Convert 24:00 to 00:00
+    if (hour === 24) {
+        return `00:${minute}`;
+    }
 
-interface Service {
-    service_id: number;
-    name: string;
-    price: number;
-    description: string;
-}
-
-interface TimeSlot {
-    slot_id: number;
-    start_time: string;
-    end_time: string;
-    price: number;
-}
-
-interface FieldData {
-    field_id: number;
-    name: string;
-    location: string;
-    sport_type: string;
-    price_per_hour: number;
-    status: string;
-    description: string;
-    rating: number;
-    images: FieldImage[];
-    subFields?: SubField[];
-    services?: Service[];
-    timeSlots?: TimeSlot[];
-}
+    return `${hour.toString().padStart(2, '0')}:${minute}`;
+};
 
 export default function UpdateFieldInfo() {
-    console.log('UpdateFieldInfo component loaded');
     const router = useRouter();
-    const { fieldId } = useLocalSearchParams<{ fieldId: string }>();
+    const { id } = useLocalSearchParams();
+    const fieldId = Array.isArray(id) ? id[0] : id;
+    const [showTimeSlots, setShowTimeSlots] = useState(false);
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [confirmationMessage, setConfirmationMessage] = useState('');
+    const [successMessage, setSuccessMessage] = useState(''); const {
+        fieldData,
+        originalFieldData,
+        loading,
+        saving,
+        imageUploading,
+        error,
+        syncPrices,
+        formData,
+        setFormData,
+        subFields,
+        services,
+        timeSlots,
+        deletedSubFields,
+        deletedServices,
+        updateTimeSlotPrice,
+        toggleTimeSlotSelection,
+        toggleSyncPrices, handlePickImage,
+        handleRemoveImage,
+        handleAddService,
+        handleUpdateService,
+        handleToggleServiceStatus,
+        handleAddSubField,
+        handleRemoveSubField,
+        handleToggleSubFieldStatus,
+        handleRemoveService,
+        updateField,
+        resetForm,
+        fetchFieldData,
+    } = useUpdateField(fieldId);
 
-    console.log('Received fieldId:', fieldId);
-
-    const [fieldData, setFieldData] = useState<FieldData | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [showSportModal, setShowSportModal] = useState(false);
-    const [showStatusModal, setShowStatusModal] = useState(false);
-
-    // Form data
-    const [formData, setFormData] = useState({
-        name: '',
-        location: '',
-        sport_type: '',
-        price_per_hour: '',
-        status: '',
-        description: ''
-    });
-
-    const sportTypes = [
-        { key: 'football', label: 'Bóng đá' },
-        { key: 'basketball', label: 'Bóng rổ' },
-        { key: 'badminton', label: 'Cầu lông' },
-        { key: 'tennis', label: 'Tennis' },
-        { key: 'volleyball', label: 'Bóng chuyền' }
-    ];
-
-    const statusOptions = [
-        { key: 'active', label: 'Hoạt động' },
-        { key: 'inactive', label: 'Tạm dừng' },
-        { key: 'maintenance', label: 'Bảo trì' }
-    ]; useEffect(() => {
-        console.log('UpdateFieldInfo useEffect triggered, fieldId:', fieldId);
+    useEffect(() => {
         if (fieldId) {
             fetchFieldData();
         } else {
-            console.log('No fieldId provided');
+            Alert.alert('Lỗi', 'Không tìm thấy ID sân.');
+            router.push('/owner/dashboard');
         }
-    }, [fieldId]);
+    }, [fieldId]);    // Log subFields khi có thay đổi
+    useEffect(() => {
+        console.log('Current subFields in update-field-info:', subFields);
+    }, [subFields]);
 
-    const fetchFieldData = async () => {
+    // Filter out deleted items for display
+    const visibleSubFields = subFields.filter(subField => !deletedSubFields.includes(subField.sub_field_id));
+    const visibleServices = services.filter(service => !deletedServices.includes(service.service_id));
+
+    const toggleTimeSlotsVisibility = () => {
+        setShowTimeSlots(prev => !prev);
+    };
+
+    const handleSubmit = async () => {
+        setConfirmationMessage('Bạn có chắc muốn cập nhật thông tin sân?');
+        setShowConfirmModal(true);
+    };
+
+    const confirmSubmit = async () => {
+        setShowConfirmModal(false);
+
         try {
-            setLoading(true);
-            const token = await AsyncStorage.getItem('token');
-
-            if (!token) {
-                Alert.alert('Lỗi', 'Không tìm thấy token xác thực', [
-                    { text: 'OK', onPress: () => router.push('/customer') }
-                ]);
-                return;
-            } const response = await fetch(`${API_ENDPOINTS.GET_OWNER_FIELD_DETAIL}/${fieldId}`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-            });
-
-            if (response.status === 401) {
-                Alert.alert('Lỗi', 'Phiên đăng nhập đã hết hạn', [
-                    { text: 'OK', onPress: () => router.push('/customer') }
-                ]);
-                return;
-            }
-
-            if (response.ok) {
-                const data = await response.json();
-                console.log('Field data:', data);
-
-                setFieldData(data);
-                setFormData({
-                    name: data.name || '',
-                    location: data.location || '',
-                    sport_type: data.sport_type || '',
-                    price_per_hour: data.price_per_hour?.toString() || '',
-                    status: data.status || '',
-                    description: data.description || ''
-                });
-            } else {
-                Alert.alert('Lỗi', 'Không thể tải thông tin sân');
-            }
-        } catch (error) {
-            console.error('Error fetching field data:', error);
-            Alert.alert('Lỗi', 'Đã xảy ra lỗi khi tải dữ liệu');
-        } finally {
-            setLoading(false);
+            await updateField();
+            setSuccessMessage('Cập nhật thông tin sân thành công!');
+            setTimeout(() => {
+                setSuccessMessage('');
+                router.push('/owner/dashboard');
+            }, 1500);
+        } catch (err) {
+            Alert.alert('Lỗi', 'Có lỗi xảy ra khi cập nhật thông tin sân.');
         }
-    };
-
-    const handleUpdateField = async () => {
-        try {
-            // Validate form
-            if (!formData.name.trim()) {
-                Alert.alert('Lỗi', 'Vui lòng nhập tên sân');
-                return;
-            }
-            if (!formData.location.trim()) {
-                Alert.alert('Lỗi', 'Vui lòng nhập địa chỉ');
-                return;
-            }
-            if (!formData.sport_type) {
-                Alert.alert('Lỗi', 'Vui lòng chọn loại thể thao');
-                return;
-            }
-            if (!formData.price_per_hour || isNaN(Number(formData.price_per_hour))) {
-                Alert.alert('Lỗi', 'Vui lòng nhập giá hợp lệ');
-                return;
-            }
-
-            setSaving(true);
-            const token = await AsyncStorage.getItem('token');
-
-            if (!token) {
-                Alert.alert('Lỗi', 'Không tìm thấy token xác thực');
-                return;
-            }
-
-            const updateData = {
-                name: formData.name.trim(),
-                location: formData.location.trim(),
-                sport_type: formData.sport_type,
-                price_per_hour: Number(formData.price_per_hour),
-                status: formData.status,
-                description: formData.description.trim()
-            }; const response = await fetch(`${API_ENDPOINTS.UPDATE_OWNER_FIELD}/${fieldId}`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(updateData),
-            });
-
-            if (response.status === 401) {
-                Alert.alert('Lỗi', 'Phiên đăng nhập đã hết hạn', [
-                    { text: 'OK', onPress: () => router.push('/customer') }
-                ]);
-                return;
-            }
-
-            if (response.ok) {
-                Alert.alert('Thành công', 'Cập nhật thông tin sân thành công!', [
-                    { text: 'OK', onPress: () => router.back() }
-                ]);
-            } else {
-                const errorData = await response.json();
-                Alert.alert('Lỗi', errorData.message || 'Không thể cập nhật thông tin sân');
-            }
-        } catch (error) {
-            console.error('Error updating field:', error);
-            Alert.alert('Lỗi', 'Đã xảy ra lỗi khi cập nhật');
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const getSportTypeLabel = (key: string) => {
-        const sport = sportTypes.find(s => s.key === key);
-        return sport ? sport.label : key;
-    };
-
-    const getStatusLabel = (key: string) => {
-        const status = statusOptions.find(s => s.key === key);
-        return status ? status.label : key;
     };
 
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#2ECC71" />
+                <ActivityIndicator size="large" color="#3B82F6" />
                 <Text style={styles.loadingText}>Đang tải thông tin sân...</Text>
-            </View>
-        );
-    }
-
-    if (!fieldData) {
-        return (
-            <View style={styles.errorContainer}>
-                <Ionicons name="warning-outline" size={50} color="#E74C3C" />
-                <Text style={styles.errorText}>Không thể tải thông tin sân</Text>
-                <TouchableOpacity style={styles.retryButton} onPress={fetchFieldData}>
-                    <Text style={styles.retryButtonText}>Thử lại</Text>
-                </TouchableOpacity>
             </View>
         );
     }
 
     return (
         <View style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#2C3E50" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Cập nhật thông tin sân</Text>
+            <ScrollView contentContainerStyle={styles.scrollContent}>
                 <TouchableOpacity
-                    onPress={handleUpdateField}
-                    style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-                    disabled={saving}
+                    style={styles.backButton}
+                    onPress={() => router.push('/owner/dashboard')}
+                    activeOpacity={0.7}
                 >
-                    {saving ? (
-                        <ActivityIndicator size="small" color="#FFF" />
-                    ) : (
-                        <Ionicons name="checkmark" size={24} color="#FFF" />
-                    )}
+                    <Ionicons name="arrow-back" size={28} color="#FFFFFF" />
                 </TouchableOpacity>
-            </View>
 
-            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                {/* Basic Information */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Thông tin cơ bản</Text>
+                <Text style={styles.title}>Cập nhật thông tin sân</Text>
 
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Tên sân <Text style={styles.required}>*</Text></Text>
-                        <TextInput
-                            style={styles.input}
-                            value={formData.name}
-                            onChangeText={(text) => setFormData({ ...formData, name: text })}
-                            placeholder="Nhập tên sân"
-                            placeholderTextColor="#BDC3C7"
-                        />
+                <View style={styles.formContainer}>
+                    {/* Thông tin cơ bản */}
+                    <View style={styles.sectionContainer}>
+                        <Text style={styles.sectionTitle}>Tên sân</Text>
+                        <View style={styles.sectionContent}>
+                            <TextInput
+                                style={styles.input}
+                                value={formData.name}
+                                onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
+                                placeholder="Nhập tên sân"
+                                placeholderTextColor="#9CA3AF"
+                            />
+                        </View>
                     </View>
 
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Địa chỉ <Text style={styles.required}>*</Text></Text>
-                        <TextInput
-                            style={styles.input}
-                            value={formData.location}
-                            onChangeText={(text) => setFormData({ ...formData, location: text })}
-                            placeholder="Nhập địa chỉ sân"
-                            placeholderTextColor="#BDC3C7"
-                        />
+                    <View style={styles.sectionContainer}>
+                        <Text style={styles.sectionTitle}>Vị trí</Text>
+                        <View style={styles.sectionContent}>
+                            <TextInput
+                                style={styles.input}
+                                value={formData.location}
+                                onChangeText={(text) => setFormData(prev => ({ ...prev, location: text }))}
+                                placeholder="Nhập vị trí"
+                                placeholderTextColor="#9CA3AF"
+                            />
+                        </View>
                     </View>
 
-                                        <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Mô tả</Text>
-                        <TextInput
-                            style={[styles.input, styles.textArea]}
-                            value={formData.description}
-                            onChangeText={(text) => setFormData({ ...formData, description: text })}
-                            placeholder="Nhập mô tả về sân"
-                            placeholderTextColor="#BDC3C7"
-                            multiline={true}
-                            numberOfLines={4}
-                            textAlignVertical="top"
-                        />
+                    <View style={styles.sectionContainer}>
+                        <Text style={styles.sectionTitle}>Loại sân</Text>
+                        <View style={styles.sectionContent}>
+                            <View style={styles.pickerContainer}>
+                                <Picker
+                                    selectedValue={formData.sport_type}
+                                    style={styles.picker}
+                                    onValueChange={(itemValue) => setFormData(prev => ({ ...prev, sport_type: itemValue }))}
+                                    dropdownIconColor="#6B7280"
+                                >
+                                    <Picker.Item label="Bóng đá" value="football" />
+                                    <Picker.Item label="Bóng rổ" value="basketball" />
+                                    <Picker.Item label="Cầu lông" value="badminton" />
+                                    <Picker.Item label="Tennis" value="tennis" />
+                                </Picker>
+                            </View>
+                        </View>
                     </View>
-                    
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Loại thể thao <Text style={styles.required}>*</Text></Text>
+
+                    <View style={styles.sectionContainer}>
+                        <Text style={styles.sectionTitle}>Trạng thái</Text>
+                        <View style={styles.sectionContent}>
+                            <View style={styles.pickerContainer}>
+                                <Picker
+                                    selectedValue={formData.status}
+                                    style={styles.picker}
+                                    onValueChange={(itemValue) => setFormData(prev => ({ ...prev, status: itemValue }))}
+                                    dropdownIconColor="#6B7280"
+                                >
+                                    <Picker.Item label="Hoạt động" value="available" />
+                                    <Picker.Item label="Ngừng hoạt động" value="unavailable" />
+                                </Picker>
+                            </View>
+                        </View>
+                    </View>
+
+                    <View style={styles.sectionContainer}>
+                        <Text style={styles.sectionTitle}>Đặc điểm sân</Text>
+                        <View style={styles.sectionContent}>
+                            <TextInput
+                                style={[styles.input, styles.multilineInput]}
+                                value={formData.description}
+                                onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
+                                placeholder="Mô tả đặc điểm sân"
+                                placeholderTextColor="#9CA3AF"
+                                multiline
+                                numberOfLines={4}
+                            />
+                        </View>
+                    </View>
+
+                    {/* Sub-fields - Các sân con */}                    <View style={styles.sectionContainer}>
+                        <Text style={styles.sectionTitle}>Quản lý sân con</Text>
+                        <View style={styles.sectionContent}>
+                            {visibleSubFields.map((subField, index) => (
+                                <View key={subField.sub_field_id} style={styles.subFieldContainer}>
+                                    <View style={styles.subFieldInfo}>
+                                        <Text style={styles.subFieldName}>{subField.name}</Text>                                        <View style={[
+                                            styles.statusBadge,
+                                            subField.status === 'available' ? styles.statusActive : styles.statusInactive
+                                        ]}>
+                                            <Text style={styles.statusText}>
+                                                {subField.status === 'available' ? 'Hoạt động' : 'Ngừng hoạt động'}
+                                            </Text>
+                                        </View>
+                                    </View>                                    <View style={styles.subFieldActions}>
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.toggleStatusButton,
+                                                subField.status === 'available' ? styles.deactivateButton : styles.activateButton
+                                            ]}
+                                            onPress={() => handleToggleSubFieldStatus(subField.sub_field_id, subField.status)}
+                                            activeOpacity={0.7}
+                                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                        >
+                                            <Text style={styles.toggleStatusText}>
+                                                {subField.status === 'available' ? 'Tạm ngừng' : 'Kích hoạt'}
+                                            </Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            style={styles.deleteButton}
+                                            onPress={() => handleRemoveSubField(subField.sub_field_id)}
+                                            activeOpacity={0.7}
+                                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                        >
+                                            <Ionicons name="close" size={20} color="#EF4444" />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            ))}
+
+                            <TouchableOpacity
+                                style={styles.addButton}
+                                onPress={handleAddSubField}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.addButtonText}>Thêm sân con mới</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Services - Dịch vụ thêm */}                    <View style={styles.sectionContainer}>
+                        <Text style={styles.sectionTitle}>Dịch vụ thêm</Text>
+                        <View style={styles.sectionContent}>
+                            {visibleServices.map((service) => (
+                                <View key={service.service_id} style={styles.serviceContainer}>
+                                    <View style={styles.serviceMainContent}>
+                                        <TextInput
+                                            style={styles.serviceInput}
+                                            value={service.name}
+                                            onChangeText={(text) => handleUpdateService(service.service_id, 'name', text)}
+                                            placeholder="Tên dịch vụ"
+                                            placeholderTextColor="#9CA3AF"
+                                        />
+                                        <TextInput
+                                            style={[styles.serviceInput, styles.descriptionInput]}
+                                            value={service.description}
+                                            onChangeText={(text) => handleUpdateService(service.service_id, 'description', text)}
+                                            placeholder="Mô tả dịch vụ"
+                                            placeholderTextColor="#9CA3AF"
+                                            multiline
+                                        />                                        <TextInput
+                                            style={styles.serviceInput}
+                                            value={service.price !== undefined ? service.price.toString() : '0'}
+                                            onChangeText={(text) => {
+                                                const numericValue = text === '' ? 0 : Number(text);
+                                                if (!isNaN(numericValue)) {
+                                                    handleUpdateService(service.service_id, 'price', numericValue);
+                                                }
+                                            }}
+                                            placeholder="Giá dịch vụ (VNĐ)"
+                                            placeholderTextColor="#9CA3AF"
+                                            keyboardType="numeric"
+                                        />
+                                    </View>                                    <View style={styles.serviceActions}>
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.toggleStatusButton,
+                                                service.status === 'available' ? styles.deactivateButton : styles.activateButton
+                                            ]}
+                                            onPress={() => handleToggleServiceStatus(service.service_id, service.status)}
+                                            activeOpacity={0.7}
+                                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                        >
+                                            <Text style={styles.toggleStatusText}>
+                                                {service.status === 'available' ? 'Tạm ngưng' : 'Kích hoạt'}
+                                            </Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            style={styles.deleteButton}
+                                            onPress={() => handleRemoveService(service.service_id)}
+                                            activeOpacity={0.7}
+                                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                        >
+                                            <Ionicons name="close" size={20} color="#EF4444" />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            ))}
+
+                            <TouchableOpacity
+                                style={styles.addButton}
+                                onPress={handleAddService}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.addButtonText}>Thêm dịch vụ mới</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Time Slots - Khung giờ */}
+                    <View style={styles.sectionContainer}>
                         <TouchableOpacity
-                            style={styles.picker}
-                            onPress={() => setShowSportModal(true)}
+                            style={styles.collapsibleHeader}
+                            onPress={toggleTimeSlotsVisibility}
+                            activeOpacity={0.7}
                         >
-                            <Text style={[styles.pickerText, !formData.sport_type && styles.placeholderText]}>
-                                {formData.sport_type ? getSportTypeLabel(formData.sport_type) : 'Chọn loại thể thao'}
-                            </Text>
-                            <Ionicons name="chevron-down" size={20} color="#7F8C8D" />
+                            <Text style={styles.sectionTitle}>Cập nhật khung giờ & giá sân</Text>
+                            <Ionicons
+                                name={showTimeSlots ? "chevron-up" : "chevron-down"}
+                                size={24}
+                                color="#6B7280"
+                            />
                         </TouchableOpacity>
-                    </View>
 
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Giá thuê (VNĐ/giờ) <Text style={styles.required}>*</Text></Text>
-                        <TextInput
-                            style={styles.input}
-                            value={formData.price_per_hour}
-                            onChangeText={(text) => setFormData({ ...formData, price_per_hour: text })}
-                            placeholder="Nhập giá thuê"
-                            placeholderTextColor="#BDC3C7"
-                            keyboardType="numeric"
-                        />
-                    </View>
+                        {showTimeSlots && (
+                            <View style={styles.sectionContent}>
+                                <TextInput
+                                    style={styles.input}
+                                    value={formData.price_per_hour !== undefined ? formData.price_per_hour.toString() : '0'}
+                                    onChangeText={(text) => {
+                                        // Ensure text is a valid number or empty string
+                                        if (text === '' || !isNaN(Number(text))) {
+                                            setFormData(prev => ({ ...prev, price_per_hour: text }));
+                                            if (syncPrices) {
+                                                timeSlots.forEach(slot => {
+                                                    if (slot.selected) {
+                                                        updateTimeSlotPrice(slot.slot_id, text || '0');
+                                                    }
+                                                });
+                                            }
+                                        }
+                                    }}
+                                    placeholder="Nhập giá cơ bản (VNĐ)"
+                                    placeholderTextColor="#9CA3AF"
+                                    keyboardType="numeric"
+                                />
 
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Trạng thái</Text>
-                        <TouchableOpacity
-                            style={styles.picker}
-                            onPress={() => setShowStatusModal(true)}
-                        >
-                            <Text style={[styles.pickerText, !formData.status && styles.placeholderText]}>
-                                {formData.status ? getStatusLabel(formData.status) : 'Chọn trạng thái'}
-                            </Text>
-                            <Ionicons name="chevron-down" size={20} color="#7F8C8D" />
-                        </TouchableOpacity>
-                    </View>
+                                <TouchableOpacity
+                                    style={styles.checkboxContainer}
+                                    onPress={toggleSyncPrices}
+                                    activeOpacity={0.7}
+                                >
+                                    <View style={[styles.customCheckbox, syncPrices && styles.customCheckboxChecked]}>
+                                        {syncPrices && (
+                                            <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                                        )}
+                                    </View>
+                                    <Text style={styles.checkboxLabel}>Đồng bộ giá sân giữa các khung giờ</Text>
+                                </TouchableOpacity>
 
+                                <View style={styles.timeSlotsContainer}>
+                                    {timeSlots.map((slot) => (
+                                        <View key={slot.slot_id} style={styles.timeSlotWrapper}>
+                                            <View style={styles.timeSlotBox}>
+                                                <TouchableOpacity
+                                                    style={styles.timeSlotCheckbox}
+                                                    onPress={() => toggleTimeSlotSelection(slot.slot_id, slot.selected)}
+                                                    activeOpacity={0.7}
+                                                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                                >
+                                                    <View style={[
+                                                        styles.customCheckbox,
+                                                        slot.selected && styles.customCheckboxChecked
+                                                    ]}>
+                                                        {slot.selected && (
+                                                            <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                                                        )}
+                                                    </View>
+                                                </TouchableOpacity>
+
+                                                <TouchableOpacity
+                                                    style={{ flex: 1 }}
+                                                    onPress={() => toggleTimeSlotSelection(slot.slot_id, slot.selected)}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <View style={[
+                                                        styles.timeSlotRow,
+                                                        slot.selected && styles.selectedTimeSlot
+                                                    ]}>
+                                                        <View style={styles.timeSlotInfo}>
+                                                            <Text style={[
+                                                                styles.timeSlotText,
+                                                                slot.selected && styles.selectedTimeSlotText
+                                                            ]}>
+                                                                {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+                                                </TouchableOpacity>
+                                            </View>
+
+                                            {slot.selected && (<TextInput
+                                                style={styles.timeSlotPriceInput}
+                                                value={slot.price !== undefined ? slot.price.toString() : '0'}
+                                                onChangeText={(text) => {
+                                                    // Ensure text is a valid number or empty string
+                                                    if (text === '' || !isNaN(Number(text))) {
+                                                        updateTimeSlotPrice(slot.slot_id, text || '0');
+                                                    }
+                                                }}
+                                                placeholder="Giá sân theo giờ"
+                                                placeholderTextColor="#9CA3AF"
+                                                keyboardType="numeric"
+                                                textAlign="left"
+                                            />
+                                            )}
+                                        </View>
+                                    ))}
+
+                                    <TouchableOpacity
+                                        style={styles.collapseButton}
+                                        onPress={toggleTimeSlotsVisibility}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text style={styles.collapseButtonText}>Rút gọn</Text>
+                                        <Ionicons name="chevron-up" size={16} color="#6B7280" />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        )}
+                    </View>                    {/* Images - Ảnh sân */}
+                    <View style={styles.sectionContainer}>
+                        <Text style={styles.sectionTitle}>Ảnh sân</Text>
+                        <View style={styles.sectionContent}>
+                            <TouchableOpacity
+                                style={[
+                                    styles.uploadButton,
+                                    imageUploading && styles.disabledButton
+                                ]}
+                                onPress={handlePickImage}
+                                activeOpacity={0.7}
+                                disabled={imageUploading}
+                            >                            {imageUploading ? (<View style={{ flexDirection: 'column', alignItems: 'center' }}>
+                                <ActivityIndicator size="small" color="#3B82F6" />
+                                <Text style={[styles.uploadText, { marginTop: 8 }]}>Đang xử lý ảnh...</Text>
+                                <Text style={styles.uploadSubtext}>Vui lòng đợi trong giây lát</Text>
+                            </View>
+                            ) : (<>
+                                <Ionicons name="image" size={24} color="#3B82F6" />
+                                <Text style={styles.uploadText}>Chọn ảnh mới</Text>
+                                <Text style={styles.uploadSubtext}>(Các thay đổi sẽ được lưu khi bạn nhấn "Cập nhật")</Text>
+                            </>
+                            )}
+                            </TouchableOpacity>                            {fieldData && (<FlatList
+                                data={fieldData.images}
+                                horizontal
+                                renderItem={({ item }) => {                                    // Determine image source - for temp images use local URI, for existing images use server URL
+                                    const imageSource = item.image_id < 0
+                                        ? { uri: item.image_name } // For temp images, image_name contains the local URI
+                                        : { uri: `${FIELD_IMAGE_BASE_URL}/${item.image_name}?t=${Date.now()}` }; // Add cache-busting parameter
+
+                                    return (
+                                        <View style={styles.imageContainer}>
+                                            <Image
+                                                source={imageSource}
+                                                style={styles.image}
+                                                resizeMode="cover"
+                                            />                                            <View style={styles.imageOverlay}>
+                                                {item.image_type === 'main' && (
+                                                    <View style={styles.mainImageBadge}>
+                                                        <Text style={styles.mainImageText}>Chính</Text>
+                                                    </View>
+                                                )}
+                                                {item.image_id < 0 && (
+                                                    <View style={styles.newImageBadge}>
+                                                        <Text style={styles.newImageText}>Mới</Text>
+                                                    </View>
+                                                )}
+                                            </View>
+
+                                            {/* Hiển thị nút xóa chỉ cho ảnh mới (ID âm) */}
+                                            {item.image_id < 0 && (
+                                                <TouchableOpacity
+                                                    style={styles.removeButton}
+                                                    onPress={() => handleRemoveImage(item.image_id)}
+                                                    disabled={imageUploading}
+                                                    activeOpacity={0.6}
+                                                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                                >
+                                                    <Ionicons name="trash-outline" size={20} color="#ff4d4f" />
+                                                </TouchableOpacity>
+                                            )}
+
+                                            <Text style={styles.imageIdText}>ID: {item.image_id}</Text>
+                                        </View>
+                                    );
+                                }}
+                                keyExtractor={(item) => item.image_id !== undefined ? item.image_id.toString() : `image-${Math.random()}`}
+                                style={styles.imageList}
+                                showsHorizontalScrollIndicator={false}
+                                ItemSeparatorComponent={() => <View style={{ width: 10 }} />} // Add space between items
+                            />
+                            )}
+                        </View>
+                    </View>
                 </View>
 
-                <View style={styles.bottomSpace} />
+                <View style={styles.buttonContainer}>
+                    <TouchableOpacity
+                        style={styles.resetButton}
+                        onPress={resetForm}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.resetButtonText}>Hủy thay đổi</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.submitButton, saving && styles.disabledButton]}
+                        onPress={handleSubmit}
+                        disabled={saving}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.submitText}>
+                            {saving ? 'Đang xử lý...' : 'Lưu thay đổi'}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
             </ScrollView>
 
-            {/* Sport Type Modal */}
+            {/* Confirmation Modal */}
             <Modal
-                visible={showSportModal}
-                transparent={true}
-                animationType="slide"
-                onRequestClose={() => setShowSportModal(false)}
+                animationType="fade"
+                transparent
+                visible={showConfirmModal}
+                onRequestClose={() => setShowConfirmModal(false)}
             >
                 <View style={styles.modalContainer}>
                     <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Chọn loại thể thao</Text>
-                            <TouchableOpacity onPress={() => setShowSportModal(false)}>
-                                <Ionicons name="close" size={24} color="#2C3E50" />
+                        <Text style={styles.modalTitle}>Xác nhận</Text>
+                        <Text style={styles.modalMessage}>{confirmationMessage}</Text>
+                        <View style={styles.modalButtonsContainer}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.cancelButton]}
+                                onPress={() => setShowConfirmModal(false)}
+                            >
+                                <Text style={styles.cancelButtonText}>Hủy</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.confirmButton]}
+                                onPress={confirmSubmit}
+                            >
+                                <Text style={styles.confirmButtonText}>Xác nhận</Text>
                             </TouchableOpacity>
                         </View>
-                        <FlatList
-                            data={sportTypes}
-                            keyExtractor={(item) => item.key}
-                            renderItem={({ item }) => (
-                                <TouchableOpacity
-                                    style={[
-                                        styles.modalItem,
-                                        formData.sport_type === item.key && styles.selectedModalItem
-                                    ]}
-                                    onPress={() => {
-                                        setFormData({ ...formData, sport_type: item.key });
-                                        setShowSportModal(false);
-                                    }}
-                                >
-                                    <Text style={[
-                                        styles.modalItemText,
-                                        formData.sport_type === item.key && styles.selectedModalItemText
-                                    ]}>
-                                        {item.label}
-                                    </Text>
-                                    {formData.sport_type === item.key && (
-                                        <Ionicons name="checkmark" size={20} color="#2ECC71" />
-                                    )}
-                                </TouchableOpacity>
-                            )}
-                        />
                     </View>
                 </View>
             </Modal>
 
-            {/* Status Modal */}
-            <Modal
-                visible={showStatusModal}
-                transparent={true}
-                animationType="slide"
-                onRequestClose={() => setShowStatusModal(false)}
-            >
-                <View style={styles.modalContainer}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Chọn trạng thái</Text>
-                            <TouchableOpacity onPress={() => setShowStatusModal(false)}>
-                                <Ionicons name="close" size={24} color="#2C3E50" />
-                            </TouchableOpacity>
-                        </View>
-                        <FlatList
-                            data={statusOptions}
-                            keyExtractor={(item) => item.key}
-                            renderItem={({ item }) => (
-                                <TouchableOpacity
-                                    style={[
-                                        styles.modalItem,
-                                        formData.status === item.key && styles.selectedModalItem
-                                    ]}
-                                    onPress={() => {
-                                        setFormData({ ...formData, status: item.key });
-                                        setShowStatusModal(false);
-                                    }}
-                                >
-                                    <Text style={[
-                                        styles.modalItemText,
-                                        formData.status === item.key && styles.selectedModalItemText
-                                    ]}>
-                                        {item.label}
-                                    </Text>
-                                    {formData.status === item.key && (
-                                        <Ionicons name="checkmark" size={20} color="#2ECC71" />
-                                    )}
-                                </TouchableOpacity>
-                            )}
-                        />
+            {/* Success Message */}
+            {successMessage !== '' && (
+                <View style={styles.successMessageContainer}>
+                    <View style={styles.successMessageContent}>
+                        <Ionicons name="checkmark-circle" size={36} color="#4CAF50" />
+                        <Text style={styles.successMessageText}>{successMessage}</Text>
                     </View>
                 </View>
-            </Modal>
+            )}
         </View>
     );
 }
@@ -451,188 +598,525 @@ export default function UpdateFieldInfo() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8F9FA',
+        backgroundColor: '#F1F5F9',
     },
-    header: {
-        flexDirection: 'row',
+    loadingContainer: {
+        flex: 1,
         alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: '#FFF',
-        borderBottomWidth: 1,
-        borderBottomColor: '#E9ECEF',
-        paddingTop: 50,
+        justifyContent: 'center',
+        backgroundColor: '#F1F5F9',
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 16,
+        color: '#6B7280',
+    },
+    scrollContent: {
+        flexGrow: 1,
+        padding: 16,
+        paddingTop: 60,
+        paddingBottom: 40,
     },
     backButton: {
-        padding: 8,
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#2C3E50',
-        flex: 1,
-        textAlign: 'center',
-        marginHorizontal: 16,
-    },
-    saveButton: {
-        backgroundColor: '#2ECC71',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 8,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    saveButtonDisabled: {
-        backgroundColor: '#BDC3C7',
-    },
-    content: {
-        flex: 1,
-        padding: 16,
-    },
-    section: {
-        backgroundColor: '#FFF',
+        position: 'absolute',
+        top: 16,
+        left: 16,
+        backgroundColor: '#3B82F6',
         borderRadius: 12,
-        padding: 16,
-        marginBottom: 16,
+        padding: 10,
+        zIndex: 100,
+    },
+    title: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#1E293B',
+        marginBottom: 24,
+        textAlign: 'center',
+    },
+    formContainer: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 20,
+        marginBottom: 20,
         shadowColor: '#000',
         shadowOffset: {
             width: 0,
             height: 2,
         },
         shadowOpacity: 0.1,
-        shadowRadius: 3.84,
-        elevation: 5,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    sectionContainer: {
+        marginBottom: 24,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E2E8F0',
+        paddingBottom: 20,
     },
     sectionTitle: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '600',
-        color: '#2C3E50',
-        marginBottom: 16,
+        color: '#1E293B',
+        marginBottom: 12,
+        textTransform: 'uppercase',
+        letterSpacing: 0.8,
     },
-    inputGroup: {
-        marginBottom: 16,
-    },
-    label: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: '#2C3E50',
-        marginBottom: 8,
-    },
-    required: {
-        color: '#E74C3C',
+    sectionContent: {
+        width: '100%',
     },
     input: {
-        borderWidth: 1,
-        borderColor: '#E9ECEF',
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 12,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        padding: 16,
         fontSize: 16,
-        color: '#2C3E50',
-        backgroundColor: '#FFF',
+        color: '#1E293B',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        marginBottom: 20,
     },
-    textArea: {
-        height: 100,
+    multilineInput: {
+        height: 120,
+        textAlignVertical: 'top',
+    },
+    pickerContainer: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        marginBottom: 20,
+        overflow: 'hidden',
+        minHeight: 60,
     },
     picker: {
+        fontSize: 16,
+        color: '#1E293B',
+        height: 60,
+        paddingVertical: 10,
+    },
+    subFieldContainer: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
         borderWidth: 1,
-        borderColor: '#E9ECEF',
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 12,
-        backgroundColor: '#FFF',
+        borderColor: '#E2E8F0',
+    },
+    subFieldInfo: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        marginBottom: 12,
     },
-    pickerText: {
-        fontSize: 16,
-        color: '#2C3E50',
-    },
-    placeholderText: {
-        color: '#BDC3C7',
-    },
-    bottomSpace: {
-        height: 20,
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#F8F9FA',
-    },
-    loadingText: {
-        marginTop: 16,
-        fontSize: 16,
-        color: '#7F8C8D',
-    },
-    errorContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#F8F9FA',
-        padding: 20,
-    },
-    errorText: {
-        fontSize: 16,
-        color: '#E74C3C',
-        textAlign: 'center',
-        marginVertical: 16,
-    },
-    retryButton: {
-        backgroundColor: '#3498DB',
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 8,
-    },
-    retryButtonText: {
-        color: '#FFF',
+    subFieldName: {
         fontSize: 16,
         fontWeight: '500',
+        color: '#1E293B',
+    },
+    statusBadge: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20,
+        marginLeft: 10,
+    },
+    statusActive: {
+        backgroundColor: '#DCFCE7',
+    },
+    statusInactive: {
+        backgroundColor: '#FEE2E2',
+    },
+    statusText: {
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    toggleStatusButton: {
+        borderRadius: 8,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        alignItems: 'center',
+    },
+    deactivateButton: {
+        backgroundColor: '#FEE2E2',
+    },
+    activateButton: {
+        backgroundColor: '#DCFCE7',
+    }, toggleStatusText: {
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    subFieldActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    }, deleteButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#FEE2E2',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: 10,
+    },
+    serviceMainContent: {
+        flex: 1,
+    },
+    serviceActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 12,
+    },
+    serviceContainer: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    serviceInput: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 8,
+        padding: 10,
+        fontSize: 14,
+        color: '#1E293B',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        marginBottom: 10,
+    },
+    descriptionInput: {
+        height: 60,
+        textAlignVertical: 'top',
+    },
+    addButton: {
+        backgroundColor: '#EFF6FF',
+        borderColor: '#3B82F6',
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 8,
+    },
+    addButtonText: {
+        color: '#3B82F6',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    collapsibleHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 4,
+    },
+    checkboxContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    customCheckbox: {
+        width: 24,
+        height: 24,
+        borderRadius: 4,
+        borderWidth: 2,
+        borderColor: '#3B82F6',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+    },
+    customCheckboxChecked: {
+        backgroundColor: '#3B82F6',
+    },
+    checkboxLabel: {
+        fontSize: 16,
+        color: '#1E293B',
+        marginLeft: 8,
+    },
+    timeSlotsContainer: {
+        marginTop: 8,
+    },
+    timeSlotWrapper: {
+        marginBottom: 12,
+    },
+    timeSlotBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    timeSlotCheckbox: {
+        marginRight: 10,
+    },
+    timeSlotRow: {
+        flex: 1,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        borderRadius: 8,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    selectedTimeSlot: {
+        backgroundColor: '#EFF6FF',
+        borderColor: '#BFDBFE',
+    },
+    timeSlotInfo: {
+        flex: 1,
+    },
+    timeSlotText: {
+        fontSize: 16,
+        color: '#1E293B',
+    },
+    selectedTimeSlotText: {
+        color: '#1E40AF',
+        fontWeight: '500',
+    },
+    timeSlotPriceInput: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 8,
+        padding: 10,
+        fontSize: 14,
+        color: '#1E293B',
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+        marginTop: 4,
+        marginLeft: 34,
+    },
+    collapseButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 8,
+        marginTop: 8,
+    },
+    collapseButtonText: {
+        color: '#6B7280',
+        fontSize: 14,
+        marginRight: 4,
+    },
+    uploadButton: {
+        backgroundColor: '#EFF6FF',
+        borderColor: '#3B82F6',
+        borderWidth: 1,
+        borderStyle: 'dashed',
+        borderRadius: 12,
+        padding: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    }, uploadText: {
+        color: '#3B82F6',
+        fontSize: 16,
+        fontWeight: '500',
+        marginTop: 4,
+    }, uploadSubtext: {
+        color: '#6B7280',
+        fontSize: 12,
+        marginTop: 4,
+        fontStyle: 'italic',
+    },
+    imageList: {
+        marginBottom: 8,
+    },
+    imageContainer: {
+        position: 'relative',
+        marginRight: 12,
+        borderRadius: 12,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        width: 120,
+        height: 120,
+    },
+    image: {
+        width: 120,
+        height: 120,
+        borderRadius: 12,
+    },
+    imageOverlay: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        padding: 8,
+    }, mainImageBadge: {
+        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+        alignSelf: 'flex-start',
+    },
+    mainImageText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    newImageBadge: {
+        backgroundColor: 'rgba(34, 197, 94, 0.7)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+        alignSelf: 'flex-start',
+        marginTop: 4,
+    }, newImageText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    removeButton: {
+        position: 'absolute',
+        top: 4,
+        right: 4,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    imageIdText: {
+        position: 'absolute',
+        bottom: 4,
+        right: 4,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        color: '#FFFFFF',
+        fontSize: 10,
+        padding: 2,
+        borderRadius: 4,
+    },
+    buttonContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 40,
+    },
+    resetButton: {
+        flex: 1,
+        backgroundColor: '#F1F5F9',
+        borderRadius: 12,
+        padding: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+        borderWidth: 1,
+        borderColor: '#CBD5E1',
+    },
+    resetButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#64748B',
+    },
+    submitButton: {
+        flex: 1,
+        backgroundColor: '#3B82F6',
+        borderRadius: 12,
+        padding: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: 10,
+    },
+    submitText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#FFFFFF',
+    },
+    disabledButton: {
+        backgroundColor: '#93C5FD',
+        opacity: 0.7,
     },
     modalContainer: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'flex-end',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     modalContent: {
-        backgroundColor: '#FFF',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        maxHeight: '70%',
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E9ECEF',
+        width: '80%',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 24,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5,
     },
     modalTitle: {
+        fontSize: 20,
+        fontWeight: '600',
+        color: '#1E293B',
+        textAlign: 'center',
+        marginBottom: 16,
+    },
+    modalMessage: {
+        fontSize: 16,
+        color: '#4B5563',
+        textAlign: 'center',
+        marginBottom: 24,
+    },
+    modalButtonsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    modalButton: {
+        flex: 1,
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    cancelButton: {
+        backgroundColor: '#F1F5F9',
+        marginRight: 8,
+        borderWidth: 1,
+        borderColor: '#CBD5E1',
+    },
+    confirmButton: {
+        backgroundColor: '#3B82F6',
+        marginLeft: 8,
+    },
+    cancelButtonText: {
+        color: '#64748B',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    confirmButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    successMessageContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        zIndex: 1000,
+    },
+    successMessageContent: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 24,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 4,
+    },
+    successMessageText: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#2C3E50',
-    },
-    modalItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F8F9FA',
-    },
-    selectedModalItem: {
-        backgroundColor: '#E8F5E8',
-    },
-    modalItemText: {
-        fontSize: 16,
-        color: '#2C3E50',
-    },
-    selectedModalItemText: {
-        color: '#2ECC71',
-        fontWeight: '500',
+        color: '#1E293B',
+        textAlign: 'center',
+        marginTop: 12,
     },
 });

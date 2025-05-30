@@ -1,7 +1,25 @@
 import express from "express";
-import { createBooking, createCourt, getFieldImages, getFields, getServices,getOccupiedSlots, getSubFields, getTimeSlots, createPendingOrder, sepayWebhookHandler, getOrderStatus, cancelPendingOrder, updateOrderStatus, updateFieldStatus } from "../controllers/courtController";
+import {
+    createBooking,
+    createCourt,
+    getFieldImages,
+    getFields,
+    getServices,
+    getOccupiedSlots,
+    getSubFields,
+    getTimeSlots,
+    createPendingOrder,
+    sepayWebhookHandler,
+    getOrderStatus,
+    cancelPendingOrder,
+    updateOrderStatus,
+    updateFieldStatus,
+    addSubField,
+    updateSubFieldStatus,
+    getFieldDetail,
+    deleteSubField
+} from "../controllers/courtController";
 import { authenticate } from "../middleware/authMiddleware";
-import { getFieldDetail } from "../controllers/courtController";
 
 const router = express.Router();
 
@@ -9,6 +27,9 @@ router.post("/", authenticate, createCourt);
 router.get("/", getFields);
 router.get("/:field_id", getFieldDetail);
 router.get("/:fieldId/subfields", getSubFields);
+router.post("/:fieldId/subfields", authenticate, addSubField);
+router.put("/:fieldId/subfields/:subFieldId", authenticate, updateSubFieldStatus);
+router.delete("/:fieldId/subfields/:subFieldId", authenticate, deleteSubField);
 router.get("/:fieldId/time-slots", getTimeSlots);
 router.get("/:fieldId/services", getServices);
 router.post("/bookings", authenticate, createBooking);

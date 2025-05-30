@@ -5,7 +5,20 @@ import {
     getTimeSlots,
     getAllFields,
     getFieldById,
-    updateField
+    updateField,
+    uploadFieldImage,
+    setMainFieldImage,
+    reorderFieldImages,
+    deleteFieldImage,
+    deleteAllFieldImages,
+    addFieldSubField,
+    updateFieldSubField,
+    deleteFieldSubField,
+    addFieldService,
+    updateFieldService,
+    deleteFieldService,
+    addFieldTimeSlot,
+    deleteFieldTimeSlot
 } from '../controllers/fieldController';
 import { authenticate } from '../middleware/authMiddleware';
 import multer from 'multer';
@@ -33,5 +46,34 @@ router.get('/:id', getFieldById);
 
 // Route để cập nhật thông tin sân
 router.put('/:id', updateField);
+
+// Route để tải lên ảnh cho sân
+router.post('/:id/images', upload.single('image'), uploadFieldImage);
+
+// Route để đặt ảnh chính cho sân
+router.put('/:id/images/:imageId/main', authenticate, setMainFieldImage);
+
+// Route để thay đổi thứ tự ảnh
+router.put('/:id/images/reorder', authenticate, reorderFieldImages);
+
+// Route để xóa ảnh
+router.delete('/:id/images/:imageId', authenticate, deleteFieldImage);
+
+// Route để xóa tất cả ảnh của một field
+router.delete('/:id/images', authenticate, deleteAllFieldImages);
+
+// Field-based subfield management routes
+router.post('/:fieldId/subfields', authenticate, addFieldSubField);
+router.put('/:fieldId/subfields/:subFieldId', authenticate, updateFieldSubField);
+router.delete('/:fieldId/subfields/:subFieldId', authenticate, deleteFieldSubField);
+
+// Field-based service management routes
+router.post('/:fieldId/services', authenticate, addFieldService);
+router.put('/:fieldId/services/:serviceId', authenticate, updateFieldService);
+router.delete('/:fieldId/services/:serviceId', authenticate, deleteFieldService);
+
+// Field-based time slot management routes
+router.post('/:fieldId/time-slots', authenticate, addFieldTimeSlot);
+router.delete('/:fieldId/time-slots/:slotId', authenticate, deleteFieldTimeSlot);
 
 export default router;

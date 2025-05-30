@@ -85,7 +85,7 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
     // Kiểm tra dữ liệu đầu vào
     if (!name || !location || !type || !description || !price) {
       console.log('Missing required fields:', { name, location, type, description, price });
-      res.status(400).json({ message: 'Vui lòng nhập đầy đủ thông tin' });
+      res.status(400).json({ message: 'Missing required fields' });
       return;
     }
 
@@ -93,7 +93,7 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
     const parsedPrice = parseFloat(price.toString().replace(/[^0-9.]/g, ''));
     if (isNaN(parsedPrice)) {
       console.log('Invalid price format:', price);
-      res.status(400).json({ message: 'Hãy nhập giá' });
+      res.status(400).json({ message: 'Invalid price format' });
       return;
     }
 
@@ -168,41 +168,6 @@ export const registerField = async (req: Request, res: Response): Promise<void> 
       ownerId = (ownerCheck[0] as any).owner_id;
       console.log('Found existing owner with ID:', ownerId);
     }
-
-    // === KIỂM TRA GIỚI HẠN SÂN ĐƯỢC PHÉP ===
-    const [subRows] = await pool.execute(`
-  SELECT sp.max_fields
-  FROM fibo.owner_subscriptions os
-  JOIN fibo.subscription_plans sp ON os.plan_id = sp.plan_id
-  WHERE os.owner_id = ?
-  ORDER BY os.created_at DESC
-  LIMIT 1
-`, [ownerId]);
-
-    const typedSubRows = subRows as any[];
-    if (!typedSubRows || typedSubRows.length === 0) {
-      res.status(403).json({ message: 'Bạn chưa đăng ký gói dịch vụ nào.' });
-      return;
-    }
-
-    const maxFields = typedSubRows[0].max_fields;
-
-    const [fieldCountRows] = await pool.execute(`
-  SELECT COUNT(*) AS currentFieldCount
-  FROM fibo.fields
-  WHERE owner_id = ?
-`, [ownerId]);
-
-    const typedFieldCount = fieldCountRows as any[];
-    const currentFieldCount = typedFieldCount[0].currentFieldCount;
-
-    if (currentFieldCount >= maxFields) {
-      res.status(403).json({
-        message: `Bạn đã đạt giới hạn ${maxFields} sân theo gói đăng ký hiện tại.`
-      });
-      return;
-    }
-
 
     // Lưu dữ liệu sân vào bảng fields
     const insertFieldQuery = `
@@ -598,7 +563,7 @@ export const updateField = async (req: Request, res: Response): Promise<void> =>
     }    // Cập nhật thông tin sân
     const updateQuery = `
       UPDATE fibo.fields 
-      SET name = ?, location = ?, sport_type = ?, price_per_hour = ?, status = ?, description = ?, updated_at = NOW()
+      SET name = ?, location = ?, sport_type = ?, price_per_hour = ?, status = ?, description = ?
       WHERE field_id = ?
     `;
 
@@ -615,11 +580,9 @@ export const updateField = async (req: Request, res: Response): Promise<void> =>
     const result = updateResult as any; if (result.affectedRows === 0) {
       res.status(404).json({ message: 'Không thể cập nhật sân' });
       return;
-    }
-
-    // Lấy thông tin sân đã cập nhật
+    }    // Lấy thông tin sân đã cập nhật
     const getUpdatedQuery = `
-      SELECT field_id, name, location, sport_type, price_per_hour, status, description, rating, created_at, updated_at
+      SELECT field_id, name, location, sport_type, price_per_hour, status, description, rating, created_at
       FROM fibo.fields 
       WHERE field_id = ?
     `;
@@ -637,5 +600,985 @@ export const updateField = async (req: Request, res: Response): Promise<void> =>
   } catch (error: any) {
     console.error('Error in updateField:', error.message, error.stack);
     res.status(500).json({ message: 'Đã có lỗi xảy ra khi cập nhật sân.', error: error.message });
+  }
+};
+
+// Upload field image
+export const uploadFieldImage = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const fieldId = req.params.id;
+
+    // Lấy user_id từ token
+    const userId = getUserIdFromToken(req);
+    if (!userId) {
+      res.status(401).json({ message: 'Token không hợp lệ hoặc không tồn tại' });
+      return;
+    }
+
+    // Kiểm tra xem sân có tồn tại và thuộc về user này không
+    const checkQuery = `
+      SELECT f.field_id, f.owner_id, o.user_id 
+      FROM fibo.fields f
+      INNER JOIN fibo.owners o ON f.owner_id = o.owner_id
+      WHERE f.field_id = ? AND o.user_id = ?
+    `;
+
+    const [checkResult] = await pool.execute(checkQuery, [fieldId, userId]);
+    const fields = checkResult as any[];
+
+    if (fields.length === 0) {
+      res.status(404).json({ message: 'Không tìm thấy sân hoặc bạn không có quyền cập nhật sân này' });
+      return;
+    }
+
+    // Check if file was uploaded
+    if (!req.file) {
+      res.status(400).json({ message: 'Vui lòng chọn một ảnh' });
+      return;
+    }
+
+    console.log('Processing field image upload:', {
+      fieldId,
+      filename: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size
+    });
+
+    // Get all existing images for this field to determine the next index
+    const [existingImages] = await pool.execute(
+      'SELECT image_id, image_name FROM fibo.field_images WHERE field_id = ? ORDER BY upload_date ASC',
+      [fieldId]
+    );
+    const currentImages = existingImages as any[];
+    console.log('Current images for field:', currentImages);
+
+    // Calculate the next index based on existing images
+    let nextIndex = 0;
+    const existingIndexes: number[] = [];
+
+    // Extract indexes from existing image names that follow our naming pattern
+    for (const image of currentImages) {
+      const match = image.image_name.match(new RegExp(`^${fieldId}_(\\d+)\\.[^.]+$`));
+      if (match) {
+        existingIndexes.push(parseInt(match[1]));
+      }
+    }
+
+    // Find the next available index
+    if (existingIndexes.length > 0) {
+      existingIndexes.sort((a, b) => a - b);
+      for (let i = 0; i <= existingIndexes.length; i++) {
+        if (!existingIndexes.includes(i)) {
+          nextIndex = i;
+          break;
+        }
+      }
+    }
+
+    console.log('Next available index:', nextIndex);
+
+    // Get file extension from original filename
+    let fileExtension = path.extname(req.file.originalname || '');
+    if (!fileExtension && req.file.mimetype) {
+      const mimeExt = req.file.mimetype.split('/')[1];
+      fileExtension = mimeExt ? `.${mimeExt}` : '.jpg';
+    }
+    if (!fileExtension) fileExtension = '.jpg';
+
+    // Use proper naming format: {fieldId}_{index}.{extension}
+    const filename = `${fieldId}_${nextIndex}${fileExtension}`;
+
+    // Ensure the directory exists
+    if (!basePath) {
+      throw new Error('FIELD_IMAGE_PATH is not defined');
+    }
+
+    if (!fs.existsSync(basePath)) {
+      fs.mkdirSync(basePath, { recursive: true });
+    }
+
+    // Write the file to disk
+    const filePath = path.join(basePath, filename);
+    fs.writeFileSync(filePath, req.file.buffer);
+
+    console.log('New image saved:', {
+      filename,
+      path: filePath,
+      size: req.file.size,
+      index: nextIndex
+    });
+
+    // Determine image type: 'main' if it's the first image (index 0), otherwise 'sub'
+    const imageType = nextIndex === 0 ? 'main' : 'sub';
+
+    // Get current Vietnam time
+    const vietnamTime = new Date();
+    vietnamTime.setHours(vietnamTime.getHours() + 7); // UTC+7
+    const uploadDate = vietnamTime.toISOString().slice(0, 19).replace('T', ' ');
+
+    // Save image metadata to database
+    const [insertResult] = await pool.execute(
+      'INSERT INTO fibo.field_images (field_id, image_name, image_type, upload_date) VALUES (?, ?, ?, ?)',
+      [fieldId, filename, imageType, uploadDate]
+    );
+
+    const imageId = (insertResult as any).insertId;
+
+    console.log('Image uploaded successfully:', {
+      fieldId,
+      imageId,
+      filename,
+      imageType,
+      index: nextIndex
+    });
+
+    res.status(201).json({
+      message: 'Đã tải ảnh lên thành công',
+      image_id: imageId,
+      image_name: filename,
+      image_type: imageType,
+      upload_date: uploadDate
+    });
+  } catch (error: any) {
+    console.error('Error uploading field image:', error.message, error.stack);
+    res.status(500).json({ message: 'Đã xảy ra lỗi khi tải ảnh lên', error: error.message });
+  }
+};
+
+// Set a specific image as main image
+export const setMainFieldImage = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const fieldId = req.params.id;
+    const imageId = req.params.imageId;
+
+    // Lấy user_id từ token
+    const userId = getUserIdFromToken(req);
+    if (!userId) {
+      res.status(401).json({ message: 'Token không hợp lệ hoặc không tồn tại' });
+      return;
+    }
+
+    // Kiểm tra xem sân có tồn tại và thuộc về user này không
+    const checkQuery = `
+      SELECT f.field_id, f.owner_id, o.user_id 
+      FROM fibo.fields f
+      INNER JOIN fibo.owners o ON f.owner_id = o.owner_id
+      WHERE f.field_id = ? AND o.user_id = ?
+    `;
+
+    const [checkResult] = await pool.execute(checkQuery, [fieldId, userId]);
+    const fields = checkResult as any[];
+
+    if (fields.length === 0) {
+      res.status(404).json({ message: 'Không tìm thấy sân hoặc bạn không có quyền cập nhật sân này' });
+      return;
+    }
+
+    // Kiểm tra xem ảnh có tồn tại không
+    const [imageCheck] = await pool.execute(
+      'SELECT * FROM fibo.field_images WHERE image_id = ? AND field_id = ?',
+      [imageId, fieldId]
+    );
+
+    if ((imageCheck as any[]).length === 0) {
+      res.status(404).json({ message: 'Không tìm thấy ảnh này' });
+      return;
+    }
+
+    // Bắt đầu transaction để đảm bảo tính nhất quán của dữ liệu
+    await pool.execute('START TRANSACTION');    // Đặt tất cả các ảnh khác thành 'sub'
+    await pool.execute(
+      'UPDATE fibo.field_images SET image_type = ? WHERE field_id = ?',
+      ['sub', fieldId]
+    );
+
+    // Đặt ảnh được chọn thành 'main'
+    await pool.execute(
+      'UPDATE fibo.field_images SET image_type = ? WHERE image_id = ?',
+      ['main', imageId]
+    );
+
+    // Hoàn thành transaction
+    await pool.execute('COMMIT');
+
+    console.log(`Image ${imageId} set as main for field ${fieldId}`);
+
+    res.status(200).json({
+      message: 'Đã đặt ảnh chính thành công',
+      image_id: parseInt(imageId),
+      field_id: parseInt(fieldId)
+    });
+  } catch (error: any) {
+    // Nếu có lỗi, rollback transaction
+    await pool.execute('ROLLBACK');
+    console.error('Error setting main field image:', error.message, error.stack);
+    res.status(500).json({ message: 'Đã xảy ra lỗi khi đặt ảnh chính', error: error.message });
+  }
+};
+
+// Reorder field images
+export const reorderFieldImages = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const fieldId = req.params.id;
+    const { imageIds } = req.body;
+
+    // Validate input
+    if (!imageIds || !Array.isArray(imageIds) || imageIds.length === 0) {
+      res.status(400).json({ message: 'Danh sách ID ảnh không hợp lệ' });
+      return;
+    }
+
+    // Lấy user_id từ token
+    const userId = getUserIdFromToken(req);
+    if (!userId) {
+      res.status(401).json({ message: 'Token không hợp lệ hoặc không tồn tại' });
+      return;
+    }
+
+    // Kiểm tra xem sân có tồn tại và thuộc về user này không
+    const checkQuery = `
+      SELECT f.field_id, f.owner_id, o.user_id 
+      FROM fibo.fields f
+      INNER JOIN fibo.owners o ON f.owner_id = o.owner_id
+      WHERE f.field_id = ? AND o.user_id = ?
+    `;
+
+    const [checkResult] = await pool.execute(checkQuery, [fieldId, userId]);
+    const fields = checkResult as any[];
+
+    if (fields.length === 0) {
+      res.status(404).json({ message: 'Không tìm thấy sân hoặc bạn không có quyền cập nhật sân này' });
+      return;
+    }
+
+    // Kiểm tra xem tất cả các ảnh có tồn tại và thuộc về sân này không
+    const [imagesCheck] = await pool.execute(
+      'SELECT image_id FROM fibo.field_images WHERE field_id = ?',
+      [fieldId]
+    );
+
+    const existingImageIds = (imagesCheck as any[]).map(img => img.image_id);
+    const validImageIds = imageIds.filter(id => existingImageIds.includes(id));
+
+    if (validImageIds.length !== imageIds.length) {
+      res.status(400).json({ message: 'Một số ảnh trong danh sách không tồn tại hoặc không thuộc về sân này' });
+      return;
+    }    // Cập nhật loại ảnh (main cho ảnh đầu tiên, additional cho các ảnh khác)
+    await pool.execute('START TRANSACTION');    // Đặt tất cả các ảnh thành sub trước
+    await pool.execute(
+      'UPDATE fibo.field_images SET image_type = ? WHERE field_id = ?',
+      ['sub', fieldId]
+    );
+
+    // Đặt ảnh đầu tiên trong danh sách thành main
+    if (imageIds.length > 0) {
+      await pool.execute(
+        'UPDATE fibo.field_images SET image_type = ? WHERE image_id = ?',
+        ['main', imageIds[0]]
+      );
+    }
+
+    await pool.execute('COMMIT');
+
+    console.log(`Images reordered for field ${fieldId}:`, imageIds);
+
+    res.status(200).json({
+      message: 'Đã sắp xếp lại ảnh thành công',
+      field_id: parseInt(fieldId),
+      image_ids: imageIds
+    });
+  } catch (error: any) {
+    // Nếu có lỗi, rollback transaction
+    await pool.execute('ROLLBACK');
+    console.error('Error reordering field images:', error.message, error.stack);
+    res.status(500).json({ message: 'Đã xảy ra lỗi khi sắp xếp lại ảnh', error: error.message });
+  }
+};
+
+// Delete a field image
+export const deleteFieldImage = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const fieldId = req.params.id;
+    const imageId = req.params.imageId;
+
+    console.log(`Deleting image: Field ID ${fieldId}, Image ID ${imageId}`);
+
+    // Lấy user_id từ token
+    const userId = getUserIdFromToken(req);
+    if (!userId) {
+      res.status(401).json({ message: 'Token không hợp lệ hoặc không tồn tại' });
+      return;
+    }
+
+    // Kiểm tra xem sân có tồn tại và thuộc về user này không
+    const checkQuery = `
+      SELECT f.field_id, f.owner_id, o.user_id 
+      FROM fibo.fields f
+      INNER JOIN fibo.owners o ON f.owner_id = o.owner_id
+      WHERE f.field_id = ? AND o.user_id = ?
+    `;
+
+    const [checkResult] = await pool.execute(checkQuery, [fieldId, userId]);
+    const fields = checkResult as any[];
+
+    if (fields.length === 0) {
+      res.status(404).json({ message: 'Không tìm thấy sân hoặc bạn không có quyền xóa ảnh này' });
+      return;
+    }
+
+    // Kiểm tra xem ảnh có tồn tại không
+    const [imageCheck] = await pool.execute(
+      'SELECT * FROM fibo.field_images WHERE image_id = ? AND field_id = ?',
+      [imageId, fieldId]
+    );
+
+    const images = imageCheck as any[];
+    if (images.length === 0) {
+      res.status(404).json({ message: 'Không tìm thấy ảnh này' });
+      return;
+    }
+
+    const image = images[0];
+
+    // Nếu đây là ảnh chính và có ảnh khác, chọn một ảnh khác làm ảnh chính
+    if (image.image_type === 'main') {
+      const [otherImagesResult] = await pool.execute(
+        'SELECT * FROM fibo.field_images WHERE field_id = ? AND image_id != ? LIMIT 1',
+        [fieldId, imageId]
+      );
+
+      const otherImages = otherImagesResult as any[];
+
+      if (otherImages && otherImages.length > 0) {
+        await pool.execute(
+          'UPDATE fibo.field_images SET image_type = ? WHERE image_id = ?',
+          ['main', otherImages[0].image_id]
+        );
+      }
+    }
+
+    // Xóa file ảnh nếu có path
+    if (basePath) {
+      const imagePath = path.join(basePath, image.image_name);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+        console.log(`File ${imagePath} deleted from disk`);
+      }
+    }
+
+    // Xóa dữ liệu ảnh từ database
+    const [deleteResult] = await pool.execute(
+      'DELETE FROM fibo.field_images WHERE image_id = ?',
+      [imageId]
+    );
+
+    console.log(`Image ${imageId} deleted successfully`);
+
+    res.status(200).json({
+      message: 'Đã xóa ảnh thành công',
+      image_id: parseInt(imageId),
+      field_id: parseInt(fieldId)
+    });
+  } catch (error: any) {
+    console.error('Error deleting field image:', error.message, error.stack);
+    res.status(500).json({ message: 'Đã xảy ra lỗi khi xóa ảnh', error: error.message });
+  }
+};
+
+// Delete all images for a field
+export const deleteAllFieldImages = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const fieldId = req.params.id;
+
+    console.log(`Deleting all images for Field ID ${fieldId}`);
+
+    // Lấy user_id từ token
+    const userId = getUserIdFromToken(req);
+    if (!userId) {
+      res.status(401).json({ message: 'Token không hợp lệ hoặc không tồn tại' });
+      return;
+    }
+
+    // Kiểm tra xem sân có tồn tại và thuộc về user này không
+    const checkQuery = `
+      SELECT f.field_id, f.owner_id, o.user_id 
+      FROM fibo.fields f
+      INNER JOIN fibo.owners o ON f.owner_id = o.owner_id
+      WHERE f.field_id = ? AND o.user_id = ?
+    `;
+
+    const [checkResult] = await pool.execute(checkQuery, [fieldId, userId]);
+    const fields = checkResult as any[];
+
+    if (fields.length === 0) {
+      res.status(404).json({ message: 'Không tìm thấy sân hoặc bạn không có quyền xóa ảnh' });
+      return;
+    }
+
+    // Lấy tất cả ảnh của field này
+    const [imagesResult] = await pool.execute(
+      'SELECT * FROM fibo.field_images WHERE field_id = ?',
+      [fieldId]
+    );
+
+    const images = imagesResult as any[];
+    const deletedImages = [];
+
+    // Xóa từng file ảnh và record trong database
+    for (const image of images) {
+      // Xóa file ảnh từ thư mục lưu trữ
+      if (basePath) {
+        const imagePath = path.join(basePath, image.image_name);
+        if (fs.existsSync(imagePath)) {
+          fs.unlinkSync(imagePath);
+          console.log(`File ${imagePath} deleted from disk`);
+        } else {
+          console.log(`Warning: File ${imagePath} not found on disk`);
+        }
+      }
+
+      deletedImages.push({
+        image_id: image.image_id,
+        image_name: image.image_name
+      });
+    }
+
+    // Xóa tất cả records từ database
+    const [deleteResult] = await pool.execute(
+      'DELETE FROM fibo.field_images WHERE field_id = ?',
+      [fieldId]
+    );
+
+    const deletedCount = (deleteResult as any).affectedRows;
+    console.log(`Deleted ${deletedCount} images for field ${fieldId}`);
+
+    res.status(200).json({
+      message: `Đã xóa ${deletedCount} ảnh của sân thành công`,
+      field_id: parseInt(fieldId),
+      deleted_images: deletedImages
+    });
+  } catch (error: any) {
+    console.error('Error deleting all field images:', error.message, error.stack);
+    res.status(500).json({ message: 'Đã xảy ra lỗi khi xóa ảnh', error: error.message });
+  }
+};
+
+// ======================= FIELD-BASED SUBFIELD MANAGEMENT =======================
+
+// Add a new subfield to a field
+export const addFieldSubField = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { fieldId } = req.params;
+    const { name } = req.body;
+
+    console.log('[addFieldSubField] Adding new subfield to field:', fieldId);
+
+    // Get user_id from token
+    const userId = getUserIdFromToken(req);
+    if (!userId) {
+      res.status(401).json({ message: 'Token không hợp lệ hoặc không tồn tại' });
+      return;
+    }
+
+    // Validate input
+    if (!name) {
+      res.status(400).json({ error: "Name is required" });
+      return;
+    }
+
+    // Check if field exists and belongs to this user
+    const checkQuery = `
+      SELECT f.field_id, f.owner_id, o.user_id 
+      FROM fibo.fields f
+      INNER JOIN fibo.owners o ON f.owner_id = o.owner_id
+      WHERE f.field_id = ? AND o.user_id = ?
+    `;
+
+    const [checkResult] = await pool.execute(checkQuery, [fieldId, userId]);
+    const fields = checkResult as any[];
+
+    if (fields.length === 0) {
+      res.status(404).json({ message: 'Không tìm thấy sân hoặc bạn không có quyền chỉnh sửa' });
+      return;
+    }
+
+    // Insert new subfield
+    const [result] = await pool.execute(
+      "INSERT INTO fibo.subfields (field_id, name, status) VALUES (?, ?, 'available')",
+      [fieldId, name]
+    );
+
+    const insertId = (result as any).insertId;
+
+    // Get the newly created subfield
+    const [rows] = await pool.execute(
+      "SELECT * FROM fibo.subfields WHERE sub_field_id = ?",
+      [insertId]
+    );
+
+    console.log('[addFieldSubField] Subfield created with ID:', insertId);
+
+    res.status(201).json((rows as any[])[0]);
+  } catch (error: any) {
+    console.error('[addFieldSubField] Error:', error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Update a subfield's details
+export const updateFieldSubField = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { fieldId, subFieldId } = req.params;
+    const { name, status } = req.body;
+
+    console.log('[updateFieldSubField] Updating subfield:', subFieldId, 'of field:', fieldId);
+
+    // Get user_id from token
+    const userId = getUserIdFromToken(req);
+    if (!userId) {
+      res.status(401).json({ message: 'Token không hợp lệ hoặc không tồn tại' });
+      return;
+    }
+
+    // Check if field exists and belongs to this user
+    const checkQuery = `
+      SELECT f.field_id, f.owner_id, o.user_id 
+      FROM fibo.fields f
+      INNER JOIN fibo.owners o ON f.owner_id = o.owner_id
+      WHERE f.field_id = ? AND o.user_id = ?
+    `;
+
+    const [checkResult] = await pool.execute(checkQuery, [fieldId, userId]);
+    const fields = checkResult as any[];
+
+    if (fields.length === 0) {
+      res.status(404).json({ message: 'Không tìm thấy sân hoặc bạn không có quyền chỉnh sửa' });
+      return;
+    }
+
+    // Build update query dynamically based on provided fields
+    const updateFields: string[] = [];
+    const updateValues: any[] = [];
+
+    if (name !== undefined) {
+      updateFields.push('name = ?');
+      updateValues.push(name);
+    }
+
+    if (status !== undefined) {
+      if (!['available', 'unavailable'].includes(status)) {
+        res.status(400).json({ error: "Trạng thái không hợp lệ" });
+        return;
+      }
+      updateFields.push('status = ?');
+      updateValues.push(status);
+    }
+
+    if (updateFields.length === 0) {
+      res.status(400).json({ error: "Không có dữ liệu để cập nhật" });
+      return;
+    }
+
+    updateValues.push(subFieldId, fieldId);
+
+    // Update subfield
+    const [result]: any = await pool.execute(
+      `UPDATE fibo.subfields SET ${updateFields.join(', ')} WHERE sub_field_id = ? AND field_id = ?`,
+      updateValues
+    );
+
+    if (result.affectedRows === 0) {
+      res.status(404).json({ error: "Không tìm thấy sân con" });
+      return;
+    }
+
+    console.log('[updateFieldSubField] Subfield updated successfully');
+
+    // Get the updated subfield
+    const [rows] = await pool.execute(
+      "SELECT * FROM fibo.subfields WHERE sub_field_id = ?",
+      [subFieldId]
+    );
+
+    res.status(200).json((rows as any[])[0]);
+  } catch (error: any) {
+    console.error('[updateFieldSubField] Error:', error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Delete a subfield
+export const deleteFieldSubField = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { fieldId, subFieldId } = req.params;
+
+    console.log('[deleteFieldSubField] Deleting subfield:', subFieldId, 'from field:', fieldId);
+
+    // Get user_id from token
+    const userId = getUserIdFromToken(req);
+    if (!userId) {
+      res.status(401).json({ message: 'Token không hợp lệ hoặc không tồn tại' });
+      return;
+    }
+
+    // Check if field exists and belongs to this user
+    const checkQuery = `
+      SELECT f.field_id, f.owner_id, o.user_id 
+      FROM fibo.fields f
+      INNER JOIN fibo.owners o ON f.owner_id = o.owner_id
+      WHERE f.field_id = ? AND o.user_id = ?
+    `;
+
+    const [checkResult] = await pool.execute(checkQuery, [fieldId, userId]);
+    const fields = checkResult as any[];
+
+    if (fields.length === 0) {
+      res.status(404).json({ message: 'Không tìm thấy sân hoặc bạn không có quyền chỉnh sửa' });
+      return;
+    }
+
+    // Delete the subfield
+    const [result]: any = await pool.execute(
+      "DELETE FROM fibo.subfields WHERE sub_field_id = ? AND field_id = ?",
+      [subFieldId, fieldId]
+    );
+
+    if (result.affectedRows === 0) {
+      res.status(404).json({ error: "Không tìm thấy sân con" });
+      return;
+    }
+
+    console.log('[deleteFieldSubField] Subfield deleted successfully');
+
+    res.status(200).json({ message: "Đã xóa sân con thành công" });
+  } catch (error: any) {
+    console.error('[deleteFieldSubField] Error:', error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// ======================= FIELD-BASED SERVICE MANAGEMENT =======================
+
+// Add a new service to a field
+export const addFieldService = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { fieldId } = req.params;
+    const { name, price, description } = req.body;
+
+    console.log('[addFieldService] Adding new service to field:', fieldId);
+
+    // Get user_id from token
+    const userId = getUserIdFromToken(req);
+    if (!userId) {
+      res.status(401).json({ message: 'Token không hợp lệ hoặc không tồn tại' });
+      return;
+    }
+
+    // Validate input
+    if (!name) {
+      res.status(400).json({ error: "Name is required" });
+      return;
+    }
+
+    // Check if field exists and belongs to this user
+    const checkQuery = `
+      SELECT f.field_id, f.owner_id, o.user_id 
+      FROM fibo.fields f
+      INNER JOIN fibo.owners o ON f.owner_id = o.owner_id
+      WHERE f.field_id = ? AND o.user_id = ?
+    `;
+
+    const [checkResult] = await pool.execute(checkQuery, [fieldId, userId]);
+    const fields = checkResult as any[];
+
+    if (fields.length === 0) {
+      res.status(404).json({ message: 'Không tìm thấy sân hoặc bạn không có quyền chỉnh sửa' });
+      return;
+    }
+
+    // Parse service price
+    const servicePrice = parseFloat(price?.toString() || '0') || 0;
+
+    // Insert new service
+    const [result] = await pool.execute(
+      "INSERT INTO fibo.services (field_id, name, price, description, status) VALUES (?, ?, ?, ?, 'available')",
+      [fieldId, name, servicePrice, description || '']
+    );
+
+    const insertId = (result as any).insertId;
+
+    // Get the newly created service
+    const [rows] = await pool.execute(
+      "SELECT * FROM fibo.services WHERE service_id = ?",
+      [insertId]
+    );
+
+    console.log('[addFieldService] Service created with ID:', insertId);
+
+    res.status(201).json((rows as any[])[0]);
+  } catch (error: any) {
+    console.error('[addFieldService] Error:', error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Update a service's details
+export const updateFieldService = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { fieldId, serviceId } = req.params;
+    const { name, price, description, status } = req.body;
+
+    console.log('[updateFieldService] Updating service:', serviceId, 'of field:', fieldId);
+
+    // Get user_id from token
+    const userId = getUserIdFromToken(req);
+    if (!userId) {
+      res.status(401).json({ message: 'Token không hợp lệ hoặc không tồn tại' });
+      return;
+    }
+
+    // Check if field exists and belongs to this user
+    const checkQuery = `
+      SELECT f.field_id, f.owner_id, o.user_id 
+      FROM fibo.fields f
+      INNER JOIN fibo.owners o ON f.owner_id = o.owner_id
+      WHERE f.field_id = ? AND o.user_id = ?
+    `;
+
+    const [checkResult] = await pool.execute(checkQuery, [fieldId, userId]);
+    const fields = checkResult as any[];
+
+    if (fields.length === 0) {
+      res.status(404).json({ message: 'Không tìm thấy sân hoặc bạn không có quyền chỉnh sửa' });
+      return;
+    }
+
+    // Build update query dynamically based on provided fields
+    const updateFields: string[] = [];
+    const updateValues: any[] = [];
+
+    if (name !== undefined) {
+      updateFields.push('name = ?');
+      updateValues.push(name);
+    }
+
+    if (price !== undefined) {
+      updateFields.push('price = ?');
+      updateValues.push(parseFloat(price?.toString() || '0') || 0);
+    }
+
+    if (description !== undefined) {
+      updateFields.push('description = ?');
+      updateValues.push(description);
+    }
+
+    if (status !== undefined) {
+      if (!['available', 'unavailable'].includes(status)) {
+        res.status(400).json({ error: "Trạng thái không hợp lệ" });
+        return;
+      }
+      updateFields.push('status = ?');
+      updateValues.push(status);
+    }
+
+    if (updateFields.length === 0) {
+      res.status(400).json({ error: "Không có dữ liệu để cập nhật" });
+      return;
+    }
+
+    updateValues.push(serviceId, fieldId);
+
+    // Update service
+    const [result]: any = await pool.execute(
+      `UPDATE fibo.services SET ${updateFields.join(', ')} WHERE service_id = ? AND field_id = ?`,
+      updateValues
+    );
+
+    if (result.affectedRows === 0) {
+      res.status(404).json({ error: "Không tìm thấy dịch vụ" });
+      return;
+    }
+
+    console.log('[updateFieldService] Service updated successfully');
+
+    // Get the updated service
+    const [rows] = await pool.execute(
+      "SELECT * FROM fibo.services WHERE service_id = ?",
+      [serviceId]
+    );
+
+    res.status(200).json((rows as any[])[0]);
+  } catch (error: any) {
+    console.error('[updateFieldService] Error:', error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Delete a service
+export const deleteFieldService = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { fieldId, serviceId } = req.params;
+
+    console.log('[deleteFieldService] Deleting service:', serviceId, 'from field:', fieldId);
+
+    // Get user_id from token
+    const userId = getUserIdFromToken(req);
+    if (!userId) {
+      res.status(401).json({ message: 'Token không hợp lệ hoặc không tồn tại' });
+      return;
+    }
+
+    // Check if field exists and belongs to this user
+    const checkQuery = `
+      SELECT f.field_id, f.owner_id, o.user_id 
+      FROM fibo.fields f
+      INNER JOIN fibo.owners o ON f.owner_id = o.owner_id
+      WHERE f.field_id = ? AND o.user_id = ?
+    `;
+
+    const [checkResult] = await pool.execute(checkQuery, [fieldId, userId]);
+    const fields = checkResult as any[];
+
+    if (fields.length === 0) {
+      res.status(404).json({ message: 'Không tìm thấy sân hoặc bạn không có quyền chỉnh sửa' });
+      return;
+    }
+
+    // Delete the service
+    const [result]: any = await pool.execute(
+      "DELETE FROM fibo.services WHERE service_id = ? AND field_id = ?",
+      [serviceId, fieldId]
+    );
+
+    if (result.affectedRows === 0) {
+      res.status(404).json({ error: "Không tìm thấy dịch vụ" });
+      return;
+    }
+
+    console.log('[deleteFieldService] Service deleted successfully');
+
+    res.status(200).json({ message: "Đã xóa dịch vụ thành công" });
+  } catch (error: any) {
+    console.error('[deleteFieldService] Error:', error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// ======================= FIELD-BASED TIME SLOT MANAGEMENT =======================
+
+// Add a new time slot pricing for a field
+export const addFieldTimeSlot = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { fieldId } = req.params;
+    const { slot_id, price } = req.body;
+
+    console.log('[addFieldTimeSlot] Adding time slot pricing to field:', fieldId);
+
+    // Get user_id from token
+    const userId = getUserIdFromToken(req);
+    if (!userId) {
+      res.status(401).json({ message: 'Token không hợp lệ hoặc không tồn tại' });
+      return;
+    }
+
+    // Validate input
+    if (!slot_id || price === undefined) {
+      res.status(400).json({ error: "Slot ID and price are required" });
+      return;
+    }
+
+    // Check if field exists and belongs to this user
+    const checkQuery = `
+      SELECT f.field_id, f.owner_id, o.user_id 
+      FROM fibo.fields f
+      INNER JOIN fibo.owners o ON f.owner_id = o.owner_id
+      WHERE f.field_id = ? AND o.user_id = ?
+    `;
+
+    const [checkResult] = await pool.execute(checkQuery, [fieldId, userId]);
+    const fields = checkResult as any[];
+
+    if (fields.length === 0) {
+      res.status(404).json({ message: 'Không tìm thấy sân hoặc bạn không có quyền chỉnh sửa' });
+      return;
+    }
+
+    // Parse slot price
+    const slotPrice = parseFloat(price?.toString() || '0') || 0;
+
+    // Insert new time slot pricing (or update if exists)
+    const insertQuery = `
+      INSERT INTO fibo.field_prices (field_id, slot_id, price)
+      VALUES (?, ?, ?)
+      ON DUPLICATE KEY UPDATE price = VALUES(price)
+    `;
+
+    await pool.execute(insertQuery, [fieldId, slot_id, slotPrice]);
+
+    // Get the time slot with pricing info
+    const [rows] = await pool.execute(
+      `SELECT ts.slot_id, ts.start_time, ts.end_time, fp.price 
+       FROM fibo.timeslots ts 
+       JOIN fibo.field_prices fp ON ts.slot_id = fp.slot_id 
+       WHERE fp.field_id = ? AND fp.slot_id = ?`,
+      [fieldId, slot_id]
+    );
+
+    console.log('[addFieldTimeSlot] Time slot pricing added/updated for slot:', slot_id);
+
+    res.status(201).json((rows as any[])[0]);
+  } catch (error: any) {
+    console.error('[addFieldTimeSlot] Error:', error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Delete time slot pricing for a field
+export const deleteFieldTimeSlot = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { fieldId, slotId } = req.params;
+
+    console.log('[deleteFieldTimeSlot] Deleting time slot pricing:', slotId, 'from field:', fieldId);
+
+    // Get user_id from token
+    const userId = getUserIdFromToken(req);
+    if (!userId) {
+      res.status(401).json({ message: 'Token không hợp lệ hoặc không tồn tại' });
+      return;
+    }
+
+    // Check if field exists and belongs to this user
+    const checkQuery = `
+      SELECT f.field_id, f.owner_id, o.user_id 
+      FROM fibo.fields f
+      INNER JOIN fibo.owners o ON f.owner_id = o.owner_id
+      WHERE f.field_id = ? AND o.user_id = ?
+    `;
+
+    const [checkResult] = await pool.execute(checkQuery, [fieldId, userId]);
+    const fields = checkResult as any[];
+
+    if (fields.length === 0) {
+      res.status(404).json({ message: 'Không tìm thấy sân hoặc bạn không có quyền chỉnh sửa' });
+      return;
+    }
+
+    // Delete the time slot pricing
+    const [result]: any = await pool.execute(
+      "DELETE FROM fibo.field_prices WHERE field_id = ? AND slot_id = ?",
+      [fieldId, slotId]
+    );
+
+    if (result.affectedRows === 0) {
+      res.status(404).json({ error: "Không tìm thấy giá khung giờ" });
+      return;
+    }
+
+    console.log('[deleteFieldTimeSlot] Time slot pricing deleted successfully');
+
+    res.status(200).json({ message: "Đã xóa giá khung giờ thành công" });
+  } catch (error: any) {
+    console.error('[deleteFieldTimeSlot] Error:', error);
+    res.status(500).json({ error: "Internal server error" });
   }
 };

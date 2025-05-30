@@ -26,7 +26,7 @@ interface FieldImage {
 }
 
 interface SubField {
-  subfield_id: number;
+  sub_field_id: number;
   field_id: number;
   name: string;
   status?: string;
@@ -167,8 +167,11 @@ export default function FieldInfo() {
       });
 
       if (response.ok) {
-        return await response.json();
+        const data = await response.json();
+        console.log('Subfields fetched in field-info:', data);
+        return data;
       }
+      console.error('Failed to fetch subfields:', response.status, response.statusText);
       return [];
     } catch (error) {
       console.error('Error fetching sub-fields:', error);
@@ -192,8 +195,7 @@ export default function FieldInfo() {
       console.error('Error fetching services:', error);
       return [];
     }
-  };
-  const fetchTimeSlots = async (fieldId: string, token: string): Promise<TimeSlot[]> => {
+  }; const fetchTimeSlots = async (fieldId: string, token: string): Promise<TimeSlot[]> => {
     try {
       const response = await fetch(`${API_URL}/courts/${fieldId}/time-slots`, {
         headers: {
@@ -202,8 +204,15 @@ export default function FieldInfo() {
         },
       });
 
+      console.log('Time slots API response status:', response.status);
       if (response.ok) {
-        return await response.json();
+        const data = await response.json();
+        console.log('Time slots data received:', data);
+        return data;
+      } else {
+        console.error('Time slots API failed with status:', response.status);
+        const errorText = await response.text();
+        console.error('Error response text:', errorText);
       }
       return [];
     } catch (error) {
@@ -231,8 +240,8 @@ export default function FieldInfo() {
       setReviews([]);
     }
   }; const getImageUrl = (imageName: string) => {
-    // Tạo URL cho ảnh dựa trên tên file
-    return `${API_URL}/fields/${imageName}`;
+    // Tạo URL cho ảnh dựa trên tên file và thêm cache-busting parameter
+    return `${API_URL}/fields/${imageName}?t=${Date.now()}`;
   };
   const getSportTypeText = (sportType: string) => {
     const sportTypes: { [key: string]: string } = {
@@ -476,12 +485,11 @@ export default function FieldInfo() {
           <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Thông tin sân</Text>        <TouchableOpacity
-          style={styles.editButton}
-          onPress={() => {
+          style={styles.editButton} onPress={() => {
             console.log('Edit button pressed, fieldId:', fieldId);
             router.push({
               pathname: './update-field-info',
-              params: { fieldId: fieldId }
+              params: { id: fieldId }
             });
           }}
         >
@@ -644,20 +652,19 @@ export default function FieldInfo() {
                 <Text style={styles.subFieldsCount}>
                   Tổng số: {fieldData.subFields.length} sân con
                 </Text>
-                <View style={styles.subFieldsList}>
-                  {fieldData.subFields.map((subField, index) => (
-                    <View key={subField.subfield_id} style={styles.subFieldItem}>
-                      <Text style={styles.subFieldName}>{subField.name}</Text>
-                      <View style={[
-                        styles.subFieldStatus,
-                        { backgroundColor: subField.status === 'available' ? '#10B981' : '#EF4444' }
-                      ]}>
-                        <Text style={styles.subFieldStatusText}>
-                          {subField.status === 'available' ? 'Hoạt động' : 'Ngừng hoạt động'}
-                        </Text>
-                      </View>
+                <View style={styles.subFieldsList}>                  {fieldData.subFields.map((subField, index) => (
+                  <View key={subField.sub_field_id} style={styles.subFieldItem}>
+                    <Text style={styles.subFieldName}>{subField.name}</Text>
+                    <View style={[
+                      styles.subFieldStatus,
+                      { backgroundColor: subField.status === 'available' ? '#10B981' : '#EF4444' }
+                    ]}>
+                      <Text style={styles.subFieldStatusText}>
+                        {subField.status === 'available' ? 'Hoạt động' : 'Ngừng hoạt động'}
+                      </Text>
                     </View>
-                  ))}
+                  </View>
+                ))}
                 </View>
               </View>
             ) : (
